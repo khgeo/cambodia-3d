@@ -2,8 +2,8 @@
 // field of 3D grass / rice clumps that follows the viewer.
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mulberry32 } from './geo.js';
-import { makeGrassMaterial } from './shaders.js';
+import { mulberry32 } from './geo.js?v=2';
+import { makeGrassMaterial } from './shaders.js?v=2';
 
 function blob(sx, sy, sz, y, seed, detail = 1) {
   const g = mergeVertices(new THREE.IcosahedronGeometry(1, detail)), p = g.attributes.position, r = mulberry32(seed);
