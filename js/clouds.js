@@ -51,7 +51,14 @@ export async function fillClouds({ ictx, W, H, ir, zi, source, say }) {
   let m = new Uint8Array(N);
   for (let i = 0, p = 0; i < N; i++, p += 4) if (isCloud(d[p], d[p + 1], d[p + 2])) m[i] = 255;
   let e = boxBlur(m, W, H, 4); for (let i = 0; i < N; i++) e[i] = e[i] >= 250 ? 255 : 0;
-  m = boxBlur(e, W, H, 7); for (let i = 0; i < N; i++) m[i] = m[i] > 0 ? 255 : 0;
+  // grow into the thinner, darker cloud margins and haze around the cores
+  const nearCore = boxBlur(e, W, H, 60);
+  for (let i = 0, p = 0; i < N; i++, p += 4) {
+    if (e[i] || !nearCore[i]) continue;
+    const r = d[p], g = d[p + 1], b = d[p + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (r + g + b > 380 && mx - mn < 0.22 * mx + 8) e[i] = 255;
+  }
+  m = boxBlur(e, W, H, 10); for (let i = 0; i < N; i++) m[i] = m[i] > 0 ? 255 : 0;
   e = null;
   const ntx = W / 256, nty = H / 256, cloudy = [];
   let cloudPx = 0;
@@ -132,6 +139,11 @@ export async function fillClouds({ ictx, W, H, ir, zi, source, say }) {
     done++; say(`Filling clouds ${done}/${cloudy.length}…`);
   });
 
+  // heavily clouded tiles with a clear replacement are swapped whole (no half-transparent smudges)
+  for (const t of cloudy) {
+    const f = fills.get(t.tx + ',' + t.ty);
+    if (f && f.clearOk && t.frac > 0.35) for (let y = 0; y < 256; y++) m.fill(255, (t.ty * 256 + y) * W + t.tx * 256, (t.ty * 256 + y) * W + t.tx * 256 + 256);
+  }
   // 3. cloud shadows: near clouds and much darker than the replacement
   const near = boxBlur(m, W, H, 40);
   for (const t of cloudy) {
