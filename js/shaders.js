@@ -152,7 +152,7 @@ diffuseColor.rgb *= col;`);
 
 /* ---------- water: opaque, colour by depth over the carved terrain, shoreline foam ---------- */
 export function makeWaterMaterial(normalMap, u) {
-  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.06, metalness: 0.05, normalMap, normalScale: new THREE.Vector2(0.3, 0.3), side: THREE.DoubleSide });
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.12, metalness: 0.0, normalMap, normalScale: new THREE.Vector2(0.3, 0.3), side: THREE.DoubleSide, envMapIntensity: 0.2 });
   m.onBeforeCompile = sh => {
     Object.assign(sh.uniforms, u);
     sh.vertexShader = sh.vertexShader
@@ -167,19 +167,22 @@ float depth = vWW.y - texture2D(uHgt, suv).r;
 vec3 img = texture2D(uImg, vec2(uImgA.x * vWW.x + uImgA.y, uImgA.z * vWW.z + uImgA.w)).rgb;
 vec3 deep = mix(img * 0.55, vec3(0.025, 0.06, 0.07), 0.55);
 vec3 col = mix(img * 0.92, deep, smoothstep(0.05, 2.2, depth));
+float reflK = 0.0; vec3 reflAdd = vec3(0.0);
 if (uReflOn > 0.5) { // planar reflection, rippled by the normal map, Fresnel-weighted
   vec4 rc = uTexMat * vec4(vWW, 1.0);
   vec2 rip = (texture2D(normalMap, vNormalMapUv).xy - 0.5) * 0.05;
   vec3 refl = texture2D(uRefl, rc.xy / rc.w + rip).rgb;
   vec3 vdir = normalize(cameraPosition - vWW);
   float fres = 0.1 + 0.9 * pow(1.0 - clamp(vdir.y, 0.0, 1.0), 4.0);
-  col = mix(col, refl, clamp(fres * 0.85 + 0.3, 0.0, 0.92) * smoothstep(0.04, 0.35, depth));
+  reflK = clamp(fres * 0.85 + 0.3, 0.0, 0.92) * smoothstep(0.04, 0.35, depth);
+  reflAdd = refl * reflK;          // added as emitted light so the lighting/env specular doesn't wash it out
 }
 float foam = (1.0 - smoothstep(0.0, 0.18, depth)) * (0.6 + 0.4 * sin(uTime * 1.7 + vWW.x * 0.9 + vWW.z * 0.7));
 col += vec3(0.22) * foam;
-diffuseColor.rgb = col;`);
+diffuseColor.rgb = col * (1.0 - reflK);`)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += reflAdd;');
   };
-  m.customProgramCacheKey = () => 'water-v3';
+  m.customProgramCacheKey = () => 'water-v4';
   return m;
 }
 

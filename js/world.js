@@ -5,14 +5,14 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=9';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=9';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=9';
-import { buildTrees, GrassField } from './vegetation.js?v=9';
-import { RoadNet, Driver, Walker } from './modes.js?v=9';
-import { vehicleKit } from './vehicles.js?v=9';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=9';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=9';
+import * as G from './geo.js?v=10';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=10';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=10';
+import { buildTrees, GrassField } from './vegetation.js?v=10';
+import { RoadNet, Driver, Walker } from './modes.js?v=10';
+import { vehicleKit } from './vehicles.js?v=10';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=10';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=10';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
