@@ -146,33 +146,63 @@ map.on('style.load', applyHash); map.on('load', applyHash); map.on('idle', apply
 
 /* ---------------- 3D ---------------- */
 const progress = t => { $('progress').hidden = !t; $('progressText').textContent = t; };
+let t0 = 0, busy = false;
+function renderStats() {
+  const s = world.D.stats, tr = s.trees || {}, nT = (tr.round || 0) + (tr.tall || 0) + (tr.wide || 0), nP = (tr.sugar || 0) + (tr.coco || 0);
+  $('stats').innerHTML = `${s.roads} road segments · ${s.buildings} buildings · ${nT} trees, ${nP} palms, ${tr.bush || 0} bushes · ${s.vehicles || 0} vehicles<br>` +
+    `Elevation ${s.elev[0].toFixed(0)}–${s.elev[1].toFixed(0)} m (×${s.exag}) · imagery zoom ${s.imageryZoom}` + (s.waterDropped ? ` · ${s.waterDropped} seasonal/dry water polygons hidden` : '') +
+    ` · ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+  const L = world.lulc, cols = { tree: '#2c5a28', crop: '#86a84a', bare: '#b0703f', built: '#b8b2a6', water: '#3b6e8f' }, names = { tree: 'Tree canopy', crop: 'Crop / grass', bare: 'Bare soil', built: 'Built / roads', water: 'Water' };
+  $('lulc').innerHTML = '<label class="lbl">Land cover seen on the image</label><div class="bar2">' +
+    Object.keys(cols).map(k => `<span style="width:${(L[k] * 100).toFixed(1)}%;background:${cols[k]}"></span>`).join('') + '</div><div class="keys">' +
+    Object.keys(cols).map(k => `<div><i style="background:${cols[k]}"></i>${names[k]} ${(L[k] * 100).toFixed(0)}%</div>`).join('') + '</div>';
+  $('credit').innerHTML = `${world.credit} · Terrain: Mapzen/AWS Terrain Tiles · ${OSM_CREDIT} · Geoinformatics and Research Lab, RUPP`;
+}
+async function rebuild() {
+  if (busy) return; busy = true; t0 = performance.now();
+  try { await world.construct({ exaggeration: +$('terrainH').value, smooth: $('smooth').checked }, progress); renderStats(); }
+  catch (e) { console.error(e); progress('Failed: ' + e.message); setTimeout(() => progress(''), 6000); }
+  busy = false; progress('');
+  document.querySelectorAll('#scenePanel [data-k]').forEach(c => world.setVisible(c.dataset.k, c.checked));
+}
+function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => b.classList.toggle('on', b.dataset.v === v)); }
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
-  if (!world) { progress('Starting 3D engine…'); const { World } = await import('./world.js'); world = new World($('scene')); }
+  if (!world) {
+    progress('Starting 3D engine…'); const { World } = await import('./world.js'); world = new World($('scene')); window.__world = world;
+    world.onModeChange = m => {
+      $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk';
+      if (m === 'drive' || m === 'walk') { setOn('views', m); if (innerWidth < 900) $('scenePanel').classList.add('hidden'); }
+    };
+    world.onHint = t => { $('driveHint').textContent = t; };
+    const { joystick } = await import('./modes.js'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+  }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
   $('aoiTitle').textContent = `${wk.toFixed(1)} × ${hk.toFixed(1)} km · ${((aoi.s + aoi.n) / 2).toFixed(4)}°N ${((aoi.w + aoi.e) / 2).toFixed(4)}°E`;
-  document.querySelectorAll('#views button').forEach((b, i) => b.classList.toggle('on', i === 0));
-  document.querySelectorAll('#ground button').forEach((b, i) => b.classList.toggle('on', i === 0));
-  document.querySelectorAll('#scenePanel [data-k]').forEach(c => c.checked = true);
-  try {
-    const t0 = performance.now();
-    const res = await world.build(aoi, { imagery: basemap, exaggeration: +$('exag').value }, progress);
-    const s = res.stats;
-    $('stats').innerHTML = `${s.roads} road segments · ${s.buildings} buildings · ${s.trees} trees + ${s.palms} palms · ${s.vehicles || 0} vehicles<br>` +
-      `Elevation ${s.elev[0].toFixed(0)}–${s.elev[1].toFixed(0)} m (×${$('exag').value}) · imagery zoom ${s.imageryZoom} · built in ${((performance.now() - t0) / 1000).toFixed(1)} s`;
-    const L = world.lulc, cols = { tree: '#2c5a28', crop: '#86a84a', bare: '#b0703f', built: '#b8b2a6', water: '#3b6e8f' }, names = { tree: 'Tree canopy', crop: 'Crop / grass', bare: 'Bare soil', built: 'Built / other', water: 'Water' };
-    $('lulc').innerHTML = '<label class="lbl">Land cover seen on the image</label><div class="bar">' +
-      Object.keys(cols).map(k => `<span style="width:${(L[k] * 100).toFixed(1)}%;background:${cols[k]}"></span>`).join('') + '</div><div class="keys">' +
-      Object.keys(cols).map(k => `<div><i style="background:${cols[k]}"></i>${names[k]} ${(L[k] * 100).toFixed(0)}%</div>`).join('') + '</div>';
-    $('credit').innerHTML = `${world.credit} · Terrain: Mapzen/AWS Terrain Tiles · ${OSM_CREDIT} · Geoinformatics and Research Lab, RUPP`;
-  } catch (e) { console.error(e); progress('Failed: ' + e.message); setTimeout(() => progress(''), 6000); return; }
-  progress('');
+  setOn('views', 'overview'); setOn('ground', 'sat');
+  try { t0 = performance.now(); await world.load(aoi, { imagery: basemap }, progress); }
+  catch (e) { console.error(e); progress('Failed: ' + e.message); setTimeout(() => progress(''), 6000); return; }
+  await rebuild();
 };
-$('back').onclick = () => { $('sceneView').hidden = true; $('mapView').hidden = false; if (world) world.paused = true; map.resize(); };
-seg('views', v => world && world.goView(v));
-seg('ground', v => world && world.setGround(v === 'sat' ? 'sat' : v));
+$('back').onclick = () => { if (world) { world.setMode('orbit'); world.paused = true; } $('sceneView').hidden = true; $('mapView').hidden = false; map.resize(); };
+seg('views', v => {
+  if (!world) return;
+  if (v === 'drive') world.enterDrive(); else if (v === 'walk') world.setMode('walk'); else world.goView(v);
+});
+seg('ground', v => world && world.setGround(v));
 document.querySelectorAll('#scenePanel [data-k]').forEach(c => c.onchange = () => world && world.setVisible(c.dataset.k, c.checked));
 $('sun').oninput = e => world && world.setSun(+e.target.value, false);
 $('sun').onchange = e => world && world.setSun(+e.target.value, true);
+$('terrainH').oninput = e => { $('terrainVal').textContent = '×' + e.target.value; };
+$('terrainH').onchange = () => world && world.D && rebuild();
+$('smooth').onchange = () => world && world.D && rebuild();
+// drive controls
+$('vehicle').onchange = e => world && world.changeVehicle(e.target.value);
+$('speed').oninput = e => { $('speedVal').textContent = e.target.value + ' km/h'; if (world && world.driver) world.driver.speed = e.target.value / 3.6; };
+$('reverse').onclick = () => world && world.driver && world.driver.reverse();
+$('cockpit').onclick = e => { if (!world) return; world.cockpit = !world.cockpit; e.target.classList.toggle('on2', world.cockpit); };
+$('pickRoad').onclick = () => world && world.chooseRoad();
+$('run').onclick = e => { if (!world) return; world.walker.run = !world.walker.run; e.target.classList.toggle('on2', world.walker.run); };
+document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.setMode('orbit'); setOn('views', ''); $('scenePanel').classList.remove('hidden'); });
 if (innerWidth < 640) { $('mapPanel').classList.add('hidden'); }

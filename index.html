@@ -41,10 +41,6 @@
       <span>Square size</span>
       <select id="aoiSize"><option value="0.5">0.5 km</option><option value="1">1 km</option><option value="2" selected>2 km</option><option value="3">3 km</option><option value="4">4 km</option></select>
     </div>
-    <div class="row">
-      <span>Terrain exaggeration</span>
-      <select id="exag"><option value="1">×1</option><option value="1.5" selected>×1.5</option><option value="2">×2</option><option value="3">×3</option></select>
-    </div>
     <div id="aoiInfo" class="info">Tap the map to place an area.</div>
     <button id="build" class="primary" disabled>Build 3D landscape ▶</button>
     <div class="legend">
@@ -65,22 +61,43 @@
       <h1 id="aoiTitle">3D landscape</h1>
     </div>
     <div class="seg" id="views">
-      <button data-v="overview" class="on">Overview</button><button data-v="oblique">Oblique</button><button data-v="street">Low</button><button data-v="drive">Drive</button>
+      <button data-v="overview" class="on">Overview</button><button data-v="oblique">Oblique</button><button data-v="street">Low</button><button data-v="drive">🚗 Drive</button><button data-v="walk">🚶 Walk</button>
     </div>
     <label class="lbl">Ground</label>
     <div class="seg" id="ground">
       <button data-v="sat" class="on">Satellite</button><button data-v="enhanced">Enhanced</button><button data-v="lulc">Stylised LULC</button>
     </div>
+    <label class="lbl">Terrain height <b id="terrainVal">×1.5</b></label>
+    <input type="range" id="terrainH" min="0" max="3" step="0.25" value="1.5" class="wide">
+    <div class="row checks">
+      <label><input type="checkbox" id="smooth" checked> Smooth terrain &amp; grade roads</label>
+    </div>
     <div class="row checks">
       <label><input type="checkbox" data-k="trees" checked> Trees</label>
       <label><input type="checkbox" data-k="buildings" checked> Buildings</label>
       <label><input type="checkbox" data-k="traffic" checked> Traffic</label>
+      <label><input type="checkbox" data-k="detail" checked> Ground detail &amp; grass</label>
       <label><input type="checkbox" data-k="shadows" checked> Shadows</label>
     </div>
     <label class="lbl">Sun <input type="range" id="sun" min="4" max="80" value="38"></label>
     <div id="lulc"></div>
     <div id="stats" class="info"></div>
   </div>
+  <div id="driveBar" class="bar" hidden>
+    <div class="hint" id="driveHint">Tap a road to start driving on it.</div>
+    <div class="row">
+      <select id="vehicle"><option value="car">Car</option><option value="moto">Motorbike</option><option value="tuktuk">Tuk-tuk</option><option value="truck">Truck</option><option value="bus">Bus</option></select>
+      <label class="spd">Speed <input type="range" id="speed" min="5" max="100" value="40"> <b id="speedVal">40 km/h</b></label>
+    </div>
+    <div class="row">
+      <button id="reverse">⇄ Turn around</button><button id="cockpit">👁 Cockpit</button><button id="pickRoad">📍 Choose road</button><button class="exit" data-exit>✕ Exit</button>
+    </div>
+  </div>
+  <div id="walkBar" class="bar" hidden>
+    <div class="hint">Drag to look · joystick or WASD / arrows to walk · tap the ground to jump there</div>
+    <div class="row"><button id="run">🏃 Run</button><button class="exit" data-exit>✕ Exit</button></div>
+  </div>
+  <div id="joy" class="joy" hidden><div class="knob"></div></div>
   <button class="fab" id="sceneToggle" aria-label="Panel">☰</button>
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>

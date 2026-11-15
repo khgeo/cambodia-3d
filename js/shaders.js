@@ -111,3 +111,83 @@ if (vWall.z > 0.5) {
   m.customProgramCacheKey = () => 'bldg-v1';
   return m;
 }
+
+/* ---------- terrain: satellite drape + near-camera detail splatting + rice-field bunds ---------- */
+export function makeTerrainMaterial(map, u) {
+  const m = new THREE.MeshStandardMaterial({ map, roughness: 0.95 });
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWT;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvWT = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vWT; uniform sampler2D uSplat, uGrass, uRice, uSoil, uGravel; uniform vec4 uGrid; uniform vec2 uTexel; uniform float uDetailOn;`)
+      .replace('#include <map_fragment>', `
+vec4 sat = texture2D(map, vMapUv);
+vec3 col = sat.rgb;
+float dist = length(vWT - cameraPosition);
+float k = (1.0 - smoothstep(35.0, 280.0, dist)) * uDetailOn;
+if (k > 0.002) {
+  vec2 suv = vec2((vWT.x - uGrid.x) / uGrid.z, (vWT.z - uGrid.y) / uGrid.w);
+  vec4 sp = texture2D(uSplat, suv);
+  float ws = sp.r + sp.g + sp.b + sp.a + 0.001;
+  vec2 w = vWT.xz;
+  float d = (texture2D(uGrass, w / 3.0).r * sp.r + texture2D(uRice, w / 2.4).r * sp.g
+           + texture2D(uSoil, w / 4.5).r * sp.b + texture2D(uGravel, w / 2.0).r * sp.a) / ws;
+  float d2 = (texture2D(uGrass, w / 11.0).r * (sp.r + sp.g) + texture2D(uSoil, w / 13.0).r * (sp.b + sp.a)) / ws;
+  d = mix(d, d2, smoothstep(30.0, 140.0, dist));
+  const vec3 LW = vec3(0.3, 0.59, 0.11);
+  float lx = dot(texture2D(map, vMapUv + vec2(uTexel.x, 0.0)).rgb - texture2D(map, vMapUv - vec2(uTexel.x, 0.0)).rgb, LW);
+  float ly = dot(texture2D(map, vMapUv + vec2(0.0, uTexel.y)).rgb - texture2D(map, vMapUv - vec2(0.0, uTexel.y)).rgb, LW);
+  float edge = smoothstep(0.025, 0.07, length(vec2(lx, ly))) * (sp.g / ws);
+  col *= mix(1.0, d * 2.0, k * 0.85);
+  col = mix(col, vec3(0.24, 0.20, 0.12), edge * k * 0.6);
+}
+diffuseColor.rgb *= col;`);
+  };
+  m.customProgramCacheKey = () => 'terrain-v2';
+  return m;
+}
+
+/* ---------- water: opaque, colour by depth over the carved terrain, shoreline foam ---------- */
+export function makeWaterMaterial(normalMap, u) {
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.06, metalness: 0.05, normalMap, normalScale: new THREE.Vector2(0.3, 0.3), side: THREE.DoubleSide });
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWW;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvWW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vWW; uniform sampler2D uHgt, uImg; uniform vec4 uGrid, uImgA; uniform float uTime;`)
+      .replace('#include <map_fragment>', `
+vec2 suv = vec2((vWW.x - uGrid.x) / uGrid.z, (vWW.z - uGrid.y) / uGrid.w);
+float depth = vWW.y - texture2D(uHgt, suv).r;
+vec3 img = texture2D(uImg, vec2(uImgA.x * vWW.x + uImgA.y, uImgA.z * vWW.z + uImgA.w)).rgb;
+vec3 deep = mix(img * 0.55, vec3(0.025, 0.06, 0.07), 0.55);
+vec3 col = mix(img * 0.92, deep, smoothstep(0.05, 2.2, depth));
+float foam = (1.0 - smoothstep(0.0, 0.18, depth)) * (0.6 + 0.4 * sin(uTime * 1.7 + vWW.x * 0.9 + vWW.z * 0.7));
+col += vec3(0.22) * foam;
+diffuseColor.rgb = col;`);
+  };
+  m.customProgramCacheKey = () => 'water-v2';
+  return m;
+}
+
+/* ---------- grass / rice blades with wind ---------- */
+export function makeGrassMaterial(u) {
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide });
+  m.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform float uTime;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+float sway = sin(uTime * 1.9 + ip.x * 0.35 + ip.z * 0.27) * 0.6 + sin(uTime * 3.1 + ip.x * 1.3) * 0.25;
+transformed.x += sway * 0.12 * position.y * position.y;
+transformed.z += sway * 0.06 * position.y * position.y;`);
+  };
+  m.customProgramCacheKey = () => 'grass-v2';
+  return m;
+}

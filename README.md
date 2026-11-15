@@ -23,6 +23,13 @@ Pick any area in Cambodia on a satellite map and turn it into a 3D scene. The sc
   - Traffic: motorbikes, cars, tuk-tuks, trucks and buses, with density by road class.
   - Ground styles: Satellite, Enhanced, or Stylised LULC, which is imagery-derived land cover (tree, crop/grass, bare soil, built, water) with a percentage summary.
 
+## Exploring the scene
+- **Terrain height** slider (×0 flat … ×3) and **Smooth terrain & grade roads**: these rebuild only the geometry, so they're fast. Roads get a smoothed long profile and the ground is shaped to meet them.
+- **Ground**: Satellite, Enhanced (haze removal, colour balance, contrast stretch, sharpening, done in JavaScript so it also works in Safari) or Stylised LULC.
+- **Ground detail & grass**: near the camera the ground gets grass, rice-row, cracked-soil and gravel detail chosen by land cover. Rice-field bunds are traced from edges in the image, and 3D grass and rice clumps sway in the wind.
+- **Drive**: tap any road. The vehicle follows the network and picks a turn at junctions. You can choose car, motorbike, tuk-tuk, truck or bus, set the speed, turn around, and switch between cockpit and chase camera.
+- **Walk**: first person anywhere, off-road too. Use the joystick or WASD/arrow keys, drag to look, and tap the ground to jump there. Buildings and water block you.
+
 ## Data
 `data/13/{x}/{y}.json` holds 8,951 compact tiles cut from `cambodia-261109_osm.pbf`. They contain roads, rail, waterways, water, land use and buildings, with coordinates delta-encoded in micro-degrees. To rebuild them from a newer PBF:
 
