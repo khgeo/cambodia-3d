@@ -30,9 +30,9 @@ export class Hud {
     if (this.root.hidden || !D || !mc || h.lat === undefined) return;
     const cv = this.canvas, ctx = cv.getContext('2d'), S = cv.width;
     // window size in metres: whole AOI in orbit view, close-up when walking/driving (tap ⊕ to change)
-    const auto = h.mode === 'walk' ? 260 : h.mode === 'drive' ? 700 : Math.max(D.W, D.H);
-    const win = [auto, 200, 600, Math.max(D.W, D.H)][this.zoom];
-    const cx = win >= Math.max(D.W, D.H) ? 0 : h.x, cz = win >= Math.max(D.W, D.H) ? 0 : h.z;
+    const auto = h.mode === 'walk' ? 260 : h.mode === 'drive' ? 700 : Math.max(D.W, D.H) * 1.2;
+    const win = [auto, 200, 600, Math.max(D.W, D.H) * 1.6][this.zoom];
+    const cx = h.x, cz = h.z; // always keep our position in the centre of the inset map
     this.view = { cx, cz, win };
     ctx.fillStyle = '#26303a'; ctx.fillRect(0, 0, S, S);
     const k = mc.width / D.W, sx = (cx - win / 2 - D.X0) * k, sy = (cz - win / 2 - D.Z0) * (mc.height / D.H);
