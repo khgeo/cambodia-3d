@@ -76,3 +76,14 @@ button.exit{background:#5a2d2d}
 @media (max-width:640px){#hud{width:140px}#hud canvas{width:140px;height:140px}}
 
 .panel.hidden{display:none}
+
+#sectionPanel{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:min(1120px,calc(100% - 20px));z-index:9;background:rgba(17,23,31,.92);color:#e8eef4;border-radius:14px;padding:10px;box-sizing:border-box;font-size:12px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 28px rgba(0,0,0,.35)}
+#sectionPanel[hidden]{display:none}
+#sectionPanel .secbar{flex-wrap:wrap;justify-content:flex-start;gap:8px;margin:0 0 8px}
+#sectionPanel .hint{color:#ffd88a;flex:1;min-width:160px}
+#secCanvas{width:100%;height:auto;border-radius:8px;display:block;background:#f7f4ee}
+#secLegend{margin-top:6px;line-height:1.7}
+#secLegend .lg{display:inline-flex;align-items:center;margin-right:10px;white-space:nowrap}
+#secLegend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;border:1px solid rgba(255,255,255,.3)}
+.seccredit{margin-top:4px;color:#8fa2b4;font-size:10.5px}

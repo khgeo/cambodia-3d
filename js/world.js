@@ -5,14 +5,15 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=15';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=15';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=15';
-import { buildTrees, GrassField } from './vegetation.js?v=15';
-import { RoadNet, Driver, Walker } from './modes.js?v=15';
-import { vehicleKit } from './vehicles.js?v=15';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=15';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=15';
+import * as G from './geo.js?v=16';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=16';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=16';
+import { buildTrees, GrassField } from './vegetation.js?v=16';
+import { RoadNet, Driver, Walker } from './modes.js?v=16';
+import { vehicleKit } from './vehicles.js?v=16';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=16';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=16';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=16';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -209,7 +210,7 @@ export class World {
       for (const p of parts) for (const c of G.clipLine(p, X0, Z0, X1, Z1)) roads.push({ ...r, id, pts: c, st: roadStyle(r.cls, r.surf, r.lanes, r.wdm, r.flags) });
     }
     roads.sort((a, b) => RANK[a.cls] - RANK[b.cls]);
-    Object.assign(D, { roads, rails, waterways, landuse, buildings }); D.stats.roads = roads.length; this.views = null;
+    Object.assign(D, { roads, rails, waterways, landuse, buildings }); D.stats.roads = roads.length; this.views = null; this.U = null; this.section = null;
 
     say('Loading terrain…');
     let elev;
@@ -513,8 +514,8 @@ export class World {
       const line = (ax, az, bx, bz, n) => Array.from({ length: n + 1 }, (_, k) => [ax + (bx - ax) * k / n, az + (bz - az) * k / n]);
       edge(line(X0, Z1, X1, Z1, nx)); edge(line(X1, Z1, X1, Z0, nz)); edge(line(X1, Z0, X0, Z0, nx)); edge(line(X0, Z0, X0, Z1, nz));
       const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); sg.setAttribute('color', new THREE.Float32BufferAttribute(scol, 3)); sg.computeVertexNormals();
-      this.root.add(new THREE.Mesh(sg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide })));
-      const bp = new THREE.Mesh(new THREE.PlaneGeometry(W, H).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2e241c })); bp.position.y = bottom; this.root.add(bp);
+      this.sidesMesh = new THREE.Mesh(sg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide })); this.root.add(this.sidesMesh);
+      const bp = new THREE.Mesh(new THREE.PlaneGeometry(W, H).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2e241c })); bp.position.y = bottom; this.root.add(bp); this.bottom = bottom;
       // height texture for water depth shading
       const hf = new Uint16Array(Hg.length); for (let i = 0; i < Hg.length; i++) hf[i] = THREE.DataUtils.toHalfFloat(Hg[i]);
       const ht = new THREE.DataTexture(hf, R, nz + 1, THREE.RedFormat, THREE.HalfFloatType); ht.magFilter = ht.minFilter = THREE.LinearFilter; ht.needsUpdate = true;
@@ -638,6 +639,7 @@ export class World {
     if (keepView) { this.camera.position.copy(keepView.p); this.controls.target.copy(keepView.t); this.controls.update(); }
     else this.goView('overview', true);
     if (prevMode === 'walk') this.setMode('walk');
+    this.exag = exag; if (this.U) { this.applySideGeology(); if (this.section) this.makeSection(this.section.A, this.section.B); }
     say('');
     return D.stats;
   }
@@ -960,9 +962,49 @@ export class World {
     Object.assign(this.hud, { mode: this.mode, x: focus.x, z: focus.z, lon: this.F.lon(focus.x), lat: this.F.lat(focus.z), elev: this.rawElevation(focus.x, focus.z), heading: (THREE.MathUtils.radToDeg(heading) + 360) % 360,
       speedShown: this.mode === 'drive' && this.driver ? this.driver.speed : (this.mode === 'walk' ? this.hud.speed : 0), fov: this.camera.fov * this.camera.aspect });
   }
+  /* ---------- underground: soil + geology, cross-sections ---------- */
+  async ensureUnderground(say) {
+    if (!this.U) { this.U = await loadUnderground(this, say); this.applySideGeology(); }
+    return this.U;
+  }
+  applySideGeology() {
+    if (!this.U || !this.D) return; const D = this.D, e = this.exag ?? 1;
+    if (this.sideWalls) this.sideWalls.forEach(m => this.root.remove(m));
+    const corners = [[D.X0, D.Z0 + D.H], [D.X0 + D.W, D.Z0 + D.H], [D.X0 + D.W, D.Z0], [D.X0, D.Z0], [D.X0, D.Z0 + D.H]];
+    this.sideWalls = [];
+    for (let k = 0; k < 4; k++) {
+      const A = { x: corners[k][0], z: corners[k][1] }, B = { x: corners[k + 1][0], z: corners[k + 1][1] }, n = Math.min(320, Math.max(40, Math.round(Math.hypot(B.x - A.x, B.z - A.z) / 6)));
+      const m = wallMesh(this, sampleLine(this, this.U, A, B, n), this.bottom, e); this.root.add(m); this.sideWalls.push(m);
+    }
+    if (this.sidesMesh) this.sidesMesh.visible = false;
+  }
+  startSection() { this.sectionPick = 'A'; this.clearSection(); this.onSectionHint && this.onSectionHint('Tap point A on the ground or on the inset map'); }
+  pickSectionPoint(x, z) {
+    if (this.sectionPick === 'A') { this.sectionA = { x, z }; this.sectionPick = 'B'; this.drawSectionMarkers(this.sectionA); this.onSectionHint && this.onSectionHint('Now tap point B'); return; }
+    if (this.sectionPick === 'B') { this.sectionPick = null; this.makeSection(this.sectionA, { x, z }); }
+  }
+  clearSection() { if (this.sectionGroup) { this.root.remove(this.sectionGroup); this.sectionGroup = null; } }
+  drawSectionMarkers(A, B) {
+    this.clearSection(); const g = this.sectionGroup = new THREE.Group(); this.root.add(g);
+    const pole = (p, col) => { const h = this.hAt(p.x, p.z), m = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 14, 8), new THREE.MeshBasicMaterial({ color: col })); m.position.set(p.x, h + 7, p.z); g.add(m);
+      const b = new THREE.Mesh(new THREE.SphereGeometry(1.4, 12, 8), new THREE.MeshBasicMaterial({ color: col })); b.position.set(p.x, h + 15, p.z); g.add(b); };
+    pole(A, 0xe74c3c); if (B) {
+      pole(B, 0x2f7fd0); const pts = []; for (let i = 0; i <= 200; i++) { const t = i / 200, x = A.x + (B.x - A.x) * t, z = A.z + (B.z - A.z) * t; pts.push(new V3(x, this.hAt(x, z) + 0.6, z)); }
+      g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffe14a })));
+    }
+  }
+  makeSection(A, B) {
+    if (!this.U) return; const L = Math.hypot(B.x - A.x, B.z - A.z); if (L < 10) return;
+    const S = sampleLine(this, this.U, A, B, Math.min(400, Math.max(60, Math.round(L / 4))));
+    this.drawSectionMarkers(A, B);
+    this.sectionWall = wallMesh(this, S, this.bottom, this.exag ?? 1); this.sectionWall.visible = this.sectionWallOn !== false; this.sectionGroup.add(this.sectionWall);
+    this.section = { A, B, S }; this.onSection && this.onSection(S);
+  }
+
   // jump to a place: walk → stand there (snapping onto a road if one is close), drive → nearest road, orbit → look there
   teleport(x, z, mode) {
     if (!this.D) return; const D = this.D;
+    if (this.sectionPick && !mode) { this.pickSectionPoint(x, z); return; }
     x = THREE.MathUtils.clamp(x, D.X0 + 2, D.X0 + D.W - 2); z = THREE.MathUtils.clamp(z, D.Z0 + 2, D.Z0 + D.H - 2);
     const m = mode || this.mode;
     if (m === 'walk') {
@@ -981,10 +1023,11 @@ export class World {
   }
   groundAt(x, z) { return this.hAt ? this.hAt(x, z) : 0; }
   onTap(e) {
-    if (!this.terrainMesh || (this.mode !== 'drive' && this.mode !== 'walk')) return;
+    if (!this.terrainMesh || (this.mode !== 'drive' && this.mode !== 'walk' && !this.sectionPick)) return;
     const r = this.renderer.domElement.getBoundingClientRect(), ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, this.camera);
     const hit = rc.intersectObjects([this.terrainMesh, ...(this.roadMesh ? [this.roadMesh] : [])], false)[0]; if (!hit) return;
+    if (this.sectionPick) { this.pickSectionPoint(hit.point.x, hit.point.z); return; }
     if (this.mode === 'walk') { if (!this.walker.blocked(hit.point.x, hit.point.z)) this.walker.place(hit.point.x, hit.point.z); return; }
     if (this.mode === 'drive' && this.pickRoad) {
       const n = this.net.near(hit.point.x, hit.point.z, 30)[0]; if (!n) { this.onHint && this.onHint('No road there – tap closer to a road.'); return; }

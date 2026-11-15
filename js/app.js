@@ -1,5 +1,5 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=15';
+import * as G from './geo.js?v=16';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -185,7 +185,7 @@ function renderStats() {
   $('lulc').innerHTML = '<label class="lbl">Land cover seen on the image</label><div class="bar2">' +
     Object.keys(cols).map(k => `<span style="width:${(L[k] * 100).toFixed(1)}%;background:${cols[k]}"></span>`).join('') + '</div><div class="keys">' +
     Object.keys(cols).map(k => `<div><i style="background:${cols[k]}"></i>${names[k]} ${(L[k] * 100).toFixed(0)}%</div>`).join('') + '</div>';
-  $('credit').innerHTML = `${world.credit} · Terrain: Mapzen/AWS Terrain Tiles · ${OSM_CREDIT} · Geoinformatics and Research Lab, RUPP`;
+  $('credit').innerHTML = `${world.credit} · Soil: ISRIC SoilGrids · Geology: ODC 2006 · Terrain: Mapzen/AWS Terrain Tiles · ${OSM_CREDIT} · Geoinformatics and Research Lab, RUPP`;
 }
 async function rebuild() {
   if (busy) return; busy = true; if (world.D && world.D.built) t0 = performance.now(); if (world.D) world.D.built = true;
@@ -198,15 +198,21 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=15'); world = new World($('scene')); window.__world = world;
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=16'); world = new World($('scene')); window.__world = world;
     world.onModeChange = m => {
       $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk';
       if (m === 'drive' || m === 'walk') { setOn('views', m); showPanel('scenePanel', false); }
     };
     world.onHint = t => { $('driveHint').textContent = t; };
     world.onVehicle = k => { $('vehicle').value = k; };
-    const { joystick } = await import('./modes.js?v=15'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=15'); new Hud($('hud'), world);
+    world.onSectionHint = t => { $('secHint').textContent = t; };
+    world.onSection = async S => {
+      const { drawProfile, legendHTML } = await import('./section.js?v=16');
+      const cv = $('secCanvas'); cv.width = Math.min(1600, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio))); cv.height = Math.round(cv.width * 0.36);
+      drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – tap ↺ New line to draw another';
+    };
+    const { joystick } = await import('./modes.js?v=16'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=16'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -240,3 +246,19 @@ $('pickRoad').onclick = () => world && world.chooseRoad();
 $('run').onclick = e => { if (!world) return; world.walker.run = !world.walker.run; e.target.classList.toggle('on2', world.walker.run); };
 document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.setMode('orbit'); setOn('views', ''); showPanel('scenePanel', true); });
 if (innerWidth < 640) showPanel('mapPanel', false);
+/* cross-section tool */
+$('sectionBtn').onclick = async () => {
+  if (!world || !world.D) return;
+  $('sectionPanel').hidden = false; $('secHint').textContent = 'Loading soil and geology data…';
+  if (innerWidth < 900) showPanel('scenePanel', false);
+  if (world.mode !== 'orbit') world.setMode('orbit');
+  try { await world.ensureUnderground(t => { $('secHint').textContent = t; }); } catch (e) { $('secHint').textContent = 'Could not load soil data: ' + e.message; }
+  if (world.U && !world.U.soilOk) $('secHint').textContent = 'SoilGrids did not respond – showing geology only. ';
+  world.startSection();
+};
+$('secNew').onclick = () => world && world.startSection();
+$('secClose').onclick = () => { $('sectionPanel').hidden = true; if (world) { world.sectionPick = null; world.clearSection(); world.section = null; } };
+$('secWall').onchange = e => { if (!world) return; world.sectionWallOn = e.target.checked; if (world.sectionWall) world.sectionWall.visible = e.target.checked; };
+const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
+$('secPng').onclick = () => $('secCanvas').toBlob(b => download('cross-section.png', b));
+$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=16'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };

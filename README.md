@@ -48,6 +48,19 @@ When walking or driving with a mouse or trackpad, the view follows the cursor wi
 - **Vehicles:** cars, pickups, motorbikes (some with a passenger), Cambodian remorks, trucks and buses. Their bodies are built from side profiles with wheels, rims, lights and glass.
 - **People and cattle:** pedestrians walk along village roads, farmers in conical hats work in the rice fields, and small herds of cows graze near villages.
 
+## Cross-section: soil and geology
+Tap **✂ Cross-section**, then tap point A and point B on the ground or on the inset map. A profile opens with these parts:
+- **Section:** the ground line at real elevation, with the vertical exaggeration stated. Under it are the soil layers, a weathered zone and the rock unit, drawn with geological patterns (sandstone dots, limestone bricks, granite crosses, volcanic v's and so on). Water along the line is marked.
+- **Soil strip:** USDA texture classes for 0–5, 5–15, 15–30, 30–60, 60–100 and 100–200 cm, computed from SoilGrids sand, silt and clay. Topsoil is drawn darker where organic carbon is higher.
+- **Legend:** the units and soil classes found along the line.
+- **Exports:** PNG and CSV. The CSV has distance, lon/lat, elevation, geology unit, and soil class with sand/silt/clay/SOC at each depth.
+- **3D:** a cut wall along the line shows the same layers, and the sides of the block switch from plain brown to the real soil and geology at each edge.
+
+Data:
+- **Soil:** ISRIC SoilGrids 2.0, read live as GeoTIFF from its WCS for the area only.
+- **Geology:** the Open Development Cambodia *Geology of Cambodia 2006* map, rasterised to 0.002° (`data/geology.png`, 180 KB, unit ids 1–22).
+- **Depth assumptions:** depths below the soil are **schematic, not measured.** Young alluvium continues to the bottom of the section. Old alluvium is about 20 m deep over unknown bedrock. Hard rock has a weathered zone about 2–8 m deep. Borehole, well or groundwater data can be added later to replace these assumptions.
+
 ## Clouds
 When **Fill clouds in 3D** is on, clouds are found in the satellite image: bright, grey, large patches, so small white roofs are ignored. Each cloudy tile is then replaced from a clear source, tried in this order:
 1. The other provider (Google or Esri).
