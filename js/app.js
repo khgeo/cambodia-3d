@@ -1,5 +1,5 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=7';
+import * as G from './geo.js?v=8';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -149,7 +149,7 @@ const progress = t => { $('progress').hidden = !t; $('progressText').textContent
 let t0 = 0, busy = false;
 function renderStats() {
   const s = world.D.stats, tr = s.trees || {}, nT = (tr.round || 0) + (tr.tall || 0) + (tr.wide || 0), nP = (tr.sugar || 0) + (tr.coco || 0);
-  $('stats').innerHTML = `${s.roads} road segments · ${s.buildings} buildings · ${nT} trees, ${nP} palms, ${tr.bush || 0} bushes · ${s.vehicles || 0} vehicles<br>` +
+  $('stats').innerHTML = `${s.roads} road segments · ${s.buildings} buildings · ${nT} trees, ${nP} palms, ${tr.bush || 0} bushes · ${s.vehicles || 0} vehicles · ${s.people || 0} people · ${s.cows || 0} cows<br>` +
     `Elevation ${s.elev[0].toFixed(0)}–${s.elev[1].toFixed(0)} m (×${s.exag}) · imagery zoom ${s.imageryZoom}` + (s.waterDropped ? ` · ${s.waterDropped} seasonal/dry water polygons hidden` : '') +
     ` · ${((performance.now() - t0) / 1000).toFixed(1)} s` +
     (s.cloud && s.cloud.cloudPct > 0.5 ? `<br>☁ Clouds ${s.cloud.cloudPct.toFixed(0)}% of the image → filled ${s.cloud.filledPct.toFixed(0)}% from ` + Object.entries(s.cloud.sources).map(([k, n]) => `${k} (${n} tile${n > 1 ? 's' : ''})`).join(', ') +
@@ -171,14 +171,14 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=7'); world = new World($('scene')); window.__world = world;
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=8'); world = new World($('scene')); window.__world = world;
     world.onModeChange = m => {
       $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk';
       if (m === 'drive' || m === 'walk') { setOn('views', m); if (innerWidth < 900) $('scenePanel').classList.add('hidden'); }
     };
     world.onHint = t => { $('driveHint').textContent = t; };
-    const { joystick } = await import('./modes.js?v=7'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=7'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=8'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=8'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);

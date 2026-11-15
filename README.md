@@ -40,6 +40,11 @@ When walking or driving with a mouse or trackpad, the view follows the cursor wi
 - **Broadleaf trees:** three crown shapes built from alpha-cut leaf cards, which cast leaf-shaped shadows, tinted from the image.
 - **Forest floor (near the viewer, inside canopy):** ferns, shrubs, small fan palms, saplings, bamboo patches, rocks and fallen logs, on leaf-litter ground.
 
+## Water, vehicles and people
+- **Water reflections:** the nearest water body mirrors the trees, buildings and sky, rippled by the waves and stronger at low viewing angles. You can turn it off with the **Water reflections** switch.
+- **Vehicles:** cars, pickups, motorbikes (some with a passenger), Cambodian remork tuk-tuks, trucks and buses. Their bodies are built from side profiles with wheels, rims, lights and glass.
+- **People and cattle:** pedestrians walk along village roads, farmers in conical hats work in the rice fields, and small herds of cows graze near villages.
+
 ## Clouds
 When **Fill clouds in 3D** is on, clouds are found in the satellite image: bright, grey, large patches, so small white roofs are ignored. Each cloudy tile is then replaced from a clear source, tried in this order:
 1. The other provider (Google or Esri).

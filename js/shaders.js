@@ -160,18 +160,26 @@ export function makeWaterMaterial(normalMap, u) {
       .replace('#include <project_vertex>', '#include <project_vertex>\nvWW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vWW; uniform sampler2D uHgt, uImg; uniform vec4 uGrid, uImgA; uniform float uTime;`)
+varying vec3 vWW; uniform sampler2D uHgt, uImg, uRefl; uniform vec4 uGrid, uImgA; uniform float uTime, uReflOn; uniform mat4 uTexMat;`)
       .replace('#include <map_fragment>', `
 vec2 suv = vec2((vWW.x - uGrid.x) / uGrid.z, (vWW.z - uGrid.y) / uGrid.w);
 float depth = vWW.y - texture2D(uHgt, suv).r;
 vec3 img = texture2D(uImg, vec2(uImgA.x * vWW.x + uImgA.y, uImgA.z * vWW.z + uImgA.w)).rgb;
 vec3 deep = mix(img * 0.55, vec3(0.025, 0.06, 0.07), 0.55);
 vec3 col = mix(img * 0.92, deep, smoothstep(0.05, 2.2, depth));
+if (uReflOn > 0.5) { // planar reflection, rippled by the normal map, Fresnel-weighted
+  vec4 rc = uTexMat * vec4(vWW, 1.0);
+  vec2 rip = (texture2D(normalMap, vNormalMapUv).xy - 0.5) * 0.05;
+  vec3 refl = texture2D(uRefl, rc.xy / rc.w + rip).rgb;
+  vec3 vdir = normalize(cameraPosition - vWW);
+  float fres = 0.1 + 0.9 * pow(1.0 - clamp(vdir.y, 0.0, 1.0), 4.0);
+  col = mix(col, refl, clamp(fres * 0.85 + 0.3, 0.0, 0.92) * smoothstep(0.04, 0.35, depth));
+}
 float foam = (1.0 - smoothstep(0.0, 0.18, depth)) * (0.6 + 0.4 * sin(uTime * 1.7 + vWW.x * 0.9 + vWW.z * 0.7));
 col += vec3(0.22) * foam;
 diffuseColor.rgb = col;`);
   };
-  m.customProgramCacheKey = () => 'water-v2';
+  m.customProgramCacheKey = () => 'water-v3';
   return m;
 }
 

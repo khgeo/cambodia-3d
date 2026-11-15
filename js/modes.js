@@ -32,7 +32,7 @@ export class Driver {
     const P = r.pts; let lo = 0, hi = P.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (P[m].s <= this.s) lo = m; else hi = m; }
     const a = P[lo], b = P[hi], t = THREE.MathUtils.clamp((this.s - a.s) / ((b.s - a.s) || 1), 0, 1);
     let tx = (b.x - a.x) * this.dir, tz = (b.z - a.z) * this.dir; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
-    const off = r.oneway ? 0 : Math.max(0.8, r.hw * 0.5) * (this.kind === 'moto' ? 1.35 : 1);
+    const off = r.oneway ? 0 : Math.max(0.8, r.hw * 0.5) * (this.kind.startsWith('moto') ? 1.35 : 1);
     const x = a.x + (b.x - a.x) * t - tz * off, z = a.z + (b.z - a.z) * t + tx * off, y = a.y + (b.y - a.y) * t;
     this.pos.set(x, y, z); this.fwd.set(tx, ((b.y - a.y) / l) * this.dir, tz).normalize();
     this.mesh.position.copy(this.pos); this.mesh.lookAt(this.pos.clone().add(this.fwd));

@@ -5,13 +5,14 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=7';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=7';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=7';
-import { buildTrees, GrassField } from './vegetation.js?v=7';
-import { RoadNet, Driver, Walker } from './modes.js?v=7';
-import { vehicleKit } from './vehicles.js?v=7';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=7';
+import * as G from './geo.js?v=8';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=8';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=8';
+import { buildTrees, GrassField } from './vegetation.js?v=8';
+import { RoadNet, Driver, Walker } from './modes.js?v=8';
+import { vehicleKit } from './vehicles.js?v=8';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=8';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=8';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -115,6 +116,8 @@ export class World {
     sc.fog = new THREE.Fog(0xc6d2db, 2000, 9000);
 
     this.noise = noiseTexture(); this.waterNormal = waterNormals(); this.detail = detailTextures();
+    this.reflRT = new THREE.WebGLRenderTarget(512, 512, { type: THREE.HalfFloatType }); this.mirrorCam = new THREE.PerspectiveCamera(); this.reflectOn = true;
+    this.reflU = { uRefl: { value: this.reflRT.texture }, uTexMat: { value: new THREE.Matrix4() }, uReflOn: { value: 0 } };
     this.uTime = { value: 0 };
     this.kit = vehicleKit();
     this.root = new THREE.Group(); sc.add(this.root);
@@ -142,7 +145,7 @@ export class World {
     new ResizeObserver(() => this.resize()).observe(container);
   }
 
-  resize() { const w = this.container.clientWidth, h = this.container.clientHeight; if (!w || !h) return; this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.renderer.setSize(w, h); }
+  resize() { const w = this.container.clientWidth, h = this.container.clientHeight; if (!w || !h) return; this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.renderer.setSize(w, h); const pr = this.renderer.getPixelRatio() * 0.5; this.reflRT.setSize(Math.round(w * pr), Math.round(h * pr)); }
 
   setSun(elev, env) {
     this.sunDir.setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - elev), THREE.MathUtils.degToRad(140));
@@ -347,7 +350,7 @@ export class World {
       uGrass: { value: this.detail.grass }, uRice: { value: this.detail.rice }, uSoil: { value: this.detail.soil }, uGravel: { value: this.detail.gravel }, uDetailOn: { value: 1 },
     };
     this.terrainMat = makeTerrainMaterial(this.texSat, this.terrainU);
-    this.waterU = { uHgt: { value: null }, uGrid: { value: new THREE.Vector4() }, uImg: this.uniforms.uImg, uImgA: this.uniforms.uImgA, uTime: this.uTime };
+    this.waterU = { uHgt: { value: null }, uGrid: { value: new THREE.Vector4() }, uImg: this.uniforms.uImg, uImgA: this.uniforms.uImgA, uTime: this.uTime, ...this.reflU };
     this.waterMat = makeWaterMaterial(this.waterNormal, this.waterU);
     return D;
   }
@@ -536,7 +539,7 @@ export class World {
       ribbon(pts, st.w / 2, [st.mk, st.lanes, st.s]);
       const oneway = (r.flags & 1) || (r.flags & 16) ? 1 : 0;
       if (r.cls <= 14 && r.cls !== 13 && L > 20) this.lanesForTraffic.push({ pts, st, cls: r.cls, oneway, urban: r.flags & 8 });
-      if (r.cls <= 16 && r.cls !== 15) netRoads.push({ pts, hw: st.w / 2, oneway, cls: r.cls });
+      if (r.cls <= 16 && r.cls !== 15) netRoads.push({ pts, hw: st.w / 2, oneway, cls: r.cls, urban: r.flags & 8 });
     }
     for (const pts of railPts) { for (const p of pts) p.y = Math.max(p.g, hAt(p.x, p.z)) + 0.32; ribbon(pts, 1.8, [0, 1, 10]); }
     if (RB.pos.length) {
@@ -578,7 +581,13 @@ export class World {
       const g = new THREE.PlaneGeometry(W, H).rotateX(-Math.PI / 2); g.translate(0, this.seaY + 0.1, 0);
       const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * W / 25, uv.getY(i) * H / 25); wGeos.push(g.toNonIndexed());
     }
-    if (wGeos.length) { const m = new THREE.Mesh(mergeGeometries(wGeos), this.waterMat); m.receiveShadow = true; this.root.add(m); }
+    this.waterMesh = null;
+    if (wGeos.length) { const m = new THREE.Mesh(mergeGeometries(wGeos), this.waterMat); m.receiveShadow = true; this.root.add(m); this.waterMesh = m; }
+    this.waterBodies = [];
+    const bb = (pts, level) => { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const p of pts) { const x = p.x ?? p[0], z = p.z ?? p[1]; x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); } this.waterBodies.push({ level, x0, x1, z0, z1 }); };
+    for (const w of waterSurfaces) bb(w.rings[0], w.level);
+    for (const w of waterLines) bb(w.pts, w.pts.reduce((a, p) => a + p.y, 0) / w.pts.length);
+    if (hmin < 1.5) this.waterBodies.push({ level: this.seaY + 0.1, x0: X0, x1: X1, z0: Z0, z1: Z1 });
 
     /* 5. buildings */
     say(`Building ${D.buildings.length} buildings…`); await tick();
@@ -594,6 +603,7 @@ export class World {
 
     /* 7. traffic */
     if (opts.traffic !== false) { say('Adding traffic…'); this.buildTraffic(rnd); }
+    say('Adding people and cattle…'); this.netRoadsForPeople = netRoads; this.buildPeople(rnd);
 
     /* 8. views */
     const hc = hAt(0, 0); this.extent = S;
@@ -721,29 +731,29 @@ export class World {
     this.vehicles = [];
     for (const ln of list) {
       const r = rnd(); let t;
-      if (ln.cls <= 4) t = r < 0.35 ? 'moto' : r < 0.75 ? 'car' : r < 0.85 ? 'bus' : 'truck';
-      else if (ln.cls <= 8) t = r < 0.5 ? 'moto' : r < 0.8 ? 'car' : r < 0.9 ? 'tuktuk' : 'truck';
-      else t = r < (ln.urban ? 0.62 : 0.72) ? 'moto' : r < 0.86 ? 'car' : r < 0.95 ? 'tuktuk' : 'truck';
+      if (ln.cls <= 4) t = r < 0.25 ? 'moto' : r < 0.35 ? 'moto2' : r < 0.6 ? 'car' : r < 0.75 ? 'pickup' : r < 0.85 ? 'bus' : 'truck';
+      else if (ln.cls <= 8) t = r < 0.38 ? 'moto' : r < 0.5 ? 'moto2' : r < 0.68 ? 'car' : r < 0.8 ? 'pickup' : r < 0.9 ? 'tuktuk' : 'truck';
+      else t = r < (ln.urban ? 0.45 : 0.55) ? 'moto' : r < 0.68 ? 'moto2' : r < 0.8 ? 'car' : r < 0.87 ? 'pickup' : r < 0.96 ? 'tuktuk' : 'truck';
       if (ln.st.w < 4 && (t === 'truck' || t === 'bus')) t = 'moto';
       const dir = ln.oneway ? 1 : (rnd() < 0.5 ? 1 : -1), src = dir > 0 ? ln.pts : ln.pts.slice().reverse(), hw = ln.st.w / 2;
       let off;
       if (ln.oneway) off = (ln.st.lanes > 1 ? (((rnd() * ln.st.lanes) | 0) + 0.5) / ln.st.lanes * 2 - 1 : 0) * (hw - 0.6);
       else { const per = Math.max(1, Math.round(ln.st.lanes / 2)); off = ((((rnd() * per) | 0) + 0.5) / per) * (hw - 0.4); }
-      if (t === 'moto') off += (ln.oneway ? 0.6 : hw * 0.25) * rnd() * 0.8;
+      if (t === 'moto' || t === 'moto2') off += (ln.oneway ? 0.6 : hw * 0.25) * rnd() * 0.8;
       const P = new Float32Array(src.length * 3), S = new Float32Array(src.length);
       for (let i = 0; i < src.length; i++) {
         const a = src[Math.max(0, i - 1)], b = src[Math.min(src.length - 1, i + 1)], tx = b.x - a.x, tz = b.z - a.z, l = Math.hypot(tx, tz) || 1;
         P[i * 3] = src[i].x - tz / l * off; P[i * 3 + 1] = src[i].y; P[i * 3 + 2] = src[i].z + tx / l * off;
         if (i) S[i] = S[i - 1] + Math.hypot(P[i * 3] - P[i * 3 - 3], P[i * 3 + 2] - P[i * 3 - 1]);
       }
-      const speed = (ln.cls <= 4 ? 22 : ln.cls <= 8 ? 15 : ln.cls <= 10 ? 11 : 7) * (t === 'moto' ? 0.9 + rnd() * 0.3 : t === 'tuktuk' ? 0.65 : t === 'truck' || t === 'bus' ? 0.8 : 1);
+      const speed = (ln.cls <= 4 ? 22 : ln.cls <= 8 ? 15 : ln.cls <= 10 ? 11 : 7) * (t.startsWith('moto') ? 0.9 + rnd() * 0.3 : t === 'tuktuk' ? 0.65 : t === 'truck' || t === 'bus' ? 0.8 : 1);
       const v = { P, S, L: S[S.length - 1], u: rnd() * S[S.length - 1], speed, t, pos: new V3(), fwd: new V3(0, 0, 1) };
       slots[t].push(v); this.vehicles.push(v);
     }
     this.vehMeshes = [];
     for (const t of types) {
       const n = slots[t].length; if (!n) continue; const k = this.kit[t];
-      const paint = new THREE.InstancedMesh(k.paint, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.45 }), n);
+      const paint = new THREE.InstancedMesh(k.paint, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.5, side: THREE.DoubleSide }), n);
       const fixed = new THREE.InstancedMesh(k.fixed, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.2 }), n);
       const c = new THREE.Color(); slots[t].forEach((v, i) => paint.setColorAt(i, c.set(k.palette[(rnd() * k.palette.length) | 0])));
       for (const m of [paint, fixed]) { m.castShadow = true; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; this.root.add(m); }
@@ -766,6 +776,95 @@ export class World {
       });
       g.paint.instanceMatrix.needsUpdate = g.fixed.instanceMatrix.needsUpdate = true;
     }
+  }
+
+  /* ---------- people and cattle ---------- */
+  buildPeople(rnd) {
+    const D = this.D, hAt = this.hAt, cap = this.mobile ? 250 : 700, mk = (geo, mat, n) => { const m = new THREE.InstancedMesh(geo, mat, n); m.castShadow = true; m.receiveShadow = true; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.root.add(m); return m; };
+    const PER_KM = { 9: 3, 10: 2, 11: 3, 12: 6, 13: 8, 14: 2, 16: 2 };
+    const walkers = [];
+    for (const r of this.netRoadsForPeople) {
+      const L = r.pts[r.pts.length - 1].s, n = Math.floor(L / 1000 * (PER_KM[r.cls] || 0) * (r.urban ? 2.2 : 1) + rnd());
+      for (let k = 0; k < n && walkers.length < cap; k++) {
+        const dir = rnd() < 0.5 ? 1 : -1, src = dir > 0 ? r.pts : r.pts.slice().reverse(), off = (rnd() < 0.5 ? -1 : 1) * (r.hw + 0.6 + rnd() * 0.6);
+        const P = new Float32Array(src.length * 3), S = new Float32Array(src.length);
+        for (let i = 0; i < src.length; i++) {
+          const a = src[Math.max(0, i - 1)], b = src[Math.min(src.length - 1, i + 1)], tx = b.x - a.x, tz = b.z - a.z, l = Math.hypot(tx, tz) || 1, x = src[i].x - tz / l * off, z = src[i].z + tx / l * off;
+          P[i * 3] = x; P[i * 3 + 1] = hAt(x, z); P[i * 3 + 2] = z; if (i) S[i] = S[i - 1] + Math.hypot(P[i * 3] - P[i * 3 - 3], P[i * 3 + 2] - P[i * 3 - 1]);
+        }
+        walkers.push({ P, S, L: S[S.length - 1], u: rnd() * S[S.length - 1], speed: 1.0 + rnd() * 0.6, pos: new V3(), fwd: new V3() });
+      }
+    }
+    // farmers in the rice fields and herds of cattle grazing near villages
+    const farmers = [], cows = [], { gw, gh, C, X0, Z0, cls, splatRice, nearB, exclude, mw, mh, MR } = D;
+    const free = (x, z) => !exclude[Math.min(mh - 1, Math.max(0, ((z - Z0) / MR) | 0)) * mw + Math.min(mw - 1, Math.max(0, ((x - X0) / MR) | 0))];
+    for (let t = 0; t < 6000 && farmers.length < (this.mobile ? 25 : 60); t++) {
+      const q = (rnd() * gw * gh) | 0; if (!splatRice[q]) continue;
+      const x = X0 + (q % gw + .5) * C, z = Z0 + (((q / gw) | 0) + .5) * C, n = 1 + ((rnd() * 3) | 0);
+      for (let k = 0; k < n; k++) { const fx = x + (rnd() - .5) * 6, fz = z + (rnd() - .5) * 6; if (free(fx, fz)) farmers.push({ pos: new V3(fx, hAt(fx, fz), fz), rot: rnd() * 6.28 }); }
+    }
+    for (let t = 0; t < 8000 && cows.length < (this.mobile ? 30 : 70); t++) {
+      const q = (rnd() * gw * gh) | 0; if (cls[q] !== 3 || !nearB[q] && rnd() > 0.15) continue;
+      const x = X0 + (q % gw + .5) * C, z = Z0 + (((q / gw) | 0) + .5) * C, n = 2 + ((rnd() * 4) | 0);
+      for (let k = 0; k < n; k++) { const cx = x + (rnd() - .5) * 10, cz = z + (rnd() - .5) * 10; if (free(cx, cz)) cows.push({ home: new V3(cx, 0, cz), pos: new V3(cx, hAt(cx, cz), cz), head: rnd() * 6.28, moving: 0, timer: rnd() * 8 }); }
+    }
+    const hw = human('walker'), hf = human('farmer'), c = new THREE.Color();
+    this.people = { walkers, farmers, cows };
+    this.pm = {
+      wc: mk(hw.cloth, animMaterial(this.uTime, 0.55, 6.5), Math.max(1, walkers.length)), wb: mk(hw.body, animMaterial(this.uTime, 0.55, 6.5), Math.max(1, walkers.length)),
+      fc: mk(hf.cloth, animMaterial(this.uTime, 0.12, 1.6), Math.max(1, farmers.length)), fb: mk(hf.body, animMaterial(this.uTime, 0.12, 1.6), Math.max(1, farmers.length)),
+      cw: mk(cow(), animMaterial(this.uTime, 0.3, 2.2), Math.max(1, cows.length)),
+    };
+    this.pm.wc.count = this.pm.wb.count = walkers.length; this.pm.fc.count = this.pm.fb.count = farmers.length; this.pm.cw.count = cows.length;
+    walkers.forEach((w, i) => this.pm.wc.setColorAt(i, c.set(SHIRTS[(rnd() * SHIRTS.length) | 0])));
+    const d = new THREE.Object3D();
+    farmers.forEach((f, i) => { d.position.copy(f.pos); d.rotation.set(0.25, f.rot, 0, 'YXZ'); d.scale.setScalar(0.95 + rnd() * 0.1); d.updateMatrix(); this.pm.fc.setMatrixAt(i, d.matrix); this.pm.fb.setMatrixAt(i, d.matrix); this.pm.fc.setColorAt(i, c.set(SHIRTS[(rnd() * SHIRTS.length) | 0])); });
+    cows.forEach((cw, i) => this.pm.cw.setColorAt(i, c.set([0xf4f1ea, 0xece4d4, 0xd9c2a0, 0xb8875a, 0xf4f1ea][(rnd() * 5) | 0])));
+    this.D.stats.people = walkers.length + farmers.length; this.D.stats.cows = cows.length;
+    this.updatePeople(0);
+  }
+  updatePeople(dt) {
+    if (!this.people) return; const d = this._pd || (this._pd = new THREE.Object3D()), look = new V3(), { walkers, cows } = this.people;
+    walkers.forEach((v, i) => {
+      v.u = (v.u + v.speed * dt) % v.L; const S = v.S; let lo = 0, hi = S.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (S[m] <= v.u) lo = m; else hi = m; }
+      const t = (v.u - S[lo]) / ((S[hi] - S[lo]) || 1), P = v.P;
+      v.pos.set(P[lo * 3] + (P[hi * 3] - P[lo * 3]) * t, P[lo * 3 + 1] + (P[hi * 3 + 1] - P[lo * 3 + 1]) * t, P[lo * 3 + 2] + (P[hi * 3 + 2] - P[lo * 3 + 2]) * t);
+      v.fwd.set(P[hi * 3] - P[lo * 3], 0, P[hi * 3 + 2] - P[lo * 3 + 2]).normalize();
+      d.position.copy(v.pos); look.copy(v.pos).add(v.fwd); d.lookAt(look); d.updateMatrix(); this.pm.wc.setMatrixAt(i, d.matrix); this.pm.wb.setMatrixAt(i, d.matrix);
+    });
+    cows.forEach((cw, i) => {
+      cw.timer -= dt; if (cw.timer <= 0) { cw.moving = Math.random() < 0.35 ? 0.35 : 0; cw.timer = 3 + Math.random() * 8; cw.head += (Math.random() - .5) * 1.5; }
+      if (cw.moving) {
+        const nx = cw.pos.x + Math.sin(cw.head) * cw.moving * dt, nz = cw.pos.z + Math.cos(cw.head) * cw.moving * dt;
+        const D = this.D, ok = !D.exclude[Math.min(D.mh - 1, Math.max(0, ((nz - D.Z0) / D.MR) | 0)) * D.mw + Math.min(D.mw - 1, Math.max(0, ((nx - D.X0) / D.MR) | 0))];
+        if (ok && Math.hypot(nx - cw.home.x, nz - cw.home.z) < 18) { cw.pos.x = nx; cw.pos.z = nz; cw.pos.y = this.hAt(nx, nz); } else cw.head += Math.PI * (0.5 + Math.random() * 0.5);
+      }
+      d.position.copy(cw.pos); d.rotation.set(0, cw.head, 0); d.scale.setScalar(1); d.updateMatrix(); this.pm.cw.setMatrixAt(i, d.matrix);
+    });
+    for (const k of ['wc', 'wb', 'cw']) this.pm[k].instanceMatrix.needsUpdate = true;
+  }
+
+  /* ---------- planar water reflection at the nearest water level ---------- */
+  renderReflection(focus) {
+    const U = this.reflU; U.uReflOn.value = 0;
+    if (!this.reflectOn || !this.waterMesh || !this.waterBodies || !this.waterBodies.length) return;
+    let best = null, bd = Infinity;
+    for (const b of this.waterBodies) { const dx = Math.max(b.x0 - focus.x, 0, focus.x - b.x1), dz = Math.max(b.z0 - focus.z, 0, focus.z - b.z1), dd = Math.hypot(dx, dz); if (dd < bd) { bd = dd; best = b; } }
+    if (!best || bd > 1500) return;
+    const h = best.level, cam = this.camera; if (cam.position.y < h + 0.15) return;
+    const mc = this.mirrorCam, n = new V3(0, 1, 0), rp = new V3(0, h, 0);
+    cam.updateMatrixWorld();
+    const cp = new V3().setFromMatrixPosition(cam.matrixWorld), rot = new THREE.Matrix4().extractRotation(cam.matrixWorld);
+    const view = new V3().subVectors(rp, cp); view.reflect(n).negate().add(rp);
+    const la = new V3(0, 0, -1).applyMatrix4(rot).add(cp), target = new V3().subVectors(rp, la); target.reflect(n).negate().add(rp);
+    mc.position.copy(view); mc.up.set(0, 1, 0).applyMatrix4(rot).reflect(n); mc.lookAt(target);
+    mc.near = cam.near; mc.far = cam.far; mc.updateMatrixWorld(); mc.projectionMatrix.copy(cam.projectionMatrix);
+    U.uTexMat.value.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1).multiply(mc.projectionMatrix).multiply(mc.matrixWorldInverse);
+    const r = this.renderer, prevClip = r.clippingPlanes, prevAuto = r.shadowMap.autoUpdate;
+    this.waterMesh.visible = false; r.clippingPlanes = [new THREE.Plane(n, -h + 0.02)]; r.shadowMap.autoUpdate = false;
+    r.setRenderTarget(this.reflRT); r.clear(); r.render(this.scene, mc); r.setRenderTarget(null);
+    r.clippingPlanes = prevClip; r.shadowMap.autoUpdate = prevAuto; this.waterMesh.visible = true;
+    U.uReflOn.value = 1;
   }
 
   /* ---------- ground looks ---------- */
@@ -793,6 +892,8 @@ export class World {
     if (kind === 'buildings' && this.buildingsMesh) this.buildingsMesh.visible = on;
     if (kind === 'traffic') { this.trafficOn = on; (this.vehMeshes || []).forEach(g => g.paint.visible = g.fixed.visible = on); }
     if (kind === 'shadows') this.sun.castShadow = on;
+    if (kind === 'reflect') this.reflectOn = on;
+    if (kind === 'traffic' && this.pm) for (const m of Object.values(this.pm)) m.visible = on;
     if (kind === 'detail') { this.terrainU.uDetailOn.value = on ? 1 : 0; this.grassOff = !on; }
   }
 
@@ -854,7 +955,7 @@ export class World {
     kind = kind || this.driveKind || 'car'; this.driveKind = kind;
     if (this.playerMesh) this.root.remove(this.playerMesh);
     const kit = this.kit[kind], g = new THREE.Group();
-    const paint = new THREE.Mesh(kit.paint, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.5, color: kind === 'tuktuk' ? 0x2a6fb0 : 0xc0392b }));
+    const paint = new THREE.Mesh(kit.paint, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.5, side: THREE.DoubleSide, color: kind === 'tuktuk' ? 0x2a6fb0 : 0xc0392b }));
     const fixed = new THREE.Mesh(kit.fixed, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5 }));
     paint.castShadow = fixed.castShadow = true; g.add(paint, fixed); this.root.add(g); this.playerMesh = g;
     const speed = this.driver ? this.driver.speed : 40 / 3.6;
@@ -886,10 +987,11 @@ export class World {
       const f = this.driver, back = this.kit[f.kind].len * 2.4 + (this.cockpit ? 0 : 5);
       const tgtOff = this.mouse.inside ? -this.mouse.x * 1.4 : 0; this.lookOff += (tgtOff - this.lookOff) * Math.min(1, dt * 4);
       const fw = f.fwd.clone().applyAxisAngle(new V3(0, 1, 0), this.lookOff), pitch = this.mouse.inside ? -this.mouse.y * 6 : 0;
-      const want = this.cockpit ? f.pos.clone().addScaledVector(f.fwd, 0.6).add(new V3(0, f.kind === 'moto' ? 1.6 : 1.35, 0))
+      const want = this.cockpit ? f.pos.clone().addScaledVector(f.fwd, f.kind.startsWith('moto') ? 0.1 : 0.6).add(new V3(0, f.kind.startsWith('moto') ? 1.75 : f.kind === 'pickup' ? 1.7 : 1.3, 0))
         : f.pos.clone().addScaledVector(fw, -back).add(new V3(0, 2.6 + back * 0.15, 0));
       this.camera.position.lerp(want, this.cockpit || this._snap ? 1 : Math.max(0.2, 1 - Math.exp(-dt * 6))); this._snap = false;
       const look = f.pos.clone().addScaledVector(fw, 25); look.y += (this.cockpit ? 1.2 : 1.0) + pitch; this.camera.lookAt(look);
+      if (this.playerMesh) this.playerMesh.visible = !this.cockpit || f.kind.startsWith('moto');
       focus = f.pos;
     } else if (this.mode === 'walk') { this.walker.step(dt, this.camera); focus = this.walker.pos; }
     else {
@@ -905,6 +1007,8 @@ export class World {
     if (cam.right !== half) { cam.left = -half; cam.right = half; cam.top = half; cam.bottom = -half; cam.near = 1; cam.far = half * 6; cam.updateProjectionMatrix(); }
     this.sun.target.position.copy(focus); this.sun.position.copy(focus).addScaledVector(this.sunDir, half * 3);
     this.updateHud(focus, dt);
+    if (this.trafficOn !== false) this.updatePeople(dt);
+    this.renderReflection(focus);
     this.renderer.render(this.scene, this.camera);
   }
 }
