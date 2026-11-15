@@ -5,14 +5,14 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=8';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=8';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=8';
-import { buildTrees, GrassField } from './vegetation.js?v=8';
-import { RoadNet, Driver, Walker } from './modes.js?v=8';
-import { vehicleKit } from './vehicles.js?v=8';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=8';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=8';
+import * as G from './geo.js?v=9';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=9';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=9';
+import { buildTrees, GrassField } from './vegetation.js?v=9';
+import { RoadNet, Driver, Walker } from './modes.js?v=9';
+import { vehicleKit } from './vehicles.js?v=9';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=9';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=9';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -407,7 +407,7 @@ export class World {
       const i = Math.floor(gx), j = Math.floor(gz), fx = gx - i, fz = gz - j;
       return (Hg[j * R + i] * (1 - fx) + Hg[j * R + i + 1] * fx) * (1 - fz) + (Hg[(j + 1) * R + i] * (1 - fx) + Hg[(j + 1) * R + i + 1] * fx) * fz;
     };
-    const waterDepth = 1.1 + 0.5 * Math.min(exag, 2);
+    const waterDepth = 1.1 + 0.5 * Math.min(exag, 2), wLevel = new Float32Array(Hg.length).fill(NaN);
     const waterSurfaces = [];
     for (const rings of D.waterPolys) {
       const o = rings[0]; let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
@@ -419,7 +419,7 @@ export class World {
       if (inside.length >= 3) { const hs = inside.map(v => Hg[v]).sort((a, b) => a - b); level = hs[Math.floor(hs.length * 0.25)]; }
       else level = Math.min(...o.map(([x, z]) => gridAt(x, z)));
       level = Math.max(level, this.seaY + 0.05);
-      for (const v of inside) Hg[v] = Math.min(Hg[v], level - waterDepth);
+      for (const v of inside) { Hg[v] = Math.min(Hg[v], level - waterDepth); wLevel[v] = level; }
       waterSurfaces.push({ rings, level: level + 0.05 });
     }
     const step = Math.min(dx, dz) * 0.6;
@@ -441,10 +441,21 @@ export class World {
         const vx = b.x - a.x, vz = b.z - a.z, L2 = vx * vx + vz * vz || 1;
         for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
           const x = X0 + i * dx, z = Z0 + j * dz, t = THREE.MathUtils.clamp(((x - a.x) * vx + (z - a.z) * vz) / L2, 0, 1);
-          if (Math.hypot(x - a.x - vx * t, z - a.z - vz * t) <= half) { const v = j * R + i; Hg[v] = Math.min(Hg[v], lvl[k] - waterDepth * 0.7); }
+          if (Math.hypot(x - a.x - vx * t, z - a.z - vz * t) <= half) { const v = j * R + i; Hg[v] = Math.min(Hg[v], lvl[k] - waterDepth * 0.7); wLevel[v] = lvl[k]; }
         }
       }
       waterLines.push({ pts, width });
+    }
+    // gentle banks: SRTM often puts forest canopy height on the land next to water, which made cliffs.
+    // Chamfer distance from water, carrying the nearest water level, then cap the land to a slope.
+    {
+      const dist = new Float32Array(Hg.length).fill(1e9), lv = new Float32Array(Hg.length);
+      for (let v = 0; v < Hg.length; v++) if (wLevel[v] === wLevel[v]) { dist[v] = 0; lv[v] = wLevel[v]; }
+      const dd = Math.hypot(dx, dz), relax = (v, u, c) => { if (dist[u] + c < dist[v]) { dist[v] = dist[u] + c; lv[v] = lv[u]; } };
+      for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) { const v = j * R + i; if (i) relax(v, v - 1, dx); if (j) { relax(v, v - R, dz); if (i) relax(v, v - R - 1, dd); if (i < nx) relax(v, v - R + 1, dd); } }
+      for (let j = nz; j >= 0; j--) for (let i = nx; i >= 0; i--) { const v = j * R + i; if (i < nx) relax(v, v + 1, dx); if (j < nz) { relax(v, v + R, dz); if (i < nx) relax(v, v + R + 1, dd); if (i) relax(v, v + R - 1, dd); } }
+      const slope = 0.06 + 0.06 * Math.min(exag, 2);
+      for (let v = 0; v < Hg.length; v++) if (dist[v] > 0 && dist[v] < 80) Hg[v] = Math.min(Hg[v], lv[v] + 0.35 + dist[v] * slope);
     }
     // road grading: smooth each road's long profile and conform the terrain corridor to it
     const tgt = new Float32Array(Hg.length), wgt = new Float32Array(Hg.length);
@@ -670,7 +681,7 @@ export class World {
       if (!h) h = ({ 1: 3.6, 2: 6.8, 3: 13, 4: 9.5, 5: 7, 6: 7, 7: 7.4, 8: 9.5, 9: 4, 10: 3, 11: 6, 12: 6 })[t] || (area > 250 ? 7.0 : 3.6 + rnd() * 3.3);
       let gnd = Infinity; for (const p of ring) gnd = Math.min(gnd, this.hAt(p[0], p[1])); gnd -= 0.3;
       const wallC = new THREE.Color(WALLS[(rnd() * WALLS.length) | 0]).convertSRGBToLinear();
-      const winType = t === 9 || t === 10 ? 0 : (h > 6.5 || [3, 4, 7, 8].includes(t)) ? 2 : 1, top = gnd + h;
+      const winType = t === 9 || t === 10 || t === 6 || t === 11 ? 0 : (h > 6.5 || [3, 4, 7, 8].includes(t)) ? 2 : 1, top = gnd + h;
       let along = 0;
       for (let i = 0; i < ring.length; i++) {
         const p = ring[i], q = ring[(i + 1) % ring.length], L = Math.hypot(q[0] - p[0], q[1] - p[1]);
