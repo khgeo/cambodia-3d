@@ -5,14 +5,14 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=11';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=11';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=11';
-import { buildTrees, GrassField } from './vegetation.js?v=11';
-import { RoadNet, Driver, Walker } from './modes.js?v=11';
-import { vehicleKit } from './vehicles.js?v=11';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=11';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=11';
+import * as G from './geo.js?v=12';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=12';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=12';
+import { buildTrees, GrassField } from './vegetation.js?v=12';
+import { RoadNet, Driver, Walker } from './modes.js?v=12';
+import { vehicleKit } from './vehicles.js?v=12';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=12';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=12';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -964,7 +964,7 @@ export class World {
     }
   }
   startDrive(ri, k, kind) {
-    kind = kind || this.driveKind || 'car'; this.driveKind = kind;
+    kind = kind || this.driveKind || 'car'; this.driveKind = kind; if (this.onVehicle) this.onVehicle(kind);
     if (this.playerMesh) this.root.remove(this.playerMesh);
     const kit = this.kit[kind], g = new THREE.Group();
     const paint = new THREE.Mesh(kit.paint, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.5, side: THREE.DoubleSide, color: kind === 'tuktuk' ? 0x2a6fb0 : 0xc0392b }));

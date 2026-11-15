@@ -1,8 +1,8 @@
 // Foliage kit: leaf textures (procedural, alpha-cut), sugar palm (Borassus) with fan leaves and a
 // skirt of dead fronds, leafy trees made of alpha-tested leaf cards, and forest understory plants.
 import * as THREE from 'three';
-import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js?v=11';
-import { mulberry32 } from './geo.js?v=11';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js?v=12';
+import { mulberry32 } from './geo.js?v=12';
 
 /* ---------------- textures ---------------- */
 function tex(c, bleed = [70, 105, 45]) {

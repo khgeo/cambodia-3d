@@ -1,6 +1,6 @@
 // Procedural textures (all generated in the browser, no downloads) and imagery enhancement
 import * as THREE from 'three';
-import { mulberry32 } from './geo.js?v=11';
+import { mulberry32 } from './geo.js?v=12';
 
 function canvas(S) { const c = document.createElement('canvas'); c.width = c.height = S; return c; }
 function gray(c, colorSpace = THREE.NoColorSpace) {
