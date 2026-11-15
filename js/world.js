@@ -5,14 +5,14 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=10';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=10';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=10';
-import { buildTrees, GrassField } from './vegetation.js?v=10';
-import { RoadNet, Driver, Walker } from './modes.js?v=10';
-import { vehicleKit } from './vehicles.js?v=10';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=10';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=10';
+import * as G from './geo.js?v=11';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=11';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=11';
+import { buildTrees, GrassField } from './vegetation.js?v=11';
+import { RoadNet, Driver, Walker } from './modes.js?v=11';
+import { vehicleKit } from './vehicles.js?v=11';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=11';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=11';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -680,7 +680,8 @@ export class World {
       let h = b.hdm > 20 ? b.hdm / 10 : b.lv > 0 ? b.lv * 3.2 + 0.6 : 0;
       if (!h) h = ({ 1: 3.6, 2: 6.8, 3: 13, 4: 9.5, 5: 7, 6: 7, 7: 7.4, 8: 9.5, 9: 4, 10: 3, 11: 6, 12: 6 })[t] || (area > 250 ? 7.0 : 3.6 + rnd() * 3.3);
       let gnd = Infinity; for (const p of ring) gnd = Math.min(gnd, this.hAt(p[0], p[1])); gnd -= 0.3;
-      const wallC = new THREE.Color(WALLS[(rnd() * WALLS.length) | 0]).convertSRGBToLinear();
+      const stone = t === 6 && area >= 1500; // large temple complexes: sandstone, flat, no windows
+      const wallC = new THREE.Color(stone ? 0x9a8c72 : WALLS[(rnd() * WALLS.length) | 0]).convertSRGBToLinear();
       const winType = t === 9 || t === 10 || t === 6 || t === 11 ? 0 : (h > 6.5 || [3, 4, 7, 8].includes(t)) ? 2 : 1, top = gnd + h;
       let along = 0;
       for (let i = 0; i < ring.length; i++) {
@@ -697,7 +698,7 @@ export class World {
         const r = Math.sqrt(area / Math.PI) * 0.9, g = new THREE.LatheGeometry([[0, 0], [r, 0], [r * 0.95, r * 0.6], [r * 0.55, r * 1.3], [r * 0.25, r * 1.9], [0.05, r * 3.2]].map(([x, y]) => new THREE.Vector2(x, y)), 12).toNonIndexed();
         const gp = g.attributes.position, gold = new THREE.Color(0xd8b25a).convertSRGBToLinear(), white = new THREE.Color(0xf2efe6).convertSRGBToLinear();
         for (let i = 0; i < gp.count; i++) push([gp.getX(i) + ob.cx, gp.getY(i) + top, gp.getZ(i) + ob.cz], gp.getY(i) > r * 1.3 ? gold : white, [0, 0, 0, 0]);
-      } else if (pitched || (t === 6 && ob)) {
+      } else if (pitched || (t === 6 && ob && area < 1500)) {
         const o = 0.45, pagoda = t === 6, P = (u, v, y) => [ob.cx + ob.ux * u + ob.vx * v, y, ob.cz + ob.uz * u + ob.vz * v];
         const roofC = new THREE.Color(pagoda ? 0xc0562a : ROOF_G[(rnd() * ROOF_G.length) | 0]).convertSRGBToLinear(), gableC = new THREE.Color(0xd9a441).convertSRGBToLinear();
         const tiers = pagoda ? [[1, 1, 0], [0.72, 0.8, 0.55]] : [[1, 1, 0]], hip = !pagoda && rnd() < 0.45;
@@ -714,7 +715,7 @@ export class World {
         }
         if (pagoda) tri(P(-0.3, 0, ybase), P(0.3, 0, ybase), P(0, 0, ybase + ob.b * 0.9), gableC);
       } else {
-        const roofC = new THREE.Color(ROOF_F[(rnd() * ROOF_F.length) | 0]).convertSRGBToLinear();
+        const roofC = new THREE.Color(stone ? 0x857a66 : ROOF_F[(rnd() * ROOF_F.length) | 0]).convertSRGBToLinear();
         const contour = ring.map(p => new THREE.Vector2(p[0], p[1]));
         for (const tr of THREE.ShapeUtils.triangulateShape(contour, [])) tri(...tr.map(k => [contour[k].x, top, contour[k].y]), roofC);
         if (big && ob && rnd() < 0.5) {
