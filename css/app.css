@@ -60,3 +60,11 @@ button.on2{background:#2f7fd0;color:#fff}
 button.exit{background:#5a2d2d}
 .joy{position:absolute;left:28px;bottom:40px;width:120px;height:120px;border-radius:50%;background:rgba(17,23,31,.45);border:2px solid rgba(255,255,255,.35);z-index:7;touch-action:none}
 .joy .knob{position:absolute;left:36px;top:36px;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.75);pointer-events:none}
+
+#hud{position:absolute;right:10px;bottom:30px;width:180px;z-index:6;background:rgba(17,23,31,.84);border-radius:12px;overflow:hidden;color:#e8eef4;font-size:11px;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 6px 20px rgba(0,0,0,.3)}
+#hud[hidden]{display:none}
+#hud canvas{display:block;width:180px;height:180px}
+#hud .hudtext{padding:6px 8px 7px;line-height:1.45;font-variant-numeric:tabular-nums}
+#hud .hudzoom{position:absolute;left:6px;top:6px;width:26px;height:26px;padding:0;border-radius:13px;background:rgba(17,23,31,.7);font-size:15px}
+@media (max-width:640px){#hud{width:140px}#hud canvas{width:140px;height:140px}}

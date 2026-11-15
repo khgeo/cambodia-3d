@@ -30,6 +30,16 @@ Pick any area in Cambodia on a satellite map and turn it into a 3D scene. The sc
 - **Drive**: tap any road. The vehicle follows the network and picks a turn at junctions. You can choose car, motorbike, tuk-tuk, truck or bus, set the speed, turn around, and switch between cockpit and chase camera.
 - **Walk**: first person anywhere, off-road too. Use the joystick or WASD/arrow keys, drag to look, and tap the ground to jump there. Buildings and water block you.
 
+## Inset map and navigation
+In the bottom-right corner, a north-up inset map shows the satellite image with roads, your position arrow and field of view, a north arrow and a scale bar. Tap ⊕ to change its zoom. Under the map you can read the heading (compass point and degrees), latitude/longitude, UTM 48N coordinates, the real elevation (not exaggerated) and the speed.
+When walking or driving with a mouse or trackpad, the view follows the cursor without dragging. Resting the cursor near a screen edge keeps turning. On touch screens you drag to look.
+
+## Vegetation
+- **Sugar palms (Borassus):** tall grey trunks, round crowns of spiky fan leaves and a skirt of dry fronds. They're placed where lone canopy stands in open fields.
+- **Coconut palms:** placed near houses.
+- **Broadleaf trees:** three crown shapes built from alpha-cut leaf cards, which cast leaf-shaped shadows, tinted from the image.
+- **Forest floor (near the viewer, inside canopy):** ferns, shrubs, small fan palms, saplings, bamboo patches, rocks and fallen logs, on leaf-litter ground.
+
 ## Clouds
 When **Fill clouds in 3D** is on, clouds are found in the satellite image: bright, grey, large patches, so small white roofs are ignored. Each cloudy tile is then replaced from a clear source, tried in this order:
 1. The other provider (Google or Esri).

@@ -5,13 +5,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=6';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=6';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=6';
-import { buildTrees, GrassField } from './vegetation.js?v=6';
-import { RoadNet, Driver, Walker } from './modes.js?v=6';
-import { vehicleKit } from './vehicles.js?v=6';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=6';
+import * as G from './geo.js?v=7';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=7';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=7';
+import { buildTrees, GrassField } from './vegetation.js?v=7';
+import { RoadNet, Driver, Walker } from './modes.js?v=7';
+import { vehicleKit } from './vehicles.js?v=7';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=7';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -129,8 +129,16 @@ export class World {
       if (moved < 8 && dt < 450) this.onTap(e);
     });
 
+    // hover tracking (mouse/trackpad): look around without dragging
+    this.mouse = { x: 0, y: 0, inside: false }; this.lookOff = 0;
+    el.addEventListener('pointermove', e => {
+      if (e.pointerType !== 'mouse') return; const b = el.getBoundingClientRect();
+      this.mouse.x = ((e.clientX - b.left) / b.width) * 2 - 1; this.mouse.y = ((e.clientY - b.top) / b.height) * 2 - 1; this.mouse.inside = true;
+    });
+    el.addEventListener('pointerleave', () => { this.mouse.inside = false; });
+    this.hud = { speed: 0 }; this._prevFocus = null;
     this.clock = new THREE.Clock();
-    r.setAnimationLoop(() => this.frame());
+    r.setAnimationLoop(() => { try { this.frame(); } catch (e) { if (!this._errShown) { console.error(e); this._errShown = true; } } });
     new ResizeObserver(() => this.resize()).observe(container);
   }
 
@@ -239,6 +247,17 @@ export class World {
     const pxX = lon => (G.lon2tx(lon, zi) - ir.x0) * 256, pxY = lat => (G.lat2ty(lat, zi) - ir.y0) * 256;
     const u0 = pxX(F.lon(X0)) / img.width, u1 = pxX(F.lon(X1)) / img.width, v0 = 1 - pxY(F.lat(Z0)) / img.height, v1 = 1 - pxY(F.lat(Z1)) / img.height;
     const imgA = new THREE.Vector4((u1 - u0) / W, u0 - X0 * (u1 - u0) / W, (v1 - v0) / H, v0 - Z0 * (v1 - v0) / H);
+    { // inset-map base: AOI imagery with roads
+      const mc = document.createElement('canvas'), asp = W / H; mc.width = asp >= 1 ? 512 : Math.round(512 * asp); mc.height = asp >= 1 ? Math.round(512 / asp) : 512;
+      const c2 = mc.getContext('2d'), sx0 = pxX(F.lon(X0)), sx1 = pxX(F.lon(X1)), sy0 = pxY(F.lat(Z0)), sy1 = pxY(F.lat(Z1));
+      c2.drawImage(img, sx0, sy0, sx1 - sx0, sy1 - sy0, 0, 0, mc.width, mc.height);
+      c2.lineCap = c2.lineJoin = 'round';
+      for (const r of roads) {
+        if (r.cls > 16) continue; c2.strokeStyle = r.cls <= 4 ? '#ff9a4a' : r.cls <= 10 ? '#ffe08a' : 'rgba(255,255,255,0.75)'; c2.lineWidth = r.cls <= 4 ? 2.4 : r.cls <= 10 ? 1.8 : 1;
+        c2.beginPath(); r.pts.forEach((p, i) => { const x = (p[0] - X0) / W * mc.width, y = (p[1] - Z0) / H * mc.height; i ? c2.lineTo(x, y) : c2.moveTo(x, y); }); c2.stroke();
+      }
+      this.miniCanvas = mc;
+    }
     let px = null; try { px = ictx.getImageData(0, 0, img.width, img.height).data; } catch { }
     const gains = px ? balanceGains(px) : { o: [0, 0, 0], g: [1, 1, 1], add: 0 };
     const pxAt = (x, z) => {
@@ -309,7 +328,7 @@ export class World {
       if (mAt(fmask, x, z) && k === 3) k = 2;
       cls[q] = k; counts[k]++;
       const o = q * 4; // r grass, g rice, b soil, a gravel
-      if (k === 2 || k === 0) splat[o] = 255;
+      if (k === 2) { splat[o] = 110; splat[o + 2] = 145; } else if (k === 0) splat[o] = 255;
       else if (k === 3) { if (nearB[q]) splat[o] = 255; else { splat[o + 1] = 255; splatRice[q] = 1; } }
       else if (k === 1) { splat[o + 1] = 120; splat[o + 2] = 135; }
       else if (k === 4) splat[o + 2] = 255;
@@ -802,6 +821,23 @@ export class World {
     }
     if (this.onModeChange) this.onModeChange(mode);
   }
+  rawElevation(x, z) {
+    const D = this.D; if (!D || !D.raw) return 0;
+    let gx = (x - D.X0) / D.dx, gz = (z - D.Z0) / D.dz; gx = Math.min(Math.max(gx, 0), D.nx - 1e-6); gz = Math.min(Math.max(gz, 0), D.nz - 1e-6);
+    const i = Math.floor(gx), j = Math.floor(gz), fx = gx - i, fz = gz - j, R = D.nx + 1, r = D.raw;
+    return (r[j * R + i] * (1 - fx) + r[j * R + i + 1] * fx) * (1 - fz) + (r[(j + 1) * R + i] * (1 - fx) + r[(j + 1) * R + i + 1] * fx) * fz;
+  }
+  updateHud(focus, dt) {
+    if (!this.F || !this.D || !this.D.raw || !this.hAt) return;
+    let heading;
+    if (this.mode === 'drive' && this.driver) heading = Math.atan2(this.driver.fwd.x, -this.driver.fwd.z);
+    else if (this.mode === 'walk') heading = Math.atan2(-Math.sin(this.walker.yaw), Math.cos(this.walker.yaw));
+    else { const v = new V3(); this.camera.getWorldDirection(v); heading = Math.atan2(v.x, -v.z); }
+    if (this._prevFocus && dt > 0) { const jump = Math.hypot(focus.x - this._prevFocus.x, focus.z - this._prevFocus.z), sp = jump / dt; if (jump > 15) this.hud.speed = 0; else this.hud.speed += (sp - this.hud.speed) * Math.min(1, dt * 3); }
+    this._prevFocus = { x: focus.x, z: focus.z };
+    Object.assign(this.hud, { mode: this.mode, x: focus.x, z: focus.z, lon: this.F.lon(focus.x), lat: this.F.lat(focus.z), elev: this.rawElevation(focus.x, focus.z), heading: (THREE.MathUtils.radToDeg(heading) + 360) % 360,
+      speedShown: this.mode === 'drive' && this.driver ? this.driver.speed : (this.mode === 'walk' ? this.hud.speed : 0), fov: this.camera.fov * this.camera.aspect });
+  }
   groundAt(x, z) { return this.hAt ? this.hAt(x, z) : 0; }
   onTap(e) {
     if (!this.terrainMesh || (this.mode !== 'drive' && this.mode !== 'walk')) return;
@@ -848,10 +884,12 @@ export class World {
     if (this.mode === 'drive' && this.driver) {
       this.driver.step(dt);
       const f = this.driver, back = this.kit[f.kind].len * 2.4 + (this.cockpit ? 0 : 5);
+      const tgtOff = this.mouse.inside ? -this.mouse.x * 1.4 : 0; this.lookOff += (tgtOff - this.lookOff) * Math.min(1, dt * 4);
+      const fw = f.fwd.clone().applyAxisAngle(new V3(0, 1, 0), this.lookOff), pitch = this.mouse.inside ? -this.mouse.y * 6 : 0;
       const want = this.cockpit ? f.pos.clone().addScaledVector(f.fwd, 0.6).add(new V3(0, f.kind === 'moto' ? 1.6 : 1.35, 0))
-        : f.pos.clone().addScaledVector(f.fwd, -back).add(new V3(0, 2.6 + back * 0.15, 0));
+        : f.pos.clone().addScaledVector(fw, -back).add(new V3(0, 2.6 + back * 0.15, 0));
       this.camera.position.lerp(want, this.cockpit || this._snap ? 1 : Math.max(0.2, 1 - Math.exp(-dt * 6))); this._snap = false;
-      const look = f.pos.clone().addScaledVector(f.fwd, 25); look.y += this.cockpit ? 1.2 : 1.0; this.camera.lookAt(look);
+      const look = f.pos.clone().addScaledVector(fw, 25); look.y += (this.cockpit ? 1.2 : 1.0) + pitch; this.camera.lookAt(look);
       focus = f.pos;
     } else if (this.mode === 'walk') { this.walker.step(dt, this.camera); focus = this.walker.pos; }
     else {
@@ -866,6 +904,7 @@ export class World {
     const half = THREE.MathUtils.clamp(dist * 0.9, 50, (this.extent || 2000) * 0.75), cam = this.sun.shadow.camera;
     if (cam.right !== half) { cam.left = -half; cam.right = half; cam.top = half; cam.bottom = -half; cam.near = 1; cam.far = half * 6; cam.updateProjectionMatrix(); }
     this.sun.target.position.copy(focus); this.sun.position.copy(focus).addScaledVector(this.sunDir, half * 3);
+    this.updateHud(focus, dt);
     this.renderer.render(this.scene, this.camera);
   }
 }

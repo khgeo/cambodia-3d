@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=6">
+<link rel="stylesheet" href="css/app.css?v=7">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -95,14 +95,15 @@
     </div>
   </div>
   <div id="walkBar" class="bar" hidden>
-    <div class="hint">Drag to look · joystick or WASD / arrows to walk · tap the ground to jump there</div>
+    <div class="hint">Move the cursor to look (drag on touch) · joystick or WASD / arrows · tap the ground to jump there</div>
     <div class="row"><button id="run">🏃 Run</button><button class="exit" data-exit>✕ Exit</button></div>
   </div>
   <div id="joy" class="joy" hidden><div class="knob"></div></div>
   <button class="fab" id="sceneToggle" aria-label="Panel">☰</button>
+  <div id="hud" hidden><canvas width="180" height="180"></canvas><button class="hudzoom" title="Change inset-map zoom">⊕</button><div class="hudtext"></div></div>
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=6"></script>
+<script type="module" src="js/app.js?v=7"></script>
 </body>
 </html>

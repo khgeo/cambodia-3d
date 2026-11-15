@@ -64,7 +64,11 @@ export class Walker {
     addEventListener('keydown', this.onKey); addEventListener('keyup', this.onKey);
     const el = world.renderer.domElement; let last = null;
     this.onDown = e => { if (!this.active || e.target !== el) return; last = [e.clientX, e.clientY]; el.setPointerCapture?.(e.pointerId); };
-    this.onMove = e => { if (!this.active || !last) return; this.yaw -= (e.clientX - last[0]) * 0.005; this.pitch = THREE.MathUtils.clamp(this.pitch - (e.clientY - last[1]) * 0.004, -1.2, 1.0); last = [e.clientX, e.clientY]; };
+    this.onMove = e => {
+      if (this.active && e.pointerType === 'mouse' && !e.buttons && e.target === el) { // look by moving the cursor, no drag
+        this.yaw -= (e.movementX || 0) * 0.0032; this.pitch = THREE.MathUtils.clamp(this.pitch - (e.movementY || 0) * 0.0026, -1.2, 1.0); return;
+      }
+      if (!this.active || !last) return; this.yaw -= (e.clientX - last[0]) * 0.005; this.pitch = THREE.MathUtils.clamp(this.pitch - (e.clientY - last[1]) * 0.004, -1.2, 1.0); last = [e.clientX, e.clientY]; };
     this.onUp = () => { last = null; };
     el.addEventListener('pointerdown', this.onDown); addEventListener('pointermove', this.onMove); addEventListener('pointerup', this.onUp);
   }
@@ -79,6 +83,8 @@ export class Walker {
     const k = this.keys; let fx = this.move.y, sx = this.move.x;
     if (k.KeyW || k.ArrowUp) fx += 1; if (k.KeyS || k.ArrowDown) fx -= 1; if (k.KeyA || k.ArrowLeft) sx -= 1; if (k.KeyD || k.ArrowRight) sx += 1;
     const len = Math.hypot(fx, sx); if (len > 1) { fx /= len; sx /= len; }
+    const m = this.w.mouse; // keep turning while the cursor rests near the screen edge
+    if (m && m.inside) { const ex = Math.abs(m.x) - 0.82, ey = Math.abs(m.y) - 0.85; if (ex > 0) this.yaw -= Math.sign(m.x) * ex / 0.18 * 1.6 * dt; if (ey > 0) this.pitch = THREE.MathUtils.clamp(this.pitch - Math.sign(m.y) * ey / 0.15 * 0.8 * dt, -1.2, 1.0); }
     const sp = (this.run ? 5.5 : 1.6) * dt;
     const fwx = -Math.sin(this.yaw), fwz = -Math.cos(this.yaw), rx = -fwz, rz = fwx;
     const dx = (fwx * fx + rx * sx) * sp, dz = (fwz * fx + rz * sx) * sp;
