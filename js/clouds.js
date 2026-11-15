@@ -130,7 +130,14 @@ export async function fillClouds({ ictx, W, H, ir, zi, source, say }) {
       if (n > 1500) { mp = [0, 1, 2].map(k => s[k] / n); sp = [0, 1, 2].map(k => Math.sqrt(Math.max(1, s[k + 3] / n - mp[k] ** 2))); mc = [0, 1, 2].map(k => s[k + 6] / n); sc = [0, 1, 2].map(k => Math.sqrt(Math.max(1, s[k + 9] / n - mc[k] ** 2))); }
       else {
         const a = [0, 0, 0, 0, 0, 0]; let c = 0; for (let q = 0; q < px.length; q += 8) { for (let k = 0; k < 3; k++) { a[k] += px[q + k]; a[k + 3] += px[q + k] ** 2; } c++; }
-        mp = gMean; sp = gStd; mc = [0, 1, 2].map(k => a[k] / c); sc = [0, 1, 2].map(k => Math.sqrt(Math.max(1, a[k + 3] / c - mc[k] ** 2)));
+        // target colours from clear primary pixels in the surrounding 3x3 tiles (keeps neighbouring swaps consistent)
+        const q2 = [0, 0, 0, 0, 0, 0]; let n2 = 0;
+        for (let yy = Math.max(0, (t.ty - 1) * 256); yy < Math.min(H, (t.ty + 2) * 256); yy += 3) for (let xx = Math.max(0, (t.tx - 1) * 256); xx < Math.min(W, (t.tx + 2) * 256); xx += 3) {
+          const i = yy * W + xx; if (m[i]) continue; const p = i * 4; for (let k = 0; k < 3; k++) { q2[k] += d[p + k]; q2[k + 3] += d[p + k] ** 2; } n2++;
+        }
+        if (n2 > 3000) { mp = [0, 1, 2].map(k => q2[k] / n2); sp = [0, 1, 2].map(k => Math.sqrt(Math.max(1, q2[k + 3] / n2 - mp[k] ** 2))); }
+        else { mp = gMean; sp = gStd; }
+        mc = [0, 1, 2].map(k => a[k] / c); sc = [0, 1, 2].map(k => Math.sqrt(Math.max(1, a[k + 3] / c - mc[k] ** 2)));
       }
       const out = new Uint8ClampedArray(256 * 256 * 3);
       for (let i = 0, q = 0; i < 65536; i++, q += 4) for (let k = 0; k < 3; k++) out[i * 3 + k] = (px[q + k] - mc[k]) * Math.min(1.6, Math.max(0.6, sp[k] / sc[k])) + mp[k];

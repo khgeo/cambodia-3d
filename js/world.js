@@ -5,13 +5,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=5';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=5';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=5';
-import { buildTrees, GrassField } from './vegetation.js?v=5';
-import { RoadNet, Driver, Walker } from './modes.js?v=5';
-import { vehicleKit } from './vehicles.js?v=5';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=5';
+import * as G from './geo.js?v=6';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=6';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=6';
+import { buildTrees, GrassField } from './vegetation.js?v=6';
+import { RoadNet, Driver, Walker } from './modes.js?v=6';
+import { vehicleKit } from './vehicles.js?v=6';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=6';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
