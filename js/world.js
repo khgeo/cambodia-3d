@@ -5,12 +5,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=3';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=3';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=3';
-import { buildTrees, GrassField } from './vegetation.js?v=3';
-import { RoadNet, Driver, Walker } from './modes.js?v=3';
-import { vehicleKit } from './vehicles.js?v=3';
+import * as G from './geo.js?v=4';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=4';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=4';
+import { buildTrees, GrassField } from './vegetation.js?v=4';
+import { RoadNet, Driver, Walker } from './modes.js?v=4';
+import { vehicleKit } from './vehicles.js?v=4';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=4';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -223,6 +224,18 @@ export class World {
     });
     if (failed === jobs.length && opts.imagery === 'google') { say('Google tiles blocked – switching to Esri…'); return this.load(aoi, { ...opts, imagery: 'esri' }, say); }
     this.credit = src.credit; D.stats.imageryZoom = zi;
+    let cloud = null;
+    if (opts.cloudFill !== false) {
+      try { cloud = await fillClouds({ ictx, W: img.width, H: img.height, ir, zi, source: opts.imagery, say }); }
+      catch (e) { console.warn('cloud fill failed', e); }
+    }
+    D.stats.cloud = cloud && cloud.stats;
+    if (cloud && cloud.stats.sources) {
+      const n = Object.keys(cloud.stats.sources);
+      if (n.some(k => k.startsWith('Google'))) this.credit += ' · © Google';
+      if (n.some(k => k.startsWith('Esri Wayback'))) this.credit += ' · Esri World Imagery Wayback';
+      if (n.some(k => k.startsWith('Sentinel'))) this.credit += ' · ' + S2_CREDIT;
+    }
     const pxX = lon => (G.lon2tx(lon, zi) - ir.x0) * 256, pxY = lat => (G.lat2ty(lat, zi) - ir.y0) * 256;
     const u0 = pxX(F.lon(X0)) / img.width, u1 = pxX(F.lon(X1)) / img.width, v0 = 1 - pxY(F.lat(Z0)) / img.height, v1 = 1 - pxY(F.lat(Z1)) / img.height;
     const imgA = new THREE.Vector4((u1 - u0) / W, u0 - X0 * (u1 - u0) / W, (v1 - v0) / H, v0 - Z0 * (v1 - v0) / H);
@@ -251,7 +264,12 @@ export class World {
 
     /* imagery classification on a 2.5 m grid */
     const C = 2.5, gw = Math.floor(W / C), gh = Math.floor(H / C), cls = new Uint8Array(gw * gh);
-    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) { const [r, g, b] = pxAt(X0 + (i + .5) * C, Z0 + (j + .5) * C); cls[j * gw + i] = classify(r, g, b); }
+    const remain = cloud && cloud.remain;
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const x = X0 + (i + .5) * C, z = Z0 + (j + .5) * C;
+      if (remain) { const pi = Math.min(img.width - 1, Math.max(0, Math.round(pxX(F.lon(x))))), pj = Math.min(img.height - 1, Math.max(0, Math.round(pxY(F.lat(z))))); if (remain[pj * img.width + pi]) { cls[j * gw + i] = 0; continue; } }
+      const [r, g, b] = pxAt(x, z); cls[j * gw + i] = classify(r, g, b);
+    }
     // drop OSM water polygons that the image shows as dry/vegetated now (seasonal flood areas)
     const keptWater = [];
     for (const rings of waterPolys) {
@@ -291,14 +309,14 @@ export class World {
       if (mAt(fmask, x, z) && k === 3) k = 2;
       cls[q] = k; counts[k]++;
       const o = q * 4; // r grass, g rice, b soil, a gravel
-      if (k === 2) splat[o] = 255;
+      if (k === 2 || k === 0) splat[o] = 255;
       else if (k === 3) { if (nearB[q]) splat[o] = 255; else { splat[o + 1] = 255; splatRice[q] = 1; } }
       else if (k === 1) { splat[o + 1] = 120; splat[o + 2] = 135; }
       else if (k === 4) splat[o + 2] = 255;
       else splat[o + 3] = 255;
     }
-    const tot = gw * gh || 1;
-    this.lulc = { water: counts[1] / tot, tree: counts[2] / tot, crop: counts[3] / tot, bare: counts[4] / tot, built: counts[5] / tot };
+    const tot = Math.max(1, gw * gh - counts[0]);
+    this.lulc = { cloud: counts[0] / (gw * gh || 1), water: counts[1] / tot, tree: counts[2] / tot, crop: counts[3] / tot, bare: counts[4] / tot, built: counts[5] / tot };
     const splatTex = new THREE.DataTexture(splat, gw, gh, THREE.RGBAFormat); splatTex.magFilter = splatTex.minFilter = THREE.LinearFilter; splatTex.needsUpdate = true; this.textures.push(splatTex);
     const exclude = new Uint8Array(mw * mh); for (let i = 0; i < exclude.length; i++) exclude[i] = bmask[i] | rmask[i] | wmask[i];
     this.bmask = new Uint8Array(mw * mh); for (let i = 0; i < exclude.length; i++) this.bmask[i] = bmask[i] | wmask[i];

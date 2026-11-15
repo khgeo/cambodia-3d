@@ -30,6 +30,14 @@ Pick any area in Cambodia on a satellite map and turn it into a 3D scene. The sc
 - **Drive**: tap any road. The vehicle follows the network and picks a turn at junctions. You can choose car, motorbike, tuk-tuk, truck or bus, set the speed, turn around, and switch between cockpit and chase camera.
 - **Walk**: first person anywhere, off-road too. Use the joystick or WASD/arrow keys, drag to look, and tap the ground to jump there. Buildings and water block you.
 
+## Clouds
+When **Fill clouds in 3D** is on, clouds are found in the satellite image: bright, grey, large patches, so small white roofs are ignored. Each cloudy tile is then replaced from a clear source, tried in this order:
+1. The other provider (Google or Esri).
+2. Older **Esri World Imagery Wayback** versions. Only versions that actually differ at that spot are tried.
+3. **Sentinel-2 cloudless 2024** (EOX, 10 m), which never has clouds.
+
+The replacement is colour-matched to the surrounding image, cloud shadows are replaced too, and the edges are feathered. Any area that stays cloudy is marked unknown, so it doesn't count in the land-cover summary and gets no trees.
+
 ## Data
 `data/13/{x}/{y}.json` holds 8,951 compact tiles cut from `cambodia-261109_osm.pbf`. They contain roads, rail, waterways, water, land use and buildings, with coordinates delta-encoded in micro-degrees. To rebuild them from a newer PBF:
 

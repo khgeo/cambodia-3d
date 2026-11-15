@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=3">
+<link rel="stylesheet" href="css/app.css?v=4">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -32,6 +32,7 @@
     <div class="row checks">
       <label><input type="checkbox" id="labels" checked> Place labels</label>
       <label><input type="checkbox" id="roadsOn" checked> OSM roads</label>
+      <label><input type="checkbox" id="cloudFill" checked> Fill clouds in 3D</label>
     </div>
     <label class="lbl">Area of interest</label>
     <div class="seg" id="aoiMode">
@@ -102,6 +103,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=3"></script>
+<script type="module" src="js/app.js?v=4"></script>
 </body>
 </html>
