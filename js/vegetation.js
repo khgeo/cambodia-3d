@@ -1,10 +1,10 @@
 // Trees (leafy species, sugar & coconut palms, bushes) placed from imagery canopy, and a near-camera
 // field of grass, rice and forest understory that follows the viewer.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=12';
-import { mulberry32 } from './geo.js?v=12';
-import { makeGrassMaterial } from './shaders.js?v=12';
-import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=12';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=13';
+import { mulberry32 } from './geo.js?v=13';
+import { makeGrassMaterial } from './shaders.js?v=13';
+import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=13';
 
 let TEX = null;
 const texs = () => TEX || (TEX = foliageTextures());
@@ -32,7 +32,7 @@ function coconut() {
 }
 
 export function buildTrees(ctx) {
-  const { X0, Z0, C, gw, gh, cls, mask, mw, mh, MR, nearBuilt, pxAt, hAt, rnd, mobile } = ctx;
+  const { X0, Z0, C, gw, gh, cls, mask, mw, mh, MR, nearBuilt, pxAt, hAt, rnd, mobile } = ctx, palmOK = ctx.palmOK || (() => true);
   const at = (raster, x, z) => raster[Math.min(mh - 1, Math.max(0, ((z - Z0) / MR) | 0)) * mw + Math.min(mw - 1, Math.max(0, ((x - X0) / MR) | 0))];
   const nTree = cls.reduce((a, v) => a + (v === 2), 0);
   const cap = mobile ? 20000 : 42000, palmCap = mobile ? 1200 : 2600;
@@ -48,11 +48,12 @@ export function buildTrees(ctx) {
     const village = nearBuilt(x, z);
     if (k === 3) { if (nb >= 2 && nb <= 5 && rnd() < 0.05) L.bush.push([x, z, 0.9 + rnd() * 1.2]); continue; }
     if (nb <= 3) { // isolated canopy in open land: palms (sugar palms in fields, coconuts by houses)
+      if (!palmOK(x, z)) { if (rnd() < 0.5) L.round.push([x, z, 2.0 + rnd() * 1.5]); continue; } // forest/hills: no palms
       if (palms < palmCap && rnd() < 0.55) { palms++; (village ? L.coco : (rnd() < 0.5 ? L.sugarA : L.sugarB)).push([x, z, village ? 0.85 + rnd() * 0.35 : 0.8 + rnd() * 0.5]); }
       continue;
     }
     if (rnd() > pBase * (nb >= 8 ? 1 : 0.7)) continue;
-    if (village && palms < palmCap && rnd() < 0.2) { palms++; L.coco.push([x, z, 0.85 + rnd() * 0.35]); continue; }
+    if (village && palms < palmCap && rnd() < 0.2 && palmOK(x, z)) { palms++; L.coco.push([x, z, 0.85 + rnd() * 0.35]); continue; }
     const b = block(x, z), s = 2.4 + rnd() * 1.8 + (nb >= 8 ? 1.1 : 0);
     L[b < 0.5 ? 'round' : b < 0.75 ? 'wide' : 'tall'].push([x, z, s]);
     if (nb < 7 && rnd() < 0.3) L.bush.push([x + (rnd() - .5) * 3, z + (rnd() - .5) * 3, 0.9 + rnd() * 1.2]);

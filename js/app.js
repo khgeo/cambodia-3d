@@ -1,5 +1,5 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=12';
+import * as G from './geo.js?v=13';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -78,8 +78,12 @@ seg('basemap', v => { basemap = v; map.setLayoutProperty('esri', 'visibility', v
 seg('aoiMode', v => { aoiMode = v; map.getCanvas().style.cursor = v === 'box' ? 'crosshair' : ''; $('aoiInfo').textContent = v === 'box' ? 'Drag on the map to draw a box.' : 'Tap the map to place a square.'; });
 $('labels').onchange = e => map.setLayoutProperty('labels', 'visibility', e.target.checked ? 'visible' : 'none');
 $('roadsOn').onchange = e => { const v = e.target.checked ? 'visible' : 'none'; map.setLayoutProperty('roadsOv', 'visibility', v); map.setLayoutProperty('roadsDet', 'visibility', v); refreshDetail(); };
-$('mapToggle').onclick = () => $('mapPanel').classList.toggle('hidden');
-$('sceneToggle').onclick = () => $('scenePanel').classList.toggle('hidden');
+// panels can be hidden (⟨) and shown again (☰)
+const FAB = { mapPanel: 'mapToggle', scenePanel: 'sceneToggle' };
+function showPanel(id, on) { $(id).classList.toggle('hidden', !on); $(FAB[id]).classList.toggle('show', !on); }
+$('mapToggle').onclick = () => showPanel('mapPanel', true);
+$('sceneToggle').onclick = () => showPanel('scenePanel', true);
+document.querySelectorAll('.hideP').forEach(b => b.onclick = () => showPanel(b.dataset.panel, false));
 
 /* search (Nominatim, Cambodia only) */
 let searchTimer;
@@ -126,7 +130,30 @@ function validateAoi() {
   info.textContent = `${area.toFixed(2)} km²` + (has || !tileIndex.size ? ' · ready to build' : ' · outside the Cambodia OSM data (imagery + terrain only)') + (area > 9 ? ' · large area: may be slow on phones' : '');
   btn.disabled = false;
 }
-map.on('click', e => { if (aoiMode === 'tap') placeSquare(e.lngLat.lng, e.lngLat.lat); });
+map.on('click', e => {
+  const A = world && world.D && world.D.aoi, ll = e.lngLat;
+  if (A && ll.lng > A.w && ll.lng < A.e && ll.lat > A.s && ll.lat < A.n) { // inside the area already in 3D: jump there
+    const el = document.createElement('div'); el.className = 'pop';
+    el.innerHTML = '<b>Go here in 3D</b><button data-g="walk">🚶 Walk here</button><button data-g="drive">🚗 Drive nearest road</button><button data-g="look">👁 Look here</button><button data-g="new">⬚ New area here</button>';
+    const pop = new maplibregl.Popup({ closeButton: true }).setLngLat(ll).setDOMContent(el).addTo(map);
+    el.onclick = ev => {
+      const g = ev.target.dataset.g; if (!g) return; pop.remove();
+      if (g === 'new') { placeSquare(ll.lng, ll.lat); return; }
+      openScene(); const x = world.F.x(ll.lng), z = world.F.z(ll.lat);
+      if (g === 'walk') { world.setMode('walk'); world.teleport(x, z); } else if (g === 'drive') { world.setMode('drive'); world.teleport(x, z); } else world.teleport(x, z, 'orbit');
+    };
+    return;
+  }
+  if (aoiMode === 'tap') placeSquare(ll.lng, ll.lat);
+});
+// live position of the 3D viewer on the 2D map
+const posEl = document.createElement('div'); posEl.className = 'posmark';
+posEl.innerHTML = '<svg viewBox="0 0 22 22" width="22" height="22"><path d="M11 1 L18 20 L11 15 L4 20 Z" fill="#ff4d3d" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>';
+const posMarker = new maplibregl.Marker({ element: posEl, rotationAlignment: 'map' });
+setInterval(() => {
+  if (!world || !world.hud || world.hud.lat === undefined) return;
+  posMarker.setLngLat([world.hud.lon, world.hud.lat]).setRotation(world.hud.heading); if (!posMarker._map) posMarker.addTo(map);
+}, 500);
 let drag = null;
 const startBox = e => { if (aoiMode !== 'box') return; e.preventDefault(); map.dragPan.disable(); drag = e.lngLat; };
 const moveBox = e => { if (!drag || !e.lngLat) return; const a = drag, b = e.lngLat; setAoi({ w: Math.min(a.lng, b.lng), e: Math.max(a.lng, b.lng), s: Math.min(a.lat, b.lat), n: Math.max(a.lat, b.lat) }); };
@@ -171,15 +198,15 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=12'); world = new World($('scene')); window.__world = world;
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=13'); world = new World($('scene')); window.__world = world;
     world.onModeChange = m => {
       $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk';
-      if (m === 'drive' || m === 'walk') { setOn('views', m); if (innerWidth < 900) $('scenePanel').classList.add('hidden'); }
+      if (m === 'drive' || m === 'walk') { setOn('views', m); if (innerWidth < 900) showPanel('scenePanel', false); }
     };
     world.onHint = t => { $('driveHint').textContent = t; };
     world.onVehicle = k => { $('vehicle').value = k; };
-    const { joystick } = await import('./modes.js?v=12'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=12'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=13'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=13'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -190,7 +217,9 @@ $('build').onclick = async () => {
   await rebuild();
   $('hud').hidden = false;
 };
-$('back').onclick = () => { if (world) { world.setMode('orbit'); world.paused = true; } $('sceneView').hidden = true; $('mapView').hidden = false; map.resize(); };
+function openScene() { $('mapView').hidden = true; $('sceneView').hidden = false; if (world) world.paused = false; }
+$('return3d').onclick = () => openScene();
+$('back').onclick = () => { if (world) { world.setMode('orbit'); world.paused = true; } $('sceneView').hidden = true; $('mapView').hidden = false; $('return3d').hidden = !(world && world.D); map.resize(); };
 seg('views', v => {
   if (!world) return;
   if (v === 'drive') world.enterDrive(); else if (v === 'walk') world.setMode('walk'); else world.goView(v);
@@ -209,5 +238,5 @@ $('reverse').onclick = () => world && world.driver && world.driver.reverse();
 $('cockpit').onclick = e => { if (!world) return; world.cockpit = !world.cockpit; e.target.classList.toggle('on2', world.cockpit); };
 $('pickRoad').onclick = () => world && world.chooseRoad();
 $('run').onclick = e => { if (!world) return; world.walker.run = !world.walker.run; e.target.classList.toggle('on2', world.walker.run); };
-document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.setMode('orbit'); setOn('views', ''); $('scenePanel').classList.remove('hidden'); });
-if (innerWidth < 640) { $('mapPanel').classList.add('hidden'); }
+document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.setMode('orbit'); setOn('views', ''); showPanel('scenePanel', true); });
+if (innerWidth < 640) showPanel('mapPanel', false);

@@ -20,29 +20,32 @@ Pick any area in Cambodia on a satellite map and turn it into a 3D scene. The sc
   - Water: OSM lakes, rivers and canals, plus the sea at 0 m.
   - Buildings: extruded from OSM footprints, with gable or hip roofs on houses, two-tier roofs on pagodas, stupas, flat roofs and windows on taller buildings.
   - Trees: placed where the imagery shows dark-green canopy (an RGB greenness index). Isolated canopy in fields becomes sugar palms.
-  - Traffic: motorbikes, cars, tuk-tuks, trucks and buses, with density by road class.
+  - Traffic: motorbikes, cars, remorks, trucks and buses, with density by road class.
   - Ground styles: Satellite, Enhanced, or Stylised LULC, which is imagery-derived land cover (tree, crop/grass, bare soil, built, water) with a percentage summary.
 
 ## Exploring the scene
 - **Terrain height** slider (×0 flat … ×3) and **Smooth terrain & grade roads**: these rebuild only the geometry, so they're fast. Roads get a smoothed long profile and the ground is shaped to meet them.
 - **Ground**: Satellite, Enhanced (haze removal, colour balance, contrast stretch, sharpening, done in JavaScript so it also works in Safari) or Stylised LULC.
 - **Ground detail & grass**: near the camera the ground gets grass, rice-row, cracked-soil and gravel detail chosen by land cover. Rice-field bunds are traced from edges in the image, and 3D grass and rice clumps sway in the wind.
-- **Drive**: tap any road. The vehicle follows the network and picks a turn at junctions. You can choose car, motorbike, tuk-tuk, truck or bus, set the speed, turn around, and switch between cockpit and chase camera.
+- **Drive**: tap any road. The vehicle follows the network and picks a turn at junctions. You can choose car, pickup, motorbike, remork, truck or bus, set the speed, turn around, and switch between cockpit and chase camera.
 - **Walk**: first person anywhere, off-road too. Use the joystick or WASD/arrow keys, drag to look, and tap the ground to jump there. Buildings and water block you.
 
+## Panels
+Both side panels can be hidden with ⟨ and shown again with ☰.
+
 ## Inset map and navigation
-In the bottom-right corner, a north-up inset map shows the satellite image with roads, your position arrow and field of view, a north arrow and a scale bar. Tap ⊕ to change its zoom. Under the map you can read the heading (compass point and degrees), latitude/longitude, UTM 48N coordinates, the real elevation (not exaggerated) and the speed.
+In the top-right corner, a north-up inset map shows the satellite image with roads, your position arrow and field of view, a north arrow and a scale bar. Tap ⊕ to change its zoom. **Tap anywhere on the inset map to jump there**: in Walk you stand there, snapped onto a road if one is close; in Drive you start on the nearest road; otherwise the camera flies there. Back on the 2D map, a red arrow shows where you are in 3D, and tapping inside the built area lets you walk, drive or look there. Under the map you can read the heading (compass point and degrees), latitude/longitude, UTM 48N coordinates, the real elevation (not exaggerated) and the speed.
 When walking or driving with a mouse or trackpad, the view follows the cursor without dragging. Resting the cursor near a screen edge keeps turning. On touch screens you drag to look.
 
 ## Vegetation
-- **Sugar palms (Borassus):** tall grey trunks, round crowns of spiky fan leaves and a skirt of dry fronds. They're placed where lone canopy stands in open fields.
+- **Sugar palms (Borassus):** tall grey trunks, round crowns of spiky fan leaves and a skirt of dry fronds. They're placed where lone canopy stands in open lowland fields, never inside large forests or on hills and mountains.
 - **Coconut palms:** placed near houses.
 - **Broadleaf trees:** three crown shapes built from alpha-cut leaf cards, which cast leaf-shaped shadows, tinted from the image.
 - **Forest floor (near the viewer, inside canopy):** ferns, shrubs, small fan palms, saplings, bamboo patches, rocks and fallen logs, on leaf-litter ground.
 
 ## Water, vehicles and people
 - **Water reflections:** the nearest water body mirrors the trees, buildings and sky, rippled by the waves and stronger at low viewing angles. You can turn it off with the **Water reflections** switch.
-- **Vehicles:** cars, pickups, motorbikes (some with a passenger), Cambodian remork tuk-tuks, trucks and buses. Their bodies are built from side profiles with wheels, rims, lights and glass.
+- **Vehicles:** cars, pickups, motorbikes (some with a passenger), Cambodian remorks, trucks and buses. Their bodies are built from side profiles with wheels, rims, lights and glass.
 - **People and cattle:** pedestrians walk along village roads, farmers in conical hats work in the rice fields, and small herds of cows graze near villages.
 
 ## Clouds

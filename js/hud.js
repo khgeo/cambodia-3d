@@ -18,6 +18,12 @@ export class Hud {
     this.zoom = 0; // 0 auto
     root.querySelector('.hudzoom').onclick = () => { this.zoom = (this.zoom + 1) % 4; };
     setInterval(() => this.draw(), 120);
+    // tap / click the inset map to jump there (walk: stand there; drive: nearest road; orbit: look there)
+    this.canvas.addEventListener('pointerdown', e => {
+      if (!this.view) return; const b = this.canvas.getBoundingClientRect(), v = this.view;
+      const x = v.cx - v.win / 2 + (e.clientX - b.left) / b.width * v.win, z = v.cz - v.win / 2 + (e.clientY - b.top) / b.height * v.win;
+      this.w.teleport(x, z); e.preventDefault(); e.stopPropagation();
+    });
   }
   draw() {
     const w = this.w, h = w.hud, D = w.D, mc = w.miniCanvas;
@@ -27,6 +33,7 @@ export class Hud {
     const auto = h.mode === 'walk' ? 260 : h.mode === 'drive' ? 700 : Math.max(D.W, D.H);
     const win = [auto, 200, 600, Math.max(D.W, D.H)][this.zoom];
     const cx = win >= Math.max(D.W, D.H) ? 0 : h.x, cz = win >= Math.max(D.W, D.H) ? 0 : h.z;
+    this.view = { cx, cz, win };
     ctx.fillStyle = '#26303a'; ctx.fillRect(0, 0, S, S);
     const k = mc.width / D.W, sx = (cx - win / 2 - D.X0) * k, sy = (cz - win / 2 - D.Z0) * (mc.height / D.H);
     ctx.drawImage(mc, sx, sy, win * k, win * (mc.height / D.H), 0, 0, S, S);

@@ -5,14 +5,14 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=12';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=12';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=12';
-import { buildTrees, GrassField } from './vegetation.js?v=12';
-import { RoadNet, Driver, Walker } from './modes.js?v=12';
-import { vehicleKit } from './vehicles.js?v=12';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=12';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=12';
+import * as G from './geo.js?v=13';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=13';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=13';
+import { buildTrees, GrassField } from './vegetation.js?v=13';
+import { RoadNet, Driver, Walker } from './modes.js?v=13';
+import { vehicleKit } from './vehicles.js?v=13';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=13';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=13';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -607,7 +607,16 @@ export class World {
 
     /* 6. trees + near grass */
     say('Planting trees from the image…'); await tick();
-    const vctx = { ...D, mask: D.exclude, pxAt: D.pxAt, hAt, rnd, mobile: this.mobile };
+    // where palms belong: open lowland, not inside large forests or on hills/mountains
+    const sat = new Uint32Array((D.gw + 1) * (D.gh + 1));
+    for (let j = 0; j < D.gh; j++) for (let i = 0; i < D.gw; i++) sat[(j + 1) * (D.gw + 1) + i + 1] = (D.cls[j * D.gw + i] === 2 ? 1 : 0) + sat[j * (D.gw + 1) + i + 1] + sat[(j + 1) * (D.gw + 1) + i] - sat[j * (D.gw + 1) + i];
+    const forestFrac = (x, z) => {
+      const ci = ((x - X0) / D.C) | 0, cj = ((z - Z0) / D.C) | 0, r = 24, i0 = Math.max(0, ci - r), i1 = Math.min(D.gw, ci + r), j0 = Math.max(0, cj - r), j1 = Math.min(D.gh, cj + r), W1 = D.gw + 1;
+      return (sat[j1 * W1 + i1] - sat[j0 * W1 + i1] - sat[j1 * W1 + i0] + sat[j0 * W1 + i0]) / Math.max(1, (i1 - i0) * (j1 - j0));
+    };
+    const slopeAt = (x, z) => { const e = 30, a = this.rawElevation(x + e, z) - this.rawElevation(x - e, z), b = this.rawElevation(x, z + e) - this.rawElevation(x, z - e); return Math.hypot(a, b) / (2 * e); };
+    const palmOK = (x, z) => forestFrac(x, z) < 0.4 && slopeAt(x, z) < 0.07 && this.rawElevation(x, z) < 150;
+    const vctx = { ...D, mask: D.exclude, pxAt: D.pxAt, hAt, rnd, mobile: this.mobile, palmOK };
     const t = buildTrees(vctx); this.treeMeshes = t.meshes; t.meshes.forEach(m => this.root.add(m));
     D.stats.trees = t.counts;
     this.grass = new GrassField(vctx, this.uTime, this.mobile); this.root.add(this.grass.group);
@@ -950,6 +959,25 @@ export class World {
     this._prevFocus = { x: focus.x, z: focus.z };
     Object.assign(this.hud, { mode: this.mode, x: focus.x, z: focus.z, lon: this.F.lon(focus.x), lat: this.F.lat(focus.z), elev: this.rawElevation(focus.x, focus.z), heading: (THREE.MathUtils.radToDeg(heading) + 360) % 360,
       speedShown: this.mode === 'drive' && this.driver ? this.driver.speed : (this.mode === 'walk' ? this.hud.speed : 0), fov: this.camera.fov * this.camera.aspect });
+  }
+  // jump to a place: walk → stand there (snapping onto a road if one is close), drive → nearest road, orbit → look there
+  teleport(x, z, mode) {
+    if (!this.D) return; const D = this.D;
+    x = THREE.MathUtils.clamp(x, D.X0 + 2, D.X0 + D.W - 2); z = THREE.MathUtils.clamp(z, D.Z0 + 2, D.Z0 + D.H - 2);
+    const m = mode || this.mode;
+    if (m === 'walk') {
+      const r = this.net && this.net.near(x, z, 10)[0];
+      if (r) { const p = this.net.roads[r[0]].pts[r[1]]; x = p.x; z = p.z; }
+      for (let k = 0; k < 40 && this.walker.blocked(x, z); k++) { const a = k * 2.4, d = 2 + k; x += Math.cos(a) * d * 0.5; z += Math.sin(a) * d * 0.5; }
+      this.walker.place(x, z); this.walker.pos.y = this.groundAt(x, z) + 1.65; if (this.mode !== 'walk') this.setMode('walk');
+    } else if (m === 'drive') {
+      if (this.mode !== 'drive') this.setMode('drive');
+      const n = this.net && this.net.near(x, z, 300)[0]; if (n) this.startDrive(n[0], n[1]); else this.onHint && this.onHint('No road near that point.');
+    } else {
+      this.setMode('orbit'); const off = new V3().subVectors(this.camera.position, this.controls.target), y = this.groundAt(x, z);
+      if (off.length() > 600) off.setLength(600);
+      this.flight = { t: 0, p0: this.camera.position.clone(), q0: this.controls.target.clone(), p1: new V3(x, y, z).add(off), q1: new V3(x, y, z) };
+    }
   }
   groundAt(x, z) { return this.hAt ? this.hAt(x, z) : 0; }
   onTap(e) {
