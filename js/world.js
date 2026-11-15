@@ -315,6 +315,15 @@ export class World {
     return D;
   }
 
+  // compatibility for a cached older page (v1 app.js called world.build)
+  async build(aoi, opts, progress) {
+    const say = progress || (() => {});
+    await this.load(aoi, opts, say);
+    const st = await this.construct({ exaggeration: opts.exaggeration ?? 1.5, smooth: true }, say);
+    const t = st.trees || {};
+    return { stats: { ...st, trees: (t.round || 0) + (t.tall || 0) + (t.wide || 0), palms: (t.sugar || 0) + (t.coco || 0) } };
+  }
+
   waterwayWidth(wv) { return wv.wdm >= 10 ? wv.wdm / 10 : ({ 1: 18, 2: 7, 3: 3.5, 4: 2 })[wv.t]; }
 
   async loadTerrain(aoi, z) {
