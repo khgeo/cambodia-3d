@@ -1,6 +1,6 @@
 // Procedural textures (all generated in the browser, no downloads) and imagery enhancement
 import * as THREE from 'three';
-import { mulberry32 } from './geo.js?v=2';
+import { mulberry32 } from './geo.js?v=3';
 
 function canvas(S) { const c = document.createElement('canvas'); c.width = c.height = S; return c; }
 function gray(c, colorSpace = THREE.NoColorSpace) {
@@ -136,6 +136,6 @@ export function classify(r, g, b) {
   if (v < 42 && exg < 8 && b >= r) return 1;
   if (exg > 12 && v < 100 && g > r) return 2;
   if (exg > 6) return 3;
-  if (r > g + 6 && r > b + 16 && v < 190) return 4;
+  if (r > g + 4 && r > b + 14 && v < 235) return 4;
   return 5;
 }

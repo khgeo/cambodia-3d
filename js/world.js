@@ -5,12 +5,12 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=2';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=2';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=2';
-import { buildTrees, GrassField } from './vegetation.js?v=2';
-import { RoadNet, Driver, Walker } from './modes.js?v=2';
-import { vehicleKit } from './vehicles.js?v=2';
+import * as G from './geo.js?v=3';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=3';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=3';
+import { buildTrees, GrassField } from './vegetation.js?v=3';
+import { RoadNet, Driver, Walker } from './modes.js?v=3';
+import { vehicleKit } from './vehicles.js?v=3';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -796,7 +796,7 @@ export class World {
     paint.castShadow = fixed.castShadow = true; g.add(paint, fixed); this.root.add(g); this.playerMesh = g;
     const speed = this.driver ? this.driver.speed : 40 / 3.6;
     this.driver = new Driver(this, this.net, g, kind); this.driver.speed = speed; this.driver.start(ri, k, 1); this.driver.step(0);
-    this.pickRoad = false; this.onHint && this.onHint('Driving – the car follows the road network and turns at junctions.');
+    this.pickRoad = false; this._snap = true; this.onHint && this.onHint('Driving – the car follows the road network and turns at junctions.');
   }
   enterDrive() {
     this.setMode('drive'); this.flight = null;
@@ -823,7 +823,7 @@ export class World {
       const f = this.driver, back = this.kit[f.kind].len * 2.4 + (this.cockpit ? 0 : 5);
       const want = this.cockpit ? f.pos.clone().addScaledVector(f.fwd, 0.6).add(new V3(0, f.kind === 'moto' ? 1.6 : 1.35, 0))
         : f.pos.clone().addScaledVector(f.fwd, -back).add(new V3(0, 2.6 + back * 0.15, 0));
-      this.camera.position.lerp(want, this.cockpit ? 1 : 1 - Math.exp(-dt * 5));
+      this.camera.position.lerp(want, this.cockpit || this._snap ? 1 : Math.max(0.2, 1 - Math.exp(-dt * 6))); this._snap = false;
       const look = f.pos.clone().addScaledVector(f.fwd, 25); look.y += this.cockpit ? 1.2 : 1.0; this.camera.lookAt(look);
       focus = f.pos;
     } else if (this.mode === 'walk') { this.walker.step(dt, this.camera); focus = this.walker.pos; }

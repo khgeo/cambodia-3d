@@ -2,8 +2,8 @@
 // field of 3D grass / rice clumps that follows the viewer.
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mulberry32 } from './geo.js?v=2';
-import { makeGrassMaterial } from './shaders.js?v=2';
+import { mulberry32 } from './geo.js?v=3';
+import { makeGrassMaterial } from './shaders.js?v=3';
 
 function blob(sx, sy, sz, y, seed, detail = 1) {
   const g = mergeVertices(new THREE.IcosahedronGeometry(1, detail)), p = g.attributes.position, r = mulberry32(seed);
@@ -112,13 +112,14 @@ function bladeTuft(nBlades, h, w, bend, seed, base, tip) {
   return g;
 }
 
+const RICE = new THREE.Color(0x9cc25a), GRASS = new THREE.Color(0xa8b870);
 export class GrassField {
   constructor(ctx, uTime, mobile) {
     this.ctx = ctx; this.group = new THREE.Group();
     const mat = makeGrassMaterial({ uTime });
     this.N = mobile ? 14000 : 42000;
-    this.grass = new THREE.InstancedMesh(bladeTuft(9, 0.38, 0.022, 0.4, 1, 0x4a6a2a, 0xb9d47a), mat, this.N);
-    this.rice = new THREE.InstancedMesh(bladeTuft(11, 0.7, 0.016, 0.16, 2, 0x4c7a2c, 0xc4de7c), mat, this.N);
+    this.grass = new THREE.InstancedMesh(bladeTuft(9, 0.34, 0.022, 0.45, 1, 0x5f7f36, 0xd0e092), mat, this.N);
+    this.rice = new THREE.InstancedMesh(bladeTuft(11, 0.5, 0.016, 0.22, 2, 0x5e8a36, 0xd2e88c), mat, this.N);
     for (const m of [this.grass, this.rice]) { m.count = 0; m.frustumCulled = false; m.receiveShadow = true; this.group.add(m); }
     this.center = new THREE.Vector3(1e9, 0, 1e9);
   }
@@ -145,14 +146,14 @@ export class GrassField {
         const x = rx + (hs - .5) * 0.04, z = rz + (hash(j, i) - .5) * 0.04;
         d.position.set(x, hAt(x, z) - 0.02, z); d.rotation.set(0, hs * 6.28, 0); d.scale.setScalar((0.8 + hs * 0.35) * (0.6 + 0.4 * fade)); d.updateMatrix();
         this.rice.setMatrixAt(nr, d.matrix);
-        const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(1.6); this.rice.setColorAt(nr, col); nr++;
+        const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(2.2).lerp(RICE, 0.35); this.rice.setColorAt(nr, col); nr++;
       } else {
         const dens = k === 3 ? 0.95 : k === 2 ? 0.55 : k === 4 ? 0.15 : k === 5 ? 0.12 : 0;
         if (hs > dens || ng >= this.N) continue;
         const x = rx + (hash(i + 7, j) - .5) * sp, z = rz + (hash(i, j + 7) - .5) * sp;
         d.position.set(x, hAt(x, z) - 0.02, z); d.rotation.set(0, hs * 40, 0); d.scale.setScalar((0.7 + hash(i + 3, j) * 0.7) * (0.55 + 0.45 * fade)); d.updateMatrix();
         this.grass.setMatrixAt(ng, d.matrix);
-        const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(1.7); this.grass.setColorAt(ng, col); ng++;
+        const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(2.2).lerp(GRASS, 0.3); this.grass.setColorAt(ng, col); ng++;
       }
     }
     this.grass.count = ng; this.rice.count = nr;
