@@ -1022,13 +1022,13 @@ export class World {
   }
 
   // jump to a place: walk → stand there (snapping onto a road if one is close), drive → nearest road, orbit → look there
-  teleport(x, z, mode) {
+  teleport(x, z, mode, exact) {
     if (!this.D) return; const D = this.D;
     if (this.sectionPick && !mode) { this.pickSectionPoint(x, z); return; }
     x = THREE.MathUtils.clamp(x, D.X0 + 2, D.X0 + D.W - 2); z = THREE.MathUtils.clamp(z, D.Z0 + 2, D.Z0 + D.H - 2);
     const m = mode || this.mode;
     if (m === 'walk') {
-      const r = this.net && this.net.near(x, z, 10)[0];
+      const r = !exact && this.net && this.net.near(x, z, 10)[0];
       if (r) { const p = this.net.roads[r[0]].pts[r[1]]; x = p.x; z = p.z; }
       for (let k = 0; k < 40 && this.walker.blocked(x, z); k++) { const a = k * 2.4, d = 2 + k; x += Math.cos(a) * d * 0.5; z += Math.sin(a) * d * 0.5; }
       this.walker.place(x, z); this.walker.pos.y = this.groundAt(x, z) + 1.65; if (this.mode !== 'walk') this.setMode('walk');

@@ -410,7 +410,7 @@ const svTarget = () => {
 };
 $('svStake').onclick = () => { if (SV && svTarget()) { world.teleport(SV.target.x, SV.target.z, 'orbit'); svSay('Target set – the green line on the inset map points to it'); } };
 $('svWalk').onclick = () => { if (!SV || !svTarget()) return; SV.walkTo(); world.walker.auto.onBlocked = () => svSay('Blocked by a building or water – steer around it, then press Walk there again'); svSay('Walking to the target…'); svRender(); };
-$('svJump').onclick = () => { if (!SV || !svTarget()) return; const T = SV.target, fx = -Math.sin(world.walker.yaw), fz = -Math.cos(world.walker.yaw); world.teleport(T.x - fx * 0.8 + fz * 0.3, T.z - fz * 0.8 - fx * 0.3, 'walk'); svSay('You are at the target'); svRender(); };
+$('svJump').onclick = () => { if (!SV || !svTarget()) return; const T = SV.target, fx = -Math.sin(world.walker.yaw), fz = -Math.cos(world.walker.yaw); world.teleport(T.x - fx * 0.8 + fz * 0.3, T.z - fz * 0.8 - fx * 0.3, 'walk', true); svSay('You are at the target'); svRender(); };
 $('svGoto').onkeydown = e => { if (e.key === 'Enter') $('svStake').onclick(); };
 $('svCsv').onclick = () => SV && download('survey-points.csv', new Blob([SV.csv()], { type: 'text/csv' }));
 $('svGeo').onclick = () => SV && download('survey.geojson', new Blob([SV.geojson()], { type: 'application/geo+json' }));
