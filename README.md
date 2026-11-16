@@ -60,6 +60,15 @@ Controls:
 - **Each layer:** a checkbox to show or hide it and a slider for its opacity.
 - **On screen:** each slab has a coloured frame and a label, and dashed corner posts tie the stack together.
 
+More in the Layers panel:
+- **Moving around the stack:** use ◀ ▲ ▼ ▶ (or the arrow keys and PageUp/PageDown) to move left, right, up and down the stack, ＋/－ to zoom, and ⤢ to see the whole stack. Tapping a layer flies the camera to it. Right-drag or two-finger drag also pans, including up and down.
+- **Spacing slider:** sets how far apart the layers sit.
+- **Thicker underground slabs:** soil and rock slabs have sides, so they read as blocks. Geology is the thickest.
+- **Deep Earth block:** a column from the soil down to the inner core (6,371 km) on a log-depth scale, showing crust, Moho, lithosphere, asthenosphere, transition zone, lower mantle and outer/inner core. The upper crust is named after the local geological unit.
+- **Land cover 2017–2025:** Esri | Impact Observatory 10 m annual land cover (Sentinel-2), loaded live for the area. A year slider and ▶ step through the years, and *Show change since 2017* maps tree loss, new trees and new built-up land.
+- **Flood level:** a water sheet set by a chosen elevation (a simple bathtub model, no flow). It reports the share of the area under water and the mean depth, and it works with the layers apart or together.
+- **Cross-section through the stack:** a section line drawn while the layers are apart is shown on every slab, joined by a light curtain.
+
 ## Cross-section: soil and geology
 Tap **✂ Cross-section**, then tap point A and point B on the ground or on the inset map. A profile opens with these parts:
 - **Section:** the ground line at real elevation, with the vertical exaggeration stated. Under it are the soil layers, a weathered zone and the rock unit, drawn with geological patterns (sandstone dots, limestone bricks, granite crosses, volcanic v's and so on). Water along the line is marked.

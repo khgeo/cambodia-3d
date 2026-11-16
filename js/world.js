@@ -5,16 +5,16 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=17';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=17';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=17';
-import { buildTrees, GrassField } from './vegetation.js?v=17';
-import { RoadNet, Driver, Walker } from './modes.js?v=17';
-import { vehicleKit } from './vehicles.js?v=17';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=17';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=17';
-import { LayerStack } from './layers.js?v=17';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=17';
+import * as G from './geo.js?v=18';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=18';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=18';
+import { buildTrees, GrassField } from './vegetation.js?v=18';
+import { RoadNet, Driver, Walker } from './modes.js?v=18';
+import { vehicleKit } from './vehicles.js?v=18';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=18';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=18';
+import { LayerStack } from './layers.js?v=18';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=18';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -102,7 +102,7 @@ export class World {
     const sc = this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.3, 60000);
     this.controls = new OrbitControls(this.camera, r.domElement);
-    this.controls.enableDamping = true; this.controls.maxPolarAngle = Math.PI * 0.49;
+    this.controls.enableDamping = true; this.controls.maxPolarAngle = Math.PI * 0.49; this.controls.screenSpacePanning = true;
 
     this.sky = new Sky(); this.sky.scale.setScalar(45000); sc.add(this.sky);
     const u = this.sky.material.uniforms; u.turbidity.value = 4; u.rayleigh.value = 2.2; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.8;
@@ -211,7 +211,7 @@ export class World {
       for (const p of parts) for (const c of G.clipLine(p, X0, Z0, X1, Z1)) roads.push({ ...r, id, pts: c, st: roadStyle(r.cls, r.surf, r.lanes, r.wdm, r.flags) });
     }
     roads.sort((a, b) => RANK[a.cls] - RANK[b.cls]);
-    Object.assign(D, { roads, rails, waterways, landuse, buildings }); D.stats.roads = roads.length; this.views = null; this.U = null; this.section = null;
+    Object.assign(D, { roads, rails, waterways, landuse, buildings }); D.stats.roads = roads.length; this.views = null; this.U = null; this.section = null; if (this.layers) { this.layers.ioYears = null; this.layers.flood = null; this.layers.t = this.layers.target = 0; this.layers.stop(); }
 
     say('Loading terrain…');
     let elev;

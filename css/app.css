@@ -77,12 +77,12 @@ button.exit{background:#5a2d2d}
 
 .panel.hidden{display:none}
 
-#sectionPanel{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:min(1120px,calc(100% - 20px));z-index:9;background:rgba(17,23,31,.92);color:#e8eef4;border-radius:14px;padding:10px;box-sizing:border-box;font-size:12px;
+#sectionPanel{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);width:min(760px,calc(100% - 20px));max-height:46vh;overflow:auto;z-index:9;background:rgba(17,23,31,.92);color:#e8eef4;border-radius:14px;padding:10px;box-sizing:border-box;font-size:12px;
   backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 28px rgba(0,0,0,.35)}
 #sectionPanel[hidden]{display:none}
 #sectionPanel .secbar{flex-wrap:wrap;justify-content:flex-start;gap:8px;margin:0 0 8px}
 #sectionPanel .hint{color:#ffd88a;flex:1;min-width:160px}
-#secCanvas{width:100%;height:auto;border-radius:8px;display:block;background:#f7f4ee}
+#secCanvas{width:100%;height:auto;max-height:30vh;object-fit:contain;border-radius:8px;display:block;background:#f7f4ee}
 #secLegend{margin-top:6px;line-height:1.7}
 #secLegend .lg{display:inline-flex;align-items:center;margin-right:10px;white-space:nowrap}
 #secLegend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;border:1px solid rgba(255,255,255,.3)}
@@ -112,3 +112,15 @@ button.exit{background:#5a2d2d}
 #lpLegend .lg{display:inline-flex;align-items:center;margin-right:8px;white-space:nowrap}
 #lpLegend .lg i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:4px}
 @media (max-width:640px){#layerPanel{top:auto;bottom:10px;right:10px;left:10px;width:auto;max-height:52%}}
+
+#sectionPanel.picking #secBody,#sectionPanel.min #secBody{display:none}
+#sectionPanel.picking .secbar,#sectionPanel.min .secbar{margin:0}
+#sectionPanel .secbar button{padding:5px 8px}
+.lpnav button{flex:1;padding:5px 0;font-size:13px}
+.lpsp span{color:#8fa2b4;font-size:11px;width:52px}.lpsp input{flex:1;accent-color:#ffb547}
+#lpTime,.lpflood{margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.12)}
+#lpTime[hidden]{display:none}
+#lpTime input[type=range],.lpflood input[type=range]{flex:1;width:100%;accent-color:#e49635}
+.lpflood input[type=range]{accent-color:#3d8fd1}
+#lpYearLbl{width:36px;text-align:right}
+#lpTime label,.lpflood label{gap:6px;cursor:pointer}

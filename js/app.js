@@ -1,5 +1,5 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=17';
+import * as G from './geo.js?v=18';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -185,7 +185,7 @@ function renderStats() {
   $('lulc').innerHTML = '<label class="lbl">Land cover seen on the image</label><div class="bar2">' +
     Object.keys(cols).map(k => `<span style="width:${(L[k] * 100).toFixed(1)}%;background:${cols[k]}"></span>`).join('') + '</div><div class="keys">' +
     Object.keys(cols).map(k => `<div><i style="background:${cols[k]}"></i>${names[k]} ${(L[k] * 100).toFixed(0)}%</div>`).join('') + '</div>';
-  $('credit').innerHTML = `${world.credit} · Soil: ISRIC SoilGrids · Geology: ODC 2006 · Terrain: Mapzen/AWS Terrain Tiles · ${OSM_CREDIT} · Geoinformatics and Research Lab, RUPP`;
+  $('credit').innerHTML = `${world.credit} · Soil: ISRIC SoilGrids · Geology: ODC 2006 · Land cover 2017–2025: Esri | Impact Observatory · Terrain: Mapzen/AWS Terrain Tiles · ${OSM_CREDIT} · Geoinformatics and Research Lab, RUPP`;
 }
 async function rebuild() {
   if (busy) return; busy = true; if (world.D && world.D.built) t0 = performance.now(); if (world.D) world.D.built = true;
@@ -198,7 +198,7 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=17'); world = new World($('scene')); window.__world = world;
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=18'); world = new World($('scene')); window.__world = world;
     world.onModeChange = m => {
       $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk';
       if (m === 'drive' || m === 'walk') { setOn('views', m); showPanel('scenePanel', false); }
@@ -207,12 +207,13 @@ $('build').onclick = async () => {
     world.onVehicle = k => { $('vehicle').value = k; };
     world.onSectionHint = t => { $('secHint').textContent = t; };
     world.onSection = async S => {
-      const { drawProfile, legendHTML } = await import('./section.js?v=17');
+      const { drawProfile, legendHTML } = await import('./section.js?v=18');
+      $('sectionPanel').classList.remove('picking', 'min'); $('secMin').textContent = '▾';
       const cv = $('secCanvas'); cv.width = Math.min(1600, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio))); cv.height = Math.round(cv.width * 0.36);
-      drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – tap ↺ New line to draw another';
+      drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – ↺ for a new line, ▾ to minimise';
     };
-    const { joystick } = await import('./modes.js?v=17'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=17'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=18'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=18'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -257,7 +258,7 @@ const lpRender = () => {
     const [cb, , , op] = row.children;
     cb.onclick = e => { e.stopPropagation(); LS.setOn(L.id, cb.checked); const sc = document.querySelector(`#scenePanel input[data-k="${L.id}"]`); if (sc) sc.checked = cb.checked; };
     op.oninput = e => { e.stopPropagation(); LS.setOp(L.id, op.value / 100); }; op.onclick = e => e.stopPropagation();
-    row.onclick = () => { if (!av) return; if (LS.tour) lpStop(); LS.setFocus(L.id); if (LS.target === 0 && L.side !== 0) { LS.setExplode(1); LS.frameCamera(); } lpRender(); };
+    row.onclick = () => { if (!av) return; if (LS.tour) lpStop(); const f = LS.setFocus(L.id); if (LS.target === 0 && L.side !== 0) LS.setExplode(1); if (f) LS.flyToLayer(f); else LS.frameCamera(); lpRender(); };
     list.appendChild(row);
   }
   lpLegend();
@@ -270,6 +271,8 @@ const lpLegend = () => {
   if (id === 'elev' && LS.elevInfo) h += `${Math.round(LS.elevInfo.lo)}–${Math.round(LS.elevInfo.hi)} m · contour every ${LS.elevInfo.step} m (bold every ${LS.elevInfo.step * 5} m)`;
   if (id === 'geology') h += '<br><span style="color:#8fa2b4">Geology of Cambodia 2006 (ODC)</span>';
   if (id === 'topsoil' || id === 'subsoil') h += '<br><span style="color:#8fa2b4">USDA texture, ISRIC SoilGrids 250 m</span>';
+  if (id === 'lctime') h += `<br><span style="color:#8fa2b4">${LS.change ? 'Change map' : 'Year ' + LS.year} · Esri | Impact Observatory 10 m annual land cover (Sentinel-2), CC BY 4.0</span>`;
+  if (id === 'deep') h += '<br><span style="color:#8fa2b4">Depth drawn on a log scale. Global average depths; Moho for Cambodia from global crust models (approximate).</span>';
   if (id === 'lulc') h += '<br><span style="color:#8fa2b4">Classified from the imagery – the same map that places the trees, grass and rice</span>';
   el.innerHTML = h;
 };
@@ -279,7 +282,7 @@ $('layersBtn').onclick = async () => {
   $('layerPanel').hidden = false; if (innerWidth < 900) showPanel('scenePanel', false);
   if (world.mode !== 'orbit') world.setMode('orbit');
   $('lpHint').textContent = 'Preparing layers…';
-  const mod = await import('./layers.js?v=17'); LAYERS_DEF = mod.LAYERS;
+  const mod = await import('./layers.js?v=18'); LAYERS_DEF = mod.LAYERS;
   LS = await world.openLayers(t => { $('lpHint').textContent = t; });
   LS.onT = t => { $('lpExplode').value = Math.round(t * 100); };
   LS.onFocus = () => lpRender();
@@ -287,9 +290,39 @@ $('layersBtn').onclick = async () => {
   world.onLayersCollapse = () => { $('lpExplode').value = 0; lpStop(); lpRender(); };
   world.onLayerToggle = () => lpRender();
   $('lpHint').textContent = world.U ? '' : 'Loading soil & geology…';
-  lpRender();
+  lpRender(); lpTimeUI(); $('lpFloodOn').checked = LS.flood != null; $('lpFlood').disabled = LS.flood == null;
   if (LS.t === 0) { LS.setExplode(1); LS.frameCamera(); }
+  LS.loadTime(t => { $('lpHint').textContent = t; }).then(() => { $('lpHint').textContent = ''; lpTimeUI(); lpRender(); });
 };
+const lpTimeUI = () => { const has = !!(LS && LS.ioYears); $('lpTime').hidden = !has; if (has) { const ys = Object.keys(LS.ioYears).map(Number); $('lpYear').min = Math.min(...ys); $('lpYear').max = Math.max(...ys); $('lpChange').parentElement.lastChild.textContent = ' Show change since ' + Math.min(...ys); } };
+$('lpYear').oninput = e => { if (!LS) return; $('lpYearLbl').textContent = e.target.value; LS.setYear(+e.target.value, $('lpChange').checked); lpLegend(); };
+$('lpChange').onchange = e => { if (!LS) return; LS.setYear(+$('lpYear').value, e.target.checked); if (LS.focus !== 'lctime') { LS.setFocus('lctime'); if (LS.target === 0) LS.setExplode(1); LS.flyToLayer('lctime'); } lpRender(); };
+let yearTimer = null;
+$('lpYearPlay').onclick = () => {
+  if (yearTimer) { clearInterval(yearTimer); yearTimer = null; $('lpYearPlay').textContent = '▶'; return; }
+  if (LS.focus !== 'lctime') { LS.setFocus('lctime'); if (LS.target === 0) LS.setExplode(1); LS.flyToLayer('lctime'); lpRender(); }
+  $('lpYearPlay').textContent = '■';
+  yearTimer = setInterval(() => { const el = $('lpYear'); let y = +el.value + 1; if (y > +el.max) y = +el.min; el.value = y; el.oninput({ target: el }); }, 1100);
+};
+const floodRange = () => { const D = world.D; return [Math.floor(D.hmin), Math.ceil(D.hmin + Math.min(40, Math.max(6, (D.hmax - D.hmin) * 0.6)))]; };
+const floodUpdate = () => {
+  if (!LS) return; const on = $('lpFloodOn').checked; $('lpFlood').disabled = !on;
+  const [lo, hi] = floodRange(), lvl = lo + (hi - lo) * $('lpFlood').value / 100, r = LS.setFlood(on ? lvl : null);
+  $('lpFloodLbl').textContent = on && r ? `${lvl.toFixed(1)} m · ${r.pct.toFixed(0)}% under water · mean depth ${r.depth.toFixed(1)} m` : '';
+};
+$('lpFloodOn').onchange = floodUpdate; $('lpFlood').oninput = floodUpdate;
+document.querySelectorAll('[data-nav]').forEach(b => b.onclick = () => {
+  if (!LS) return; const k = b.dataset.nav; if (LS.tour) { lpStop(); lpRender(); }
+  if (k === 'l') LS.nudge(-1, 0); if (k === 'r') LS.nudge(1, 0); if (k === 'u') LS.nudge(0, 1); if (k === 'd') LS.nudge(0, -1);
+  if (k === 'in') LS.zoom(0.75); if (k === 'out') LS.zoom(1.33); if (k === 'all') LS.frameCamera();
+});
+$('lpSpace').oninput = e => LS && LS.setSpacing(e.target.value / 100);
+addEventListener('keydown', e => {
+  if (!LS || $('layerPanel').hidden || !world || world.mode !== 'orbit' || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  const m = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1], PageUp: [0, 1], PageDown: [0, -1] }[e.key];
+  if (m) { LS.nudge(...m); e.preventDefault(); }
+  if (e.key === '+' || e.key === '=') LS.zoom(0.8); if (e.key === '-') LS.zoom(1.25);
+});
 $('lpExplode').oninput = e => { if (LS) { LS.setExplode(e.target.value / 100, true); } };
 $('lpApart').onclick = () => { if (LS) { LS.setExplode(1); LS.frameCamera(); } };
 $('lpTogether').onclick = () => { if (LS) { lpStop(); LS.setExplode(0); world.goView('oblique'); lpRender(); } };
@@ -299,16 +332,17 @@ $('lpClose').onclick = () => { $('layerPanel').hidden = true; if (LS) { lpStop()
 /* cross-section tool */
 $('sectionBtn').onclick = async () => {
   if (!world || !world.D) return;
-  $('sectionPanel').hidden = false; $('secHint').textContent = 'Loading soil and geology data…';
+  $('sectionPanel').hidden = false; $('sectionPanel').classList.add('picking'); $('secHint').textContent = 'Loading soil and geology data…';
   if (innerWidth < 900) showPanel('scenePanel', false);
   if (world.mode !== 'orbit') world.setMode('orbit');
   try { await world.ensureUnderground(t => { $('secHint').textContent = t; }); } catch (e) { $('secHint').textContent = 'Could not load soil data: ' + e.message; }
   if (world.U && !world.U.soilOk) $('secHint').textContent = 'SoilGrids did not respond – showing geology only. ';
   world.startSection();
 };
-$('secNew').onclick = () => world && world.startSection();
+$('secNew').onclick = () => { if (!world) return; $('sectionPanel').classList.add('picking'); world.startSection(); };
+$('secMin').onclick = () => { const m = $('sectionPanel').classList.toggle('min'); $('secMin').textContent = m ? '▴' : '▾'; };
 $('secClose').onclick = () => { $('sectionPanel').hidden = true; if (world) { world.sectionPick = null; world.clearSection(); world.section = null; } };
 $('secWall').onchange = e => { if (!world) return; world.sectionWallOn = e.target.checked; if (world.sectionWall) world.sectionWall.visible = e.target.checked; };
 const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 $('secPng').onclick = () => $('secCanvas').toBlob(b => download('cross-section.png', b));
-$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=17'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
+$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=18'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };

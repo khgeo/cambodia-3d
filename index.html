@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=17">
+<link rel="stylesheet" href="css/app.css?v=18">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -111,24 +111,38 @@
       <button id="lpApart">⇕ Pull apart</button>
       <button id="lpTogether">⇣ Put together</button>
     </div>
+    <div class="row lpnav">
+      <button data-nav="l" title="Move left">◀</button><button data-nav="u" title="Move up the stack">▲</button><button data-nav="d" title="Move down the stack">▼</button><button data-nav="r" title="Move right">▶</button>
+      <button data-nav="in" title="Zoom in">＋</button><button data-nav="out" title="Zoom out">－</button><button data-nav="all" title="See the whole stack">⤢</button>
+    </div>
+    <div class="row lpsp"><span>Spacing</span><input type="range" id="lpSpace" min="4" max="30" value="11"></div>
     <div class="lpbody">
       <div class="lplevel"><span>apart</span><input type="range" id="lpExplode" min="0" max="100" value="0" orient="vertical"><span>together</span></div>
       <div id="lpList"></div>
+    </div>
+    <div id="lpTime" hidden>
+      <div class="row"><b>Land cover through time</b></div>
+      <div class="row"><button id="lpYearPlay">▶</button><input type="range" id="lpYear" min="2017" max="2025" value="2025" step="1"><b id="lpYearLbl">2025</b></div>
+      <label class="row"><input type="checkbox" id="lpChange"> Show change since 2017</label>
+    </div>
+    <div class="lpflood">
+      <label class="row"><input type="checkbox" id="lpFloodOn"> 🌊 <b>Flood level</b> <span id="lpFloodLbl"></span></label>
+      <input type="range" id="lpFlood" min="0" max="100" value="20" disabled>
     </div>
     <div id="lpLegend"></div>
   </div>
   <div id="sectionPanel" hidden>
     <div class="row secbar"><b>Cross-section</b><span id="secHint" class="hint">Tap point A on the ground or on the inset map</span>
       <label><input type="checkbox" id="secWall" checked> Cut wall in 3D</label>
-      <button id="secNew">↺ New line</button><button id="secPng">⬇ PNG</button><button id="secCsv">⬇ CSV</button><button id="secClose">✕</button></div>
-    <canvas id="secCanvas" width="1100" height="380"></canvas>
+      <button id="secNew">↺ New line</button><button id="secPng">⬇ PNG</button><button id="secCsv">⬇ CSV</button><button id="secMin" title="Minimise">▾</button><button id="secClose">✕</button></div>
+    <div id="secBody"><canvas id="secCanvas" width="1100" height="380"></canvas>
     <div id="secLegend"></div>
-    <div class="seccredit">Soil: ISRIC SoilGrids 2.0 (250 m, CC BY 4.0) · Geology: Geology of Cambodia 2006, Open Development Cambodia / Save Cambodia's Wildlife (CC BY-SA 4.0)</div>
+    <div class="seccredit">Soil: ISRIC SoilGrids 2.0 (250 m, CC BY 4.0) · Geology: Geology of Cambodia 2006, Open Development Cambodia / Save Cambodia's Wildlife (CC BY-SA 4.0)</div></div>
   </div>
   <div id="hud" hidden><canvas width="180" height="180"></canvas><button class="hudzoom" title="Change inset-map zoom">⊕</button><div class="hudtext"></div></div>
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=17"></script>
+<script type="module" src="js/app.js?v=18"></script>
 </body>
 </html>
