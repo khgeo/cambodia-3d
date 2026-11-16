@@ -135,7 +135,7 @@ export class Survey {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
     const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -4 })); m.renderOrder = 5;
     // faint copy that shows through hills
-    const ghost = new THREE.Line(new THREE.BufferGeometry().setFromPoints(samples.map(p => new THREE.Vector3(p.x, w.hAt(p.x, p.z) + 0.3, p.z))), new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.35, depthTest: false }));
+    const ghost = new THREE.Line(new THREE.BufferGeometry().setFromPoints(samples.map(p => new THREE.Vector3(p.x, w.hAt(p.x, p.z) + 0.3, p.z))), new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6, depthTest: false }));
     ghost.renderOrder = 4; this.group.add(m, ghost);
   }
   stake(x, z, color, text, big) {
