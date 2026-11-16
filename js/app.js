@@ -265,8 +265,8 @@ const lpRender = () => {
   for (const L of LAYERS_DEF) {
     const st = LS.state[L.id], av = LS.available(L.id), row = document.createElement('div');
     row.className = 'lprow' + (av ? '' : ' na') + (LS.focus === L.id ? ' focus' : '') + (L.id === 'surface' ? ' ground' : '');
-    const why = av ? '' : L.under && !(world.U && (L.id === 'geology' || world.U.soilOk)) ? (L.id === 'lctime' ? 'loading…' : world.U ? 'no data' : 'loading…') : L.id === 'lctime' ? 'loading…' : 'none here';
-    row.innerHTML = `<input type="checkbox" ${st.on ? 'checked' : ''} ${av ? '' : 'disabled'}><i style="background:${L.c}"></i><span title="${L.name}${av ? '' : ' – ' + why}">${L.short || L.name}${av ? '' : ` <em>${why}</em>`}</span><input type="range" min="0" max="100" value="${Math.round(st.op * 100)}" ${av ? '' : 'disabled'}>`;
+    const why = av ? '' : L.under && !(world.U && (L.id === 'geology' || world.U.soilOk)) ? (L.id === 'lctime' ? 'loading…' : world.U ? 'no data' : 'loading…') : L.id === 'lctime' ? 'loading…' : 'none in this area';
+    row.innerHTML = `<input type="checkbox" ${st.on ? 'checked' : ''} ${av ? '' : 'disabled'}><i style="background:${L.c}"></i><span title="${L.name}${av ? '' : ' – ' + why}">${L.short || L.name}${av ? '' : ` <em>· ${why === 'none in this area' ? 'none' : why}</em>`}</span><input type="range" min="0" max="100" value="${Math.round(st.op * 100)}" ${av ? '' : 'disabled'}>`;
     const [cb, , , op] = row.children;
     cb.onclick = e => { e.stopPropagation(); LS.setOn(L.id, cb.checked); const sc = document.querySelector(`#scenePanel input[data-k="${L.id}"]`); if (sc) sc.checked = cb.checked; };
     op.oninput = e => { e.stopPropagation(); LS.setOp(L.id, op.value / 100); }; op.onclick = e => e.stopPropagation();
