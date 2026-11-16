@@ -2,9 +2,9 @@
 // Features are kept in lon/lat in this browser (localStorage), rebuilt whenever the scene is rebuilt,
 // drivable (new roads join the Drive network) and exportable / importable as GeoJSON.
 import * as THREE from 'three';
-import { RoadNet } from './modes.js?v=22';
-import { instTrees } from './vegetation.js?v=22';
-import { makeBuildingMaterial } from './shaders.js?v=22';
+import { RoadNet } from './modes.js?v=23';
+import { instTrees } from './vegetation.js?v=23';
+import { makeBuildingMaterial } from './shaders.js?v=23';
 
 const KEY = 'cambodia3d.edits.v1';
 export const ROAD_TYPES = {
@@ -37,6 +37,7 @@ function roadTexture(type) {
 export class Editor {
   constructor(world) {
     this.w = world; this.group = new THREE.Group(); this.preview = new THREE.Group(); this.tool = 'road'; this.verts = []; this.active = false;
+    this.snapOn = true;
     this.opts = { road: 'residential', floors: 1, roof: 'gable', wall: '#e9e4d8', roofC: '#a8452f', tree: 'coco', rect: true, stilt: false };
     try { this.features = JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (e) { this.features = []; }
     this.tex = {};
@@ -47,9 +48,58 @@ export class Editor {
   xz(c) { return { x: this.F.x(c[0]), z: this.F.z(c[1]) }; }
   inAOI(f) { const D = this.w.D; return f.coords.some(c => { const p = this.xz(c); return p.x >= D.X0 && p.x <= D.X0 + D.W && p.z >= D.Z0 && p.z <= D.Z0 + D.H; }); }
   setTool(t) { this.tool = t; this.verts = []; this.drawPreview(); }
+  /* ---- snapping: to corners/vertices first, then to edges and road centrelines ---- */
+  snapIndex() {
+    const w = this.w, D = w.D, cell = 20, V = new Map(), E = new Map(), key = (x, z) => Math.floor(x / cell) + ',' + Math.floor(z / cell);
+    const addV = (x, z, kind) => { const k = key(x, z); (V.get(k) || V.set(k, []).get(k)).push({ x, z, kind }); };
+    const addE = (a, b, kind) => { const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / cell)); for (let i = 0; i <= n; i++) { const x = a.x + (b.x - a.x) * i / n, z = a.z + (b.z - a.z) * i / n, k = key(x, z); const l = E.get(k) || E.set(k, []).get(k); if (l[l.length - 1] !== a) l.push({ a, b, kind }); } };
+    const ring = (pts, kind, closed) => { pts.forEach(p => addV(p.x, p.z, kind)); for (let i = 0; i < pts.length - (closed ? 0 : 1); i++) addE(pts[i], pts[(i + 1) % pts.length], kind); };
+    for (const r of (w.net && w.net.roads) || []) { const P = r.pts; ring([P[0], P[P.length - 1]], 'road end', false); for (let i = 0; i < P.length - 1; i += 1) addE(P[i], P[i + 1], r.user ? 'your road' : 'road'); }
+    for (const b of D.buildings || []) ring(b.ring.map(([x, z]) => ({ x, z })), 'building corner', true);
+    for (const b of w.housesList || []) ring(b.ring.map(([x, z]) => ({ x, z })), 'house corner', true);
+    for (const f of this.features) if (this.inAOI(f)) { const P = f.coords.map(c => this.xz(c)); if (f.type === 'tree') addV(P[0].x, P[0].z, 'tree'); else ring(P, f.type === 'road' ? 'your road' : 'your ' + f.type, f.type !== 'road'); }
+    const sv = w.survey; if (sv) { for (const p of sv.points) addV(p.x, p.z, 'survey point ' + p.id); for (const p of sv.parcelsHere()) ring(p.coords.map(c => this.xz(c)), 'parcel', true); }
+    this.snapIdx = { V, E, cell };
+  }
+  snap(x, z, tol) {
+    if (!this.snapOn) return { x, z };
+    if (!this.snapIdx) this.snapIndex(); const { V, E, cell } = this.snapIdx, ci = Math.floor(x / cell), cj = Math.floor(z / cell);
+    let best = null, bd = tol;
+    for (const p of this.verts) { const d = Math.hypot(p.x - x, p.z - z); if (d < bd) { bd = d; best = { x: p.x, z: p.z, kind: p === this.verts[0] ? 'close shape' : 'vertex' }; } }
+    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) for (const p of V.get(i + ',' + j) || []) { const d = Math.hypot(p.x - x, p.z - z); if (d < bd) { bd = d; best = p; } }
+    if (best) return best;
+    bd = tol * 0.8;
+    for (let i = ci - 1; i <= ci + 1; i++) for (let j = cj - 1; j <= cj + 1; j++) for (const e of E.get(i + ',' + j) || []) {
+      const vx = e.b.x - e.a.x, vz = e.b.z - e.a.z, L = vx * vx + vz * vz || 1, t = Math.max(0, Math.min(1, ((x - e.a.x) * vx + (z - e.a.z) * vz) / L)), px = e.a.x + vx * t, pz = e.a.z + vz * t, d = Math.hypot(px - x, pz - z);
+      if (d < bd) { bd = d; best = { x: px, z: pz, kind: 'on ' + e.kind }; }
+    }
+    // right angles: square to the previous segment when close to 90°
+    if (!best && this.verts.length >= 2 && this.tool !== 'tree') {
+      const a = this.verts[this.verts.length - 2], b = this.verts[this.verts.length - 1], ux = b.x - a.x, uz = b.z - a.z, L = Math.hypot(ux, uz) || 1, nx = -uz / L, nz = ux / L, dx = x - b.x, dz = z - b.z;
+      const along = (dx * ux + dz * uz) / L, perp = dx * nx + dz * nz; if (Math.abs(along) < tol * 0.8 && Math.abs(perp) > tol) return { x: b.x + nx * perp, z: b.z + nz * perp, kind: '90°' };
+    }
+    return best || { x, z };
+  }
+  hover(x, z, tol) {
+    if (!this.active || this.tool === 'delete') { this.hoverPt = null; this.drawHover(); return null; }
+    this.hoverPt = this.snap(x, z, tol); this.drawHover(); return this.hoverPt;
+  }
+  drawHover() {
+    const w = this.w; if (!this.hoverG) { this.hoverG = new THREE.Group(); }
+    if (!this.hoverG.parent) w.root.add(this.hoverG);
+    const g = this.hoverG; g.traverse(o => { if (o.geometry) o.geometry.dispose(); }); g.clear(); const p = this.hoverPt; if (!p || !w.hAt) return;
+    const y = w.hAt(p.x, p.z) + 0.5, snapped = !!p.kind, col = snapped ? 0xffe14a : 0xff3df2;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.3, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: col, depthTest: false, side: THREE.DoubleSide })); ring.position.set(p.x, y, p.z); ring.renderOrder = 12; g.add(ring);
+    const L = this.verts[this.verts.length - 1];
+    if (L && this.tool !== 'tree') { const ln = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(L.x, w.hAt(L.x, L.z) + 0.5, L.z), new THREE.Vector3(p.x, y, p.z)]), new THREE.LineDashedMaterial({ color: col, dashSize: 1.2, gapSize: 0.8, depthTest: false })); ln.computeLineDistances(); ln.renderOrder = 12; g.add(ln); }
+    this.onHover && this.onHover(p);
+  }
   /* ---- input ---- */
   tap(x, z) {
     const t = this.tool;
+    if (t !== 'delete' && this.hoverPt && Math.hypot(this.hoverPt.x - x, this.hoverPt.z - z) < 30) { x = this.hoverPt.x; z = this.hoverPt.z; }
+    else if (t !== 'delete') { const p = this.snap(x, z, this.tapTol || 3); x = p.x; z = p.z; }
+    if ((t === 'building' && !this.opts.rect || t === 'pond') && this.verts.length >= 3 && Math.hypot(this.verts[0].x - x, this.verts[0].z - z) < 0.01) { this.finish(); return; }
     if (t === 'delete') { this.deleteNear(x, z); return; }
     if (t === 'tree') { this.addFeature({ type: 'tree', coords: [this.ll(x, z)], props: { kind: this.opts.tree, s: 0.85 + Math.random() * 0.4 } }); return; }
     this.verts.push({ x, z });
@@ -88,7 +138,7 @@ export class Editor {
   clearAll() { this.features = this.features.filter(f => !this.inAOI(f)); this.save(); this.rebuild(); this.onChange && this.onChange(); }
   /* ---- 3D ---- */
   rebuild() {
-    const w = this.w; if (!w.D || !w.hAt) return;
+    const w = this.w; if (!w.D || !w.hAt) return; this.snapIdx = null;
     this.group.traverse(o => { if (o.geometry && !o.userData.shared) o.geometry.dispose(); }); this.group.clear();
     if (!this.group.parent) w.root.add(this.group); if (!this.preview.parent) w.root.add(this.preview);
     const here = this.features.filter(f => this.inAOI(f)), roads = here.filter(f => f.type === 'road'), blds = here.filter(f => f.type === 'building'), trees = here.filter(f => f.type === 'tree'), ponds = here.filter(f => f.type === 'pond');

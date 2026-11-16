@@ -5,19 +5,21 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=22';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=22';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=22';
-import { buildTrees, GrassField } from './vegetation.js?v=22';
-import { RoadNet, Driver, Walker } from './modes.js?v=22';
-import { vehicleKit } from './vehicles.js?v=22';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=22';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=22';
-import { LayerStack } from './layers.js?v=22';
-import { Survey } from './survey.js?v=22';
-import { Editor } from './editor.js?v=22';
-import { Atmos } from './atmos.js?v=22';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=22';
+import * as G from './geo.js?v=23';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=23';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=23';
+import { buildTrees, GrassField } from './vegetation.js?v=23';
+import { RoadNet, Driver, Walker } from './modes.js?v=23';
+import { vehicleKit } from './vehicles.js?v=23';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=23';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=23';
+import { LayerStack } from './layers.js?v=23';
+import { Survey } from './survey.js?v=23';
+import { Editor } from './editor.js?v=23';
+import { Atmos } from './atmos.js?v=23';
+import { NightLights } from './lights.js?v=23';
+import { SEASON } from './vegetation.js?v=23';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=23';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -133,6 +135,16 @@ export class World {
     // taps (short press without drag) for picking roads / teleporting
     const el = r.domElement; let down = null;
     el.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY, performance.now()]; });
+    // digitizing: live snap marker + rubber band under the cursor
+    let lastHover = 0;
+    el.addEventListener('pointermove', e => {
+      const ed = this.editor; if (!ed || !ed.active || this.mode !== 'orbit' || !this.terrainMesh || e.buttons || (this.layers && this.layers.t > 0.01)) return;
+      const now = performance.now(); if (now - lastHover < 33) return; lastHover = now;
+      const r = el.getBoundingClientRect(), rc = this._rc || (this._rc = new THREE.Raycaster());
+      rc.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera);
+      const hit = rc.intersectObject(this.terrainMesh, false)[0]; if (!hit) return;
+      ed.hover(hit.point.x, hit.point.z, this.pxToMetres(hit.point, 14));
+    });
     el.addEventListener('pointerup', e => {
       if (!down) return; const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]), dt = performance.now() - down[2]; down = null;
       if (moved < 8 && dt < 450) this.onTap(e);
@@ -354,7 +366,7 @@ export class World {
 
     this.terrainU = {
       uSplat: { value: splatTex }, uGrid: { value: new THREE.Vector4(X0, Z0, gw * C, gh * C) }, uTexel: { value: new THREE.Vector2(1 / img.width, 1 / img.height) },
-      uGrass: { value: this.detail.grass }, uRice: { value: this.detail.rice }, uSoil: { value: this.detail.soil }, uGravel: { value: this.detail.gravel }, uDetailOn: { value: 1 },
+      uGrass: { value: this.detail.grass }, uRice: { value: this.detail.rice }, uSoil: { value: this.detail.soil }, uGravel: { value: this.detail.gravel }, uDetailOn: { value: 1 }, uSeason: { value: new THREE.Vector4(0, 0, 0, 0) },
     };
     this.terrainMat = makeTerrainMaterial(this.texSat, this.terrainU);
     this.waterU = { uHgt: { value: null }, uGrid: { value: new THREE.Vector4() }, uImg: this.uniforms.uImg, uImgA: this.uniforms.uImgA, uTime: this.uTime, ...this.reflU };
@@ -468,10 +480,13 @@ export class World {
     // road grading: smooth each road's long profile and conform the terrain corridor to it
     const tgt = new Float32Array(Hg.length), wgt = new Float32Array(Hg.length);
     const graded = [];
-    const grade = (pts, hw, win, isRoad) => {
+    const profile = (pts, win) => {
       const g = pts.map(p => gridAt(p.x, p.z)), w = Math.max(1, Math.round(win / step));
       const sm = movingAvg(movingAvg(g, w), Math.max(1, w >> 1)).map(v => Math.max(v, this.seaY + 0.3));
       pts.forEach((p, i) => p.g = sm[i]);
+    };
+    const grade = (pts, hw, win, noProfile) => {
+      if (!noProfile) profile(pts, win);
       const half = hw + 1.5, blend = 7;
       for (let k = 0; k < pts.length - 1; k++) {
         const a = pts[k], b = pts[k + 1], r = half + blend;
@@ -489,8 +504,33 @@ export class World {
       if (r.flags & 4) continue;
       const pts = withS(densify(r.pts, step)); if (pts[pts.length - 1].s < 0.5) continue;
       const isBridge = (r.flags & 2) && pts[pts.length - 1].s > 6;
-      if (!isBridge) grade(pts, r.st.w / 2, r.cls <= 4 ? 120 : r.cls <= 8 ? 80 : r.cls <= 12 ? 45 : 25);
+      if (!isBridge) profile(pts, r.cls <= 4 ? 120 : r.cls <= 8 ? 80 : r.cls <= 12 ? 45 : 25);
       graded.push({ r, pts, isBridge });
+    }
+    // junctions: each road meets the more important road it joins at that road's height,
+    // easing its own long profile into the junction over ~30 m (no steps or floating ends)
+    {
+      const cell = 6, hash = new Map(), key = (x, z) => Math.floor(x / cell) + ',' + Math.floor(z / cell);
+      const order = graded.filter(g => !g.isBridge).sort((a, b) => (RANK[b.r.cls] ?? 0) - (RANK[a.r.cls] ?? 0) || b.pts[b.pts.length - 1].s - a.pts[a.pts.length - 1].s);
+      for (const { r, pts } of order) {
+        const hw = r.st.w / 2, anchors = [];
+        pts.forEach(p => {
+          const ci = Math.floor(p.x / cell), cj = Math.floor(p.z / cell); let best = null, bd = Infinity;
+          for (let i = ci - 2; i <= ci + 2; i++) for (let j = cj - 2; j <= cj + 2; j++) for (const q of hash.get(i + ',' + j) || []) { const d = Math.hypot(q.x - p.x, q.z - p.z); if (d < q.hw + hw + 1 && d < bd) { bd = d; best = q; } }
+          if (best) anchors.push({ s: p.s, g: best.g });
+        });
+        if (anchors.length) {
+          const R2 = 30, base = pts.map(p => p.g);
+          pts.forEach((p, i) => {
+            let wsum = 0, gsum = 0, wmax = 0;
+            for (const a of anchors) { const d = Math.abs(p.s - a.s); if (d >= R2) continue; const t = 1 - d / R2, w = t * t * (3 - 2 * t); wsum += w; gsum += w * a.g; wmax = Math.max(wmax, w); }
+            if (wsum > 0) p.g = base[i] * (1 - wmax) + (gsum / wsum) * wmax;
+          });
+        }
+        for (const p of pts) { const k = key(p.x, p.z); (hash.get(k) || hash.set(k, []).get(k)).push({ x: p.x, z: p.z, g: p.g, hw }); }
+      }
+      // conform the terrain: minor roads first so the major road corridor wins where they overlap
+      for (const g of order.slice().reverse()) grade(g.pts, g.r.st.w / 2, 0, true);
     }
     const railPts = D.rails.map(c => { const pts = withS(densify(c, step)); grade(pts, 1.8, 160); return pts; });
     for (let v = 0; v < Hg.length; v++) if (wgt[v] > 0) Hg[v] = Hg[v] * (1 - wgt[v]) + tgt[v] * wgt[v];
@@ -615,7 +655,7 @@ export class World {
     // rural houses inferred from the image where OpenStreetMap has none (built-up pixels next to roads)
     this.housesMesh = null; D.stats.houses = 0;
     if (this.inferHouses !== false) {
-      const hs = this.inferHousesList(rnd); D.stats.houses = hs.length;
+      const hs = this.inferHousesList(rnd); D.stats.houses = hs.length; this.housesList = hs;
       if (hs.length) { const g = this.buildBuildings(hs, rnd, { noStats: true }); if (g) { const m = new THREE.Mesh(g, makeBuildingMaterial()); m.castShadow = m.receiveShadow = true; this.housesMesh = m; this.root.add(m); } }
     }
 
@@ -652,6 +692,7 @@ export class World {
     if (keepView) { this.camera.position.copy(keepView.p); this.controls.target.copy(keepView.t); this.controls.update(); }
     else this.goView('overview', true);
     if (prevMode === 'walk') this.setMode('walk');
+    if (!this.lights) this.lights = new NightLights(this); this.lights.build();
     if (!this.editor) { try { if (JSON.parse(localStorage.getItem('cambodia3d.edits.v1') || '[]').length) this.editor = new Editor(this); } catch (e) {} }
     if (this.editor) this.editor.rebuild();
     if (this.survey) this.survey.redraw();
@@ -802,6 +843,7 @@ export class World {
     const list = want.length > cap ? want.filter(() => rnd() < cap / want.length) : want;
     const types = Object.keys(this.kit), slots = Object.fromEntries(types.map(t => [t, []]));
     this.vehicles = [];
+    const lanesIdx = new Map(this.lanesForTraffic.map((l, i) => [l, i]));
     for (const ln of list) {
       const r = rnd(); let t;
       if (ln.cls <= 4) t = r < 0.25 ? 'moto' : r < 0.35 ? 'moto2' : r < 0.6 ? 'car' : r < 0.75 ? 'pickup' : r < 0.85 ? 'bus' : 'truck';
@@ -820,7 +862,7 @@ export class World {
         if (i) S[i] = S[i - 1] + Math.hypot(P[i * 3] - P[i * 3 - 3], P[i * 3 + 2] - P[i * 3 - 1]);
       }
       const speed = (ln.cls <= 4 ? 22 : ln.cls <= 8 ? 15 : ln.cls <= 10 ? 11 : 7) * (t.startsWith('moto') ? 0.9 + rnd() * 0.3 : t === 'tuktuk' ? 0.65 : t === 'truck' || t === 'bus' ? 0.8 : 1);
-      const v = { P, S, L: S[S.length - 1], u: rnd() * S[S.length - 1], speed, t, pos: new V3(), fwd: new V3(0, 0, 1) };
+      const v = { P, S, L: S[S.length - 1], u: rnd() * S[S.length - 1], speed, base: speed, cur: speed, t, len: (this.kit[t] && this.kit[t].len) || 4, lat: 0, twoWay: !ln.oneway, shift: Math.max(2.2, hw * (ln.oneway ? 0.6 : 0.9)), group: lanesIdx.get(ln) + (dir > 0 ? 'f' : 'b'), pos: new V3(), fwd: new V3(0, 0, 1) };
       slots[t].push(v); this.vehicles.push(v);
     }
     this.vehMeshes = [];
@@ -832,20 +874,45 @@ export class World {
       for (const m of [paint, fixed]) { m.castShadow = true; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; this.root.add(m); }
       this.vehMeshes.push({ paint, fixed, list: slots[t] });
     }
+    this.trafficGroups = [...this.vehicles.reduce((m, v) => (m.get(v.group) || m.set(v.group, []).get(v.group)).push(v) && m, new Map()).values()];
     this.updateTraffic(0);
     this.D.stats.vehicles = this.vehicles.length;
   }
   updateTraffic(dt) {
     if (!this.vehMeshes) return;
-    const d = this._d || (this._d = new THREE.Object3D()), look = new V3();
+    // car-following and overtaking within each lane: keep a safe gap; if the car ahead is slower and the road
+    // is two-way, pull out to the left, pass and pull back in (Cambodia drives on the right)
+    if (dt > 0) for (const G of this.trafficGroups || []) {
+      G.sort((a, b) => a.u - b.u);
+      for (let i = 0; i < G.length; i++) {
+        const v = G[i]; let want = v.base;
+        if (v.passing) {
+          const p = v.passing, ahead = ((v.u - p.u) % v.L + v.L) % v.L;
+          want = v.base * 1.2 + 3; if (ahead > (v.len + p.len) / 2 + 7 && ahead < v.L / 2) v.passing = null;
+        } else if (G.length > 1) {
+          const ld = G[(i + 1) % G.length], gap = ((ld.u - v.u) % v.L + v.L) % v.L - (v.len + ld.len) / 2, safe = 4 + v.cur * 1.1;
+          if (gap < safe) {
+            if (v.twoWay && ld.cur < v.base - 1 && !ld.passing && !G.some(o => o.passing && o !== v && Math.abs(o.u - v.u) < 60)) v.passing = ld;
+            else want = Math.min(v.base, Math.max(0, ld.cur * Math.max(0, gap - 1.5) / safe));
+          }
+        }
+        v.cur += THREE.MathUtils.clamp(want - v.cur, -7 * dt, 2.8 * dt);
+        const latWant = v.passing ? v.shift : 0; v.lat += THREE.MathUtils.clamp(latWant - v.lat, -1.3 * dt, 1.3 * dt);
+      }
+    }
+    const d = this._d || (this._d = new THREE.Object3D()), look = new V3(), at = (v, u, out) => {
+      u = ((u % v.L) + v.L) % v.L; const S = v.S, P = v.P; let lo = 0, hi = S.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (S[m] <= u) lo = m; else hi = m; }
+      const t = (u - S[lo]) / ((S[hi] - S[lo]) || 1); return out.set(P[lo * 3] + (P[hi * 3] - P[lo * 3]) * t, P[lo * 3 + 1] + (P[hi * 3 + 1] - P[lo * 3 + 1]) * t, P[lo * 3 + 2] + (P[hi * 3 + 2] - P[lo * 3 + 2]) * t);
+    };
+    const ahead = new V3();
     for (const g of this.vehMeshes) {
       g.list.forEach((v, i) => {
-        v.u = (v.u + v.speed * dt) % v.L;
-        const S = v.S; let lo = 0, hi = S.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (S[m] <= v.u) lo = m; else hi = m; }
-        const t = (v.u - S[lo]) / ((S[hi] - S[lo]) || 1), P = v.P;
-        v.pos.set(P[lo * 3] + (P[hi * 3] - P[lo * 3]) * t, P[lo * 3 + 1] + (P[hi * 3 + 1] - P[lo * 3 + 1]) * t, P[lo * 3 + 2] + (P[hi * 3 + 2] - P[lo * 3 + 2]) * t);
-        v.fwd.set(P[hi * 3] - P[lo * 3], P[hi * 3 + 1] - P[lo * 3 + 1], P[hi * 3 + 2] - P[lo * 3 + 2]).normalize();
-        d.position.copy(v.pos); look.copy(v.pos).add(v.fwd); d.lookAt(look); d.updateMatrix(); g.paint.setMatrixAt(i, d.matrix); g.fixed.setMatrixAt(i, d.matrix);
+        v.u = (v.u + (v.cur ?? v.speed) * dt) % v.L;
+        at(v, v.u, v.pos); at(v, v.u + 3.5, ahead);
+        v.fwd.copy(ahead).sub(v.pos).normalize();
+        if (v.lat) { const lx = v.fwd.z, lz = -v.fwd.x, n = Math.hypot(lx, lz) || 1; v.pos.x += lx / n * v.lat; v.pos.z += lz / n * v.lat; v.pos.y = Math.max(v.pos.y, this.hAt(v.pos.x, v.pos.z) + 0.1); }
+        const steer = v.passing ? 0.12 : v.lat > 0.05 ? -0.12 : 0;
+        d.position.copy(v.pos); look.copy(v.pos).add(v.fwd); d.lookAt(look); if (steer) d.rotateY(steer); d.updateMatrix(); g.paint.setMatrixAt(i, d.matrix); g.fixed.setMatrixAt(i, d.matrix);
       });
       g.paint.instanceMatrix.needsUpdate = g.fixed.instanceMatrix.needsUpdate = true;
     }
@@ -1044,6 +1111,12 @@ export class World {
     return this.layers;
   }
   openEditor() { if (!this.editor) { this.editor = new Editor(this); this.editor.rebuild(); } this.editor.active = true; return this.editor; }
+  // rice-field stage: image (as photographed), planting (flooded), growing (green), ripening (golden), harvested (stubble)
+  setSeason(k) {
+    const S = { image: [0, 0, 0, 0, 1, null], planting: [0.28, 0.36, 0.36, 0.78, 0.35, 0x6f9a4a], growing: [0.24, 0.5, 0.14, 0.72, 1, 0x4f8f2a], ripening: [0.82, 0.66, 0.26, 0.78, 1.1, 0xd9b54a], harvested: [0.62, 0.52, 0.36, 0.72, 0.22, 0xa89064] }[k] || [0, 0, 0, 0, 1, null];
+    this.terrainU.uSeason.value.set(S[0], S[1], S[2], S[3]); SEASON.h = S[4]; SEASON.col = S[5] != null ? new THREE.Color(S[5]) : null;
+    if (this.grass) this.grass.center.set(1e9, 0, 1e9);
+  }
   getAtmos() { if (!this.atmos) this.atmos = new Atmos(this); return this.atmos; }
   openSurvey() { if (!this.survey) this.survey = new Survey(this); this.survey.active = true; this.survey.redraw(); return this.survey; }
   startSection() { this.sectionPick = 'A'; this.clearSection(); this.onSectionHint && this.onSectionHint('Tap point A on the ground or on the inset map'); }
@@ -1090,6 +1163,7 @@ export class World {
     }
   }
   groundAt(x, z) { return this.hAt ? this.hAt(x, z) : 0; }
+  pxToMetres(p, px) { const d = this.camera.position.distanceTo(p); return Math.max(0.3, d * 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) / this.renderer.domElement.clientHeight * px); }
   onTap(e) {
     const edPick = this.editor && this.editor.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
     const svPick = !edPick && this.survey && this.survey.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
@@ -1098,7 +1172,7 @@ export class World {
     const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, this.camera);
     const hit = rc.intersectObjects([this.terrainMesh, ...(this.roadMesh ? [this.roadMesh] : [])], false)[0]; if (!hit) return;
     if (this.sectionPick) { this.pickSectionPoint(hit.point.x, hit.point.z); return; }
-    if (edPick) { this.editor.tap(hit.point.x, hit.point.z); return; }
+    if (edPick) { this.editor.tapTol = this.pxToMetres(hit.point, e.pointerType === 'touch' ? 26 : 14); if (e.pointerType === 'touch') this.editor.hoverPt = null; this.editor.tap(hit.point.x, hit.point.z); return; }
     if (svPick) { this.survey.add(hit.point.x, hit.point.z); return; }
     if (this.mode === 'walk') { if (!this.walker.blocked(hit.point.x, hit.point.z)) this.walker.place(hit.point.x, hit.point.z); return; }
     if (this.mode === 'drive' && this.pickRoad) {
@@ -1160,6 +1234,7 @@ export class World {
     if (this.layers) this.layers.step(dt);
     if (this.survey) this.survey.step(dt);
     if (this.atmos) this.atmos.step(dt);
+    if (this.lights) this.lights.step();
     if (this.grass) { if (this.grassOff) this.grass.group.visible = false; else this.grass.update(focus, this.mode === 'orbit' ? this.camera.position.distanceTo(focus) : 0); }
     const dist = this.mode === 'orbit' ? this.camera.position.distanceTo(focus) : 60;
     const half = THREE.MathUtils.clamp(dist * 0.9, 50, (this.extent || 2000) * 0.75), cam = this.sun.shadow.camera;

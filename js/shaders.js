@@ -129,11 +129,18 @@ export function makeTerrainMaterial(map, u) {
       .replace('#include <project_vertex>', '#include <project_vertex>\nvWT = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vWT; uniform sampler2D uSplat, uGrass, uRice, uSoil, uGravel; uniform vec4 uGrid; uniform vec2 uTexel; uniform float uDetailOn;`)
+varying vec3 vWT; uniform sampler2D uSplat, uGrass, uRice, uSoil, uGravel; uniform vec4 uGrid; uniform vec2 uTexel; uniform float uDetailOn; uniform vec4 uSeason;`)
       .replace('#include <map_fragment>', `
 vec4 sat = texture2D(map, vMapUv);
 vec3 col = sat.rgb;
 float dist = length(vWT - cameraPosition);
+// rice season: tint the rice fields (splat green channel) – flooded, green, golden or harvested
+if (uSeason.a > 0.0) {
+  vec4 sp0 = texture2D(uSplat, vec2((vWT.x - uGrid.x) / uGrid.z, (vWT.z - uGrid.y) / uGrid.w));
+  float rw = sp0.g / (sp0.r + sp0.g + sp0.b + sp0.a + 0.001);
+  float lum = dot(col, vec3(0.3, 0.59, 0.11));
+  col = mix(col, uSeason.rgb * (0.7 + 0.9 * lum), rw * uSeason.a);
+}
 float k = (1.0 - smoothstep(35.0, 280.0, dist)) * uDetailOn;
 if (k > 0.002) {
   vec2 suv = vec2((vWT.x - uGrid.x) / uGrid.z, (vWT.z - uGrid.y) / uGrid.w);
@@ -153,7 +160,7 @@ if (k > 0.002) {
 }
 diffuseColor.rgb *= col;`);
   };
-  m.customProgramCacheKey = () => 'terrain-v2';
+  m.customProgramCacheKey = () => 'terrain-v3';
   return m;
 }
 

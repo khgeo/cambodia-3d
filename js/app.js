@@ -1,5 +1,5 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=22';
+import * as G from './geo.js?v=23';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -198,7 +198,7 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=22'); world = new World($('scene')); window.__world = world;
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=23'); world = new World($('scene')); window.__world = world;
     world.onModeChange = m => {
       $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk'; if (SV && !$('surveyPanel').hidden) svRender();
       if (m === 'drive' || m === 'walk') { setOn('views', m); showPanel('scenePanel', false); }
@@ -207,13 +207,13 @@ $('build').onclick = async () => {
     world.onVehicle = k => { $('vehicle').value = k; };
     world.onSectionHint = t => { $('secHint').textContent = t; };
     world.onSection = async S => {
-      const { drawProfile, legendHTML } = await import('./section.js?v=22');
+      const { drawProfile, legendHTML } = await import('./section.js?v=23');
       $('sectionPanel').classList.remove('picking', 'min'); $('secMin').textContent = '▾';
       const cv = $('secCanvas'); cv.width = Math.min(1600, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio))); cv.height = Math.round(cv.width * 0.36);
       drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – ↺ for a new line, ▾ to minimise';
     };
-    const { joystick } = await import('./modes.js?v=22'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=22'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=23'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=23'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -303,7 +303,7 @@ $('layersBtn').onclick = async () => {
   $('layerPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
   if (world.mode !== 'orbit') world.setMode('orbit');
   $('lpHint').textContent = 'Preparing layers…';
-  const mod = await import('./layers.js?v=22'); LAYERS_DEF = mod.LAYERS;
+  const mod = await import('./layers.js?v=23'); LAYERS_DEF = mod.LAYERS;
   LS = await world.openLayers(t => { $('lpHint').textContent = t; });
   LS.onT = t => { $('lpExplode').value = Math.round(t * 100); };
   LS.onFocus = () => lpRender();
@@ -406,7 +406,7 @@ const svProfile = m => {
 const svOpen = async () => {
   if (!world || !world.D) return;
   if (!$('layerPanel').hidden) $('lpClose').onclick(); if (!$('editPanel').hidden) $('edClose').onclick();
-  SVM = await import('./survey.js?v=22'); SV = world.openSurvey(); SV.onChange = svRender;
+  SVM = await import('./survey.js?v=23'); SV = world.openSurvey(); SV.onChange = svRender;
   SV.onArrive = () => { svSay('Arrived at the target'); if (SV.tool === 'points') $('svMark').classList.add('pulse'); setTimeout(() => $('svMark').classList.remove('pulse'), 2500); svRender(); };
   if (!$('svCode').options.length) $('svCode').innerHTML = SVM.CODES.map(c => `<option>${c}</option>`).join('');
   $('surveyPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); svRender();
@@ -445,6 +445,26 @@ $('svGeo').onclick = () => SV && download('survey.geojson', new Blob([SV.geojson
 $('svKml').onclick = () => SV && download('survey.kml', new Blob([SV.kml()], { type: 'application/vnd.google-earth.kml+xml' }));
 addEventListener('keydown', e => { if (SV && SV.active && world.mode === 'walk' && (e.key === 'm' || e.key === 'M') && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) $('svMark').onclick(); });
 
+/* rice season, video recording, Esc */
+$('season').onchange = e => world && world.setSeason(e.target.value);
+let rec = null;
+$('recBtn').onclick = () => {
+  if (rec) { rec.stop(); return; }
+  if (!world) return; const cv = world.renderer.domElement; if (!cv.captureStream || !window.MediaRecorder) { alert('Video recording is not supported in this browser.'); return; }
+  const type = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'].find(t => MediaRecorder.isTypeSupported(t)) || '';
+  const r = new MediaRecorder(cv.captureStream(30), { mimeType: type, videoBitsPerSecond: 10e6 }), chunks = [], t0 = Date.now();
+  r.ondataavailable = e => e.data.size && chunks.push(e.data);
+  const tick = setInterval(() => { const s = Math.round((Date.now() - t0) / 1000); $('recTime').textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }, 500);
+  r.onstop = () => { clearInterval(tick); rec = null; $('recDot').hidden = true; $('recBtn').textContent = '⏺ Rec'; $('recBtn').classList.remove('on');
+    const blob = new Blob(chunks, { type: type || 'video/webm' }); download(`cambodia-3d-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.${/mp4/.test(type) ? 'mp4' : 'webm'}`, blob); };
+  r.start(1000); rec = r; $('recDot').hidden = false; $('recBtn').textContent = '■ Stop'; $('recBtn').classList.add('on');
+};
+addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !world || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  if (world.atmos && world.atmos.tour) { world.atmos.stopTour(); return; }
+  if (world.mode === 'walk' || world.mode === 'drive') { world.walker.auto = null; world.setMode('orbit'); setOn('views', ''); showPanel('scenePanel', true); e.preventDefault(); }
+});
+
 /* digitizing */
 let ED = null, EDM = null;
 const ED_HELP = {
@@ -468,7 +488,8 @@ $('editBtn').onclick = async () => {
   if (!world || !world.D) return;
   if (!$('layerPanel').hidden) $('lpClose').onclick(); if (!$('surveyPanel').hidden) $('svClose').onclick();
   if (world.mode !== 'orbit') world.setMode('orbit');
-  EDM = await import('./editor.js?v=22'); ED = world.openEditor(); ED.onChange = edRender;
+  EDM = await import('./editor.js?v=23'); ED = world.openEditor(); ED.onChange = edRender;
+  ED.onHover = p => { $('edSnapKind').textContent = p && p.kind ? '→ ' + p.kind : ''; };
   if (!$('edRoad').options.length) { fillSel('#edRoad'.slice(1), EDM.ROAD_TYPES, ED.opts.road); fillSel('edRoof', EDM.ROOFS, ED.opts.roof); fillSel('edWall', EDM.WALLS, ED.opts.wall); fillSel('edRoofC', EDM.ROOF_COLS, ED.opts.roofC); fillSel('edTree', EDM.TREES, ED.opts.tree); }
   $('editPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); edRender();
 };
@@ -477,6 +498,7 @@ $('edMin').onclick = () => { const c = $('editPanel').classList.toggle('collapse
 document.querySelectorAll('.edtabs button').forEach(b => b.onclick = () => { ED.setTool(b.dataset.et); edRender(); });
 $('edRoad').onchange = e => ED.opts.road = e.target.value; $('edRoof').onchange = e => ED.opts.roof = e.target.value; $('edWall').onchange = e => ED.opts.wall = e.target.value;
 $('edRoofC').onchange = e => ED.opts.roofC = e.target.value; $('edTree').onchange = e => ED.opts.tree = e.target.value; $('edFloors').oninput = e => ED.opts.floors = Math.max(1, Math.min(40, +e.target.value || 1));
+$('edSnap').onchange = e => { if (ED) { ED.snapOn = e.target.checked; ED.hoverPt = null; ED.drawHover(); } };
 $('edRect').onchange = e => { ED.opts.rect = e.target.checked; ED.cancel(); }; $('edStilt').onchange = e => ED.opts.stilt = e.target.checked;
 $('edFinish').onclick = () => { if (ED && ED.finish()) $('edHint').textContent = 'Added'; };
 $('edUndo').onclick = () => ED && ED.undo(); $('edCancel').onclick = () => ED && ED.cancel();
@@ -502,4 +524,4 @@ $('secClose').onclick = () => { $('sectionPanel').hidden = true; if (world) { wo
 $('secWall').onchange = e => { if (!world) return; world.sectionWallOn = e.target.checked; if (world.sectionWall) world.sectionWall.visible = e.target.checked; };
 const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 $('secPng').onclick = () => $('secCanvas').toBlob(b => download('cross-section.png', b));
-$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=22'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
+$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=23'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };

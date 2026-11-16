@@ -1,10 +1,10 @@
 // Trees (leafy species, sugar & coconut palms, bushes) placed from imagery canopy, and a near-camera
 // field of grass, rice and forest understory that follows the viewer.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=22';
-import { mulberry32 } from './geo.js?v=22';
-import { makeGrassMaterial } from './shaders.js?v=22';
-import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=22';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=23';
+import { mulberry32 } from './geo.js?v=23';
+import { makeGrassMaterial } from './shaders.js?v=23';
+import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=23';
 
 let TEX = null;
 const texs = () => TEX || (TEX = foliageTextures());
@@ -113,6 +113,7 @@ function bladeTuft(nBlades, h, w, bend, seed, base, tip) {
   return g;
 }
 const RICE = new THREE.Color(0x9cc25a), GRASS = new THREE.Color(0xa8b870), WHITE = new THREE.Color(1, 1, 1);
+export const SEASON = { col: null, h: 1 }; // rice stage set from the scene panel
 
 export class GrassField {
   constructor(ctx, uTime, mobile) {
@@ -156,8 +157,8 @@ export class GrassField {
       if (k === 3 && splatRice[cj * gw + ci] > 0) {
         if (nr >= this.N) continue;
         const x = rx + (hs - .5) * 0.04, z = rz + (hash(j, i) - .5) * 0.04;
-        d.position.set(x, hAt(x, z) - 0.02, z); d.rotation.set(0, hs * 6.28, 0); d.scale.setScalar((0.8 + hs * 0.35) * (0.6 + 0.4 * fade)); d.updateMatrix(); this.rice.setMatrixAt(nr, d.matrix);
-        const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(2.2).lerp(RICE, 0.35); this.rice.setColorAt(nr, col); nr++;
+        d.position.set(x, hAt(x, z) - 0.02, z); d.rotation.set(0, hs * 6.28, 0); d.scale.set((0.8 + hs * 0.35) * (0.6 + 0.4 * fade), (0.8 + hs * 0.35) * (0.6 + 0.4 * fade) * SEASON.h, (0.8 + hs * 0.35) * (0.6 + 0.4 * fade)); d.updateMatrix(); this.rice.setMatrixAt(nr, d.matrix);
+        const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(2.2).lerp(RICE, 0.35); if (SEASON.col) col.lerp(SEASON.col, 0.75); this.rice.setColorAt(nr, col); nr++;
       } else {
         const dens = k === 3 ? 0.95 : k === 2 ? 0.45 : k === 4 ? 0.15 : k === 5 ? 0.12 : 0.3;
         if (hs > dens || ng >= this.N) continue;

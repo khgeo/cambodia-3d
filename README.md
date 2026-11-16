@@ -87,6 +87,15 @@ OpenStreetMap has few buildings in rural Cambodia. When OSM has none nearby, vil
 - **Weather:** clear, haze (burning season), monsoon rain (falling rain, overcast, short visibility) and thunderstorm (wind-driven rain and lightning flashes).
 - **🎥 Fly:** a slow cinematic flight around and across the area. Any click or key stops it.
 
+## More realism
+- **Junctions:** each road eases into the height of the more important road it joins over about 30 m, so side roads no longer step up or float at junctions.
+- **Traffic:** vehicles keep a safe gap to the one ahead and slow down behind it. On two-way roads a faster vehicle pulls out to the left, passes, and pulls back in.
+- **Night lights:** street lamps every ~35 m on main roads and town streets, with warm pools of light. Vehicles show headlight beams and red tail lights. Lights also come on in rain and storms.
+- **Rice season:** the rice fields can show the image as photographed, or be tinted for planting (flooded, Jun–Jul), growing (green, Aug–Oct), ripening (golden, Nov–Dec) or harvested (stubble, Jan–May). Rice plants grow and shrink to match.
+- **⏺ Rec:** records the 3D view (for example the 🎥 flight or a drive) as an MP4 or WebM video.
+- **Esc:** leaves Walk or Drive and stops the flight, so you don't have to move the cursor to Exit (which turns the view).
+- **Digitizing snaps** to road centrelines and ends, building and house corners, your own features, survey points and parcels. It also squares corners to 90° and closes a shape when you tap its first point. A yellow ring shows a snap and names the target. Turn it off with 🧲.
+
 ## Survey: measure, mark and go to
 Open **📐 Survey**. It has three tools:
 - **📍 Points:** tap to drop points. In Walk mode the surveyor carries a GNSS rover pole (antenna, controller and level bubble), and **Mark** (or the M key) records the point where the pole tip touches the ground. Each point gets an ID, a code (corner, tree, well…), lat/lon, UTM 48N E/N and an elevation. A stake with a flag and a label is drawn at each point.
