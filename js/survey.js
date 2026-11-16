@@ -75,7 +75,7 @@ export class Survey {
   }
   undo() { if (this.tool === 'points') { this.points.pop(); } else this.verts.pop(); this.redraw(); this.onChange && this.onChange(); }
   // where the rover pole tip touches the ground (just in front of the surveyor)
-  poleTip() { const wk = this.w.walker, fx = -Math.sin(wk.yaw), fz = -Math.cos(wk.yaw); return { x: wk.pos.x + fx * 0.6 - fz * 0.22, z: wk.pos.z + fz * 0.6 + fx * 0.22 }; }
+  poleTip() { const wk = this.w.walker, fx = -Math.sin(wk.yaw), fz = -Math.cos(wk.yaw); return { x: wk.pos.x + fx * 0.8 - fz * 0.3, z: wk.pos.z + fz * 0.8 + fx * 0.3 }; }
   markAtPole() { const p = this.poleTip(); this.add(p.x, p.z, 'rover'); this.flash = 0.6; }
   /* ---- measurements (real elevations, metres) ---- */
   path(pts, closed) {
