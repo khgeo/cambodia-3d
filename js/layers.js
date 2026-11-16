@@ -192,8 +192,8 @@ export class LayerStack {
   setFocus(id) { this.focus = this.focus === id ? null : id; this.dirty = true; return this.focus; }
   frameCamera() {
     const w = this.w, D = w.D, { top, bot } = this.layout(), ext = Math.max(D.W, D.H), mid = (top + bot) / 2 + w.hAt(D.X0 + D.W / 2, D.Z0 + D.H / 2);
-    const tgt = new THREE.Vector3(D.X0 + D.W * 0.58, mid, D.Z0 + D.H / 2), dir = new THREE.Vector3(-0.55, 0.42, 1).normalize();
-    w.flight = { t: 0, p0: w.camera.position.clone(), q0: w.controls.target.clone(), p1: tgt.clone().addScaledVector(dir, ext * 1.15 + (top - bot) * 0.9), q1: tgt };
+    const tgt = new THREE.Vector3(D.X0 + D.W * 0.6, mid, D.Z0 + D.H / 2), dir = new THREE.Vector3(-0.6, 0.25, 1).normalize();
+    w.flight = { t: 0, p0: w.camera.position.clone(), q0: w.controls.target.clone(), p1: tgt.clone().addScaledVector(dir, ext * 1.5 + (top - bot)), q1: tgt };
   }
   play() { this.setExplode(1); this.frameCamera(); this.tour = { i: -1, time: 0 }; this.w.controls.autoRotate = true; this.w.controls.autoRotateSpeed = 0.6; }
   stop() { this.tour = null; this.w.controls.autoRotate = false; this.focus = null; this.dirty = true; this.onFocus && this.onFocus(null); }
