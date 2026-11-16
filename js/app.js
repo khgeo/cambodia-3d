@@ -1,5 +1,5 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=18';
+import * as G from './geo.js?v=19';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -198,7 +198,7 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=18'); world = new World($('scene')); window.__world = world;
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=19'); world = new World($('scene')); window.__world = world;
     world.onModeChange = m => {
       $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk';
       if (m === 'drive' || m === 'walk') { setOn('views', m); showPanel('scenePanel', false); }
@@ -207,13 +207,13 @@ $('build').onclick = async () => {
     world.onVehicle = k => { $('vehicle').value = k; };
     world.onSectionHint = t => { $('secHint').textContent = t; };
     world.onSection = async S => {
-      const { drawProfile, legendHTML } = await import('./section.js?v=18');
+      const { drawProfile, legendHTML } = await import('./section.js?v=19');
       $('sectionPanel').classList.remove('picking', 'min'); $('secMin').textContent = '▾';
       const cv = $('secCanvas'); cv.width = Math.min(1600, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio))); cv.height = Math.round(cv.width * 0.36);
       drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – ↺ for a new line, ▾ to minimise';
     };
-    const { joystick } = await import('./modes.js?v=18'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=18'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=19'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=19'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -247,6 +247,17 @@ $('pickRoad').onclick = () => world && world.chooseRoad();
 $('run').onclick = e => { if (!world) return; world.walker.run = !world.walker.run; e.target.classList.toggle('on2', world.walker.run); };
 document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.setMode('orbit'); setOn('views', ''); showPanel('scenePanel', true); });
 if (innerWidth < 640) showPanel('mapPanel', false);
+/* right-hand column: keep the layer panel under the inset map, never on top of it */
+const placeRight = () => {
+  const lp = $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); hud.classList.remove('mini'); return; }
+  document.body.classList.add('lp-open');
+  if (innerWidth < 640) { hud.classList.add('mini'); lp.style.top = ''; lp.style.maxHeight = ''; return; }
+  hud.classList.remove('mini');
+  let top = hud.hidden ? 12 : hud.getBoundingClientRect().bottom + 8;
+  if (!hud.hidden && innerHeight - top < 420) { hud.classList.add('mini'); top = hud.getBoundingClientRect().bottom + 8; }
+  lp.style.top = top + 'px'; lp.style.maxHeight = (innerHeight - top - 12) + 'px';
+};
+addEventListener('resize', placeRight);
 /* layer explorer */
 let LS = null, LAYERS_DEF = null;
 const lpRender = () => {
@@ -254,7 +265,8 @@ const lpRender = () => {
   for (const L of LAYERS_DEF) {
     const st = LS.state[L.id], av = LS.available(L.id), row = document.createElement('div');
     row.className = 'lprow' + (av ? '' : ' na') + (LS.focus === L.id ? ' focus' : '') + (L.id === 'surface' ? ' ground' : '');
-    row.innerHTML = `<input type="checkbox" ${st.on ? 'checked' : ''} ${av && L.id !== 'surface' ? '' : 'disabled'}><i style="background:${L.c}"></i><span title="${L.name}">${L.name}${av ? '' : L.under ? ' …' : ''}</span><input type="range" min="0" max="100" value="${Math.round(st.op * 100)}" ${av ? '' : 'disabled'}>`;
+    const why = av ? '' : L.under && !(world.U && (L.id === 'geology' || world.U.soilOk)) ? (L.id === 'lctime' ? 'loading…' : world.U ? 'no data' : 'loading…') : L.id === 'lctime' ? 'loading…' : 'none here';
+    row.innerHTML = `<input type="checkbox" ${st.on ? 'checked' : ''} ${av ? '' : 'disabled'}><i style="background:${L.c}"></i><span title="${L.name}${av ? '' : ' – ' + why}">${L.short || L.name}${av ? '' : ` <em>${why}</em>`}</span><input type="range" min="0" max="100" value="${Math.round(st.op * 100)}" ${av ? '' : 'disabled'}>`;
     const [cb, , , op] = row.children;
     cb.onclick = e => { e.stopPropagation(); LS.setOn(L.id, cb.checked); const sc = document.querySelector(`#scenePanel input[data-k="${L.id}"]`); if (sc) sc.checked = cb.checked; };
     op.oninput = e => { e.stopPropagation(); LS.setOp(L.id, op.value / 100); }; op.onclick = e => e.stopPropagation();
@@ -279,10 +291,10 @@ const lpLegend = () => {
 const lpStop = () => { LS.stop(); $('lpPlay').textContent = '▶ Play tour'; $('lpPlay').classList.remove('on'); };
 $('layersBtn').onclick = async () => {
   if (!world || !world.D) return;
-  $('layerPanel').hidden = false; if (innerWidth < 900) showPanel('scenePanel', false);
+  $('layerPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
   if (world.mode !== 'orbit') world.setMode('orbit');
   $('lpHint').textContent = 'Preparing layers…';
-  const mod = await import('./layers.js?v=18'); LAYERS_DEF = mod.LAYERS;
+  const mod = await import('./layers.js?v=19'); LAYERS_DEF = mod.LAYERS;
   LS = await world.openLayers(t => { $('lpHint').textContent = t; });
   LS.onT = t => { $('lpExplode').value = Math.round(t * 100); };
   LS.onFocus = () => lpRender();
@@ -327,7 +339,7 @@ $('lpExplode').oninput = e => { if (LS) { LS.setExplode(e.target.value / 100, tr
 $('lpApart').onclick = () => { if (LS) { LS.setExplode(1); LS.frameCamera(); } };
 $('lpTogether').onclick = () => { if (LS) { lpStop(); LS.setExplode(0); world.goView('oblique'); lpRender(); } };
 $('lpPlay').onclick = () => { if (!LS) return; if (LS.tour) { lpStop(); lpRender(); return; } LS.play(); $('lpPlay').textContent = '■ Stop tour'; $('lpPlay').classList.add('on'); };
-$('lpClose').onclick = () => { $('layerPanel').hidden = true; if (LS) { lpStop(); LS.focus = null; LS.setExplode(0, true); world.goView('oblique'); } };
+$('lpClose').onclick = () => { $('layerPanel').hidden = true; placeRight(); if (LS) { lpStop(); LS.focus = null; LS.setExplode(0, true); world.goView('oblique'); } };
 
 /* cross-section tool */
 $('sectionBtn').onclick = async () => {
@@ -345,4 +357,4 @@ $('secClose').onclick = () => { $('sectionPanel').hidden = true; if (world) { wo
 $('secWall').onchange = e => { if (!world) return; world.sectionWallOn = e.target.checked; if (world.sectionWall) world.sectionWall.visible = e.target.checked; };
 const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 $('secPng').onclick = () => $('secCanvas').toBlob(b => download('cross-section.png', b));
-$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=18'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
+$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=19'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };

@@ -5,16 +5,16 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=18';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=18';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=18';
-import { buildTrees, GrassField } from './vegetation.js?v=18';
-import { RoadNet, Driver, Walker } from './modes.js?v=18';
-import { vehicleKit } from './vehicles.js?v=18';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=18';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=18';
-import { LayerStack } from './layers.js?v=18';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=18';
+import * as G from './geo.js?v=19';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=19';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=19';
+import { buildTrees, GrassField } from './vegetation.js?v=19';
+import { RoadNet, Driver, Walker } from './modes.js?v=19';
+import { vehicleKit } from './vehicles.js?v=19';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=19';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=19';
+import { LayerStack } from './layers.js?v=19';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=19';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },

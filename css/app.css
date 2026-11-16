@@ -88,7 +88,7 @@ button.exit{background:#5a2d2d}
 #secLegend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;border:1px solid rgba(255,255,255,.3)}
 .seccredit{margin-top:4px;color:#8fa2b4;font-size:10.5px}
 
-#layerPanel{position:absolute;right:12px;top:268px;width:268px;max-height:calc(100% - 290px);overflow:auto;z-index:7;background:rgba(17,23,31,.88);color:#e8eef4;border-radius:12px;padding:10px;box-sizing:border-box;font-size:12px;
+#layerPanel{position:absolute;right:12px;top:268px;width:270px;max-height:calc(100% - 290px);overflow:auto;overscroll-behavior:contain;z-index:7;background:rgba(17,23,31,.88);color:#e8eef4;border-radius:12px;padding:10px;box-sizing:border-box;font-size:12px;
   backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 28px rgba(0,0,0,.35)}
 #layerPanel[hidden]{display:none}
 #layerPanel .row{display:flex;gap:6px;align-items:center;margin:0 0 8px}
@@ -124,3 +124,14 @@ button.exit{background:#5a2d2d}
 .lpflood input[type=range]{accent-color:#3d8fd1}
 #lpYearLbl{width:36px;text-align:right}
 #lpTime label,.lpflood label{gap:6px;cursor:pointer}
+
+#layerPanel .lphead{position:sticky;top:-10px;z-index:2;background:rgba(17,23,31,.97);margin:-10px -10px 8px;padding:10px 10px 8px;border-radius:12px 12px 0 0}
+.lprow{grid-template-columns:18px 12px 1fr 52px;padding:3px 5px}
+.lprow input[type=range]{width:52px}
+.lprow em{font-style:normal;color:#8fa2b4;font-size:10px}
+.lprow.na span{opacity:.7}
+#hud.mini .hudtext{display:none}
+#hud.mini canvas{width:120px;height:120px}
+#hud.mini{width:120px}
+body.lp-open #sectionPanel{left:12px;right:296px;transform:none;width:auto;max-width:760px;margin-left:auto}
+@media (max-width:640px){body.lp-open #sectionPanel{right:10px;left:10px}}

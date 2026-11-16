@@ -2,22 +2,22 @@
 // Above-ground layers (water, roads, plants, buildings, traffic) rise; derived map layers (land cover,
 // elevation, soil, geology) sink below the imagery surface. A level bar picks / isolates a layer.
 import * as THREE from 'three';
-import { UNITS, SOIL_CLASSES, geologyAt, soilAt } from './section.js?v=18';
+import { UNITS, SOIL_CLASSES, geologyAt, soilAt } from './section.js?v=19';
 
 export const LAYERS = [
-  { id: 'traffic', name: 'Traffic & people', c: '#ff8a3d', side: 1, on: true },
-  { id: 'buildings', name: 'Buildings', c: '#e9e4d8', side: 1, on: true },
-  { id: 'trees', name: 'Trees & plants', c: '#3f8f3a', side: 1, on: true },
-  { id: 'roads', name: 'Roads, rail & bridges', c: '#f2c14e', side: 1, on: true },
-  { id: 'water', name: 'Water', c: '#3d8fd1', side: 1, on: true },
-  { id: 'surface', name: 'Satellite surface', c: '#9fb7a0', side: 0, on: true },
-  { id: 'lulc', name: 'Land cover (classified)', c: '#7fb85a', side: -1, on: true },
-  { id: 'lctime', name: 'Land cover 2017–2025', c: '#e49635', side: -1, on: true, under: true },
-  { id: 'elev', name: 'Elevation & contours', c: '#d9b36a', side: -1, on: true },
-  { id: 'topsoil', name: 'Topsoil 15–30 cm', c: '#a8835a', side: -1, on: true, under: true },
-  { id: 'subsoil', name: 'Subsoil 100–200 cm', c: '#8a5a3c', side: -1, on: true, under: true },
-  { id: 'geology', name: 'Geology (rock units)', c: '#d89c78', side: -1, on: true, under: true },
-  { id: 'deep', name: 'Deep Earth: crust → core', c: '#f2c14e', side: -1, on: true },
+  { id: 'traffic', short: 'Traffic & people', name: 'Traffic & people', c: '#ff8a3d', side: 1, on: true },
+  { id: 'buildings', short: 'Buildings', name: 'Buildings', c: '#e9e4d8', side: 1, on: true },
+  { id: 'trees', short: 'Trees & plants', name: 'Trees & plants', c: '#3f8f3a', side: 1, on: true },
+  { id: 'roads', short: 'Roads & rail', name: 'Roads, rail & bridges', c: '#f2c14e', side: 1, on: true },
+  { id: 'water', short: 'Water (OSM)', name: 'Water', c: '#3d8fd1', side: 1, on: true },
+  { id: 'surface', short: 'Satellite surface', name: 'Satellite surface', c: '#9fb7a0', side: 0, on: true },
+  { id: 'lulc', short: 'Land cover (image)', name: 'Land cover (classified)', c: '#7fb85a', side: -1, on: true },
+  { id: 'lctime', short: 'Land cover 2017–25', name: 'Land cover 2017–2025', c: '#e49635', side: -1, on: true, under: true },
+  { id: 'elev', short: 'Elevation', name: 'Elevation & contours', c: '#d9b36a', side: -1, on: true },
+  { id: 'topsoil', short: 'Topsoil 15–30 cm', name: 'Topsoil 15–30 cm', c: '#a8835a', side: -1, on: true, under: true },
+  { id: 'subsoil', short: 'Subsoil 1–2 m', name: 'Subsoil 100–200 cm', c: '#8a5a3c', side: -1, on: true, under: true },
+  { id: 'geology', short: 'Geology', name: 'Geology (rock units)', c: '#d89c78', side: -1, on: true, under: true },
+  { id: 'deep', short: 'Deep Earth', name: 'Deep Earth: crust → core', c: '#f2c14e', side: -1, on: true },
 ];
 // thickness of each sunk slab, as a share of the spacing (soil and rock look like real blocks)
 const THICK = { lulc: 0.05, lctime: 0.05, elev: 0.05, topsoil: 0.14, subsoil: 0.22, geology: 0.38 };
