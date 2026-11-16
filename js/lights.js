@@ -30,7 +30,7 @@ export class NightLights {
     const arm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 0.08, 1.4).translate(0, 7, 0.65), pole.material, n);
     const head = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 0.12, 0.55).translate(0, 6.95, 1.3), new THREE.MeshStandardMaterial({ color: 0x3a3f44, emissive: 0xffc070, emissiveIntensity: 0 }), n);
     const bulb = new THREE.InstancedMesh(new THREE.PlaneGeometry(1.6, 1.6).rotateX(-Math.PI / 2).translate(0, 6.85, 1.3), add(0xffd59a, this.tex, 0), n);
-    const pool = new THREE.InstancedMesh(new THREE.PlaneGeometry(14, 14).rotateX(-Math.PI / 2).translate(0, 0.25, 1.6), add(0xffb35c, this.tex, 0), n);
+    const pool = new THREE.InstancedMesh(new THREE.PlaneGeometry(17, 17).rotateX(-Math.PI / 2).translate(0, 0.7, 1.8), add(0xffb35c, this.tex, 0), n);
     const d = new THREE.Object3D();
     lamps.forEach((p, i) => { d.position.set(p.x, w.hAt(p.x, p.z), p.z); d.rotation.set(0, Math.atan2(p.nx, p.nz), 0); d.updateMatrix(); for (const m of [pole, arm, head, bulb, pool]) m.setMatrixAt(i, d.matrix); });
     for (const m of [pole, arm, head]) m.castShadow = true;
@@ -38,7 +38,7 @@ export class NightLights {
     g.add(pole, arm, head, bulb, pool);
     // headlights (beam on the road + two glows) and tail lights for every vehicle
     const N = (w.vehicles || []).length + 1; this.nVeh = N;
-    this.beam = new THREE.InstancedMesh(new THREE.PlaneGeometry(4.5, 14).rotateX(-Math.PI / 2).translate(0, 0.3, 8), add(0xfff2d0, this.tex, 0), N);
+    this.beam = new THREE.InstancedMesh(new THREE.PlaneGeometry(5, 16).rotateX(-Math.PI / 2).translate(0, 0.45, 8.5), add(0xfff2d0, this.tex, 0), N);
     const hg = new THREE.PlaneGeometry(0.55, 0.55), front = [], rear = [];
     for (const sx of [-0.62, 0.62]) { front.push(hg.clone().translate(sx, 0.75, 0)); rear.push(hg.clone().rotateY(Math.PI).translate(sx, 0.85, 0)); }
     const merge = gs => mergeGeometries(gs);
@@ -48,7 +48,7 @@ export class NightLights {
   }
   apply(night) {
     this.level = night; if (!this.lampMats) return; const k = THREE.MathUtils.smoothstep(night, 0.25, 0.8);
-    this.lampMats.head.emissiveIntensity = 2.2 * k; this.lampMats.bulb.opacity = 0.95 * k; this.lampMats.pool.opacity = 0.55 * k;
+    this.lampMats.head.emissiveIntensity = 2.2 * k; this.lampMats.bulb.opacity = 0.95 * k; this.lampMats.pool.opacity = 0.9 * k;
     for (const m of [this.beam, this.heads, this.tails]) if (m) { m.material.opacity = (m === this.beam ? 0.32 : 0.9) * k; m.visible = k > 0.01; }
   }
   step() {
