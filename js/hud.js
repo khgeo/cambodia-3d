@@ -21,26 +21,26 @@ export class Hud {
     // tap / click the inset map to jump there (walk: stand there; drive: nearest road; orbit: look there)
     this.canvas.addEventListener('pointerdown', e => {
       if (!this.view) return; const b = this.canvas.getBoundingClientRect(), v = this.view;
-      const x = v.cx - v.win / 2 + (e.clientX - b.left) / b.width * v.win, z = v.cz - v.win / 2 + (e.clientY - b.top) / b.height * v.win;
+      const x = v.cx - v.win / 2 + (e.clientX - b.left) / b.width * v.win, z = v.cz - v.winZ / 2 + (e.clientY - b.top) / b.height * v.winZ;
       this.w.teleport(x, z); e.preventDefault(); e.stopPropagation();
     });
   }
   draw() {
     const w = this.w, h = w.hud, D = w.D, mc = w.miniCanvas;
     if (this.root.hidden || !D || !mc || h.lat === undefined) return;
-    const cv = this.canvas, ctx = cv.getContext('2d'), S = cv.width;
+    const cv = this.canvas, ctx = cv.getContext('2d'), S = cv.width, T = cv.height;
     // window size in metres: whole AOI in orbit view, close-up when walking/driving (tap ⊕ to change)
     const auto = h.mode === 'walk' ? 260 : h.mode === 'drive' ? 700 : Math.max(D.W, D.H) * 1.2;
     const win = [auto, 200, 600, Math.max(D.W, D.H) * 1.6][this.zoom];
     const cx = h.x, cz = h.z; // always keep our position in the centre of the inset map
-    this.view = { cx, cz, win };
-    ctx.fillStyle = '#26303a'; ctx.fillRect(0, 0, S, S);
-    const k = mc.width / D.W, sx = (cx - win / 2 - D.X0) * k, sy = (cz - win / 2 - D.Z0) * (mc.height / D.H);
-    ctx.drawImage(mc, sx, sy, win * k, win * (mc.height / D.H), 0, 0, S, S);
-    const toPx = (x, z) => [(x - (cx - win / 2)) / win * S, (z - (cz - win / 2)) / win * S];
+    const winZ = win * T / S; this.view = { cx, cz, win, winZ };
+    ctx.fillStyle = '#26303a'; ctx.fillRect(0, 0, S, T);
+    const k = mc.width / D.W, sx = (cx - win / 2 - D.X0) * k, sy = (cz - winZ / 2 - D.Z0) * (mc.height / D.H);
+    ctx.drawImage(mc, sx, sy, win * k, winZ * (mc.height / D.H), 0, 0, S, T);
+    const toPx = (x, z) => [(x - (cx - win / 2)) / win * S, (z - (cz - winZ / 2)) / winZ * T];
     // view cone + position arrow
     const [px, py] = toPx(h.x, h.z), hd = h.heading * Math.PI / 180, fov = Math.min(1.6, (h.fov || 60) * Math.PI / 180 / 2);
-    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.moveTo(px, py); ctx.arc(px, py, S * 0.28, hd - Math.PI / 2 - fov / 2, hd - Math.PI / 2 + fov / 2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.beginPath(); ctx.moveTo(px, py); ctx.arc(px, py, T * 0.36, hd - Math.PI / 2 - fov / 2, hd - Math.PI / 2 + fov / 2); ctx.closePath(); ctx.fill();
     ctx.save(); ctx.translate(px, py); ctx.rotate(hd);
     ctx.fillStyle = '#ff4d3d'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(7, 8); ctx.lineTo(0, 4); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
@@ -49,11 +49,11 @@ export class Hud {
     ctx.fillStyle = '#fff'; ctx.font = '700 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText('N', S - 16, 14); ctx.beginPath(); ctx.moveTo(S - 16, 17); ctx.lineTo(S - 12, 25); ctx.lineTo(S - 20, 25); ctx.fill();
     // scale bar
     const nice = [10, 20, 50, 100, 200, 500, 1000, 2000], target = win / 4, len = nice.find(v => v >= target) || 2000, lp = len / win * S;
-    ctx.fillStyle = 'rgba(17,23,31,.7)'; ctx.fillRect(6, S - 22, lp + 12, 16); ctx.fillStyle = '#fff'; ctx.fillRect(12, S - 12, lp, 3);
-    ctx.font = '600 10px system-ui'; ctx.textAlign = 'left'; ctx.fillText(len >= 1000 ? len / 1000 + ' km' : len + ' m', 14, S - 15);
+    ctx.fillStyle = 'rgba(17,23,31,.7)'; ctx.fillRect(6, T - 22, lp + 12, 16); ctx.fillStyle = '#fff'; ctx.fillRect(12, T - 12, lp, 3);
+    ctx.font = '600 10px system-ui'; ctx.textAlign = 'left'; ctx.fillText(len >= 1000 ? len / 1000 + ' km' : len + ' m', 14, T - 15);
     // readout
     const u = utm(h.lat, h.lon), dir = DIRS[Math.round(h.heading / 45) % 8], kmh = (h.speedShown || 0) * 3.6;
-    this.text.innerHTML = `<b>${dir} ${h.heading.toFixed(0).padStart(3, '0')}°</b>${h.mode === 'orbit' ? '' : ` · <b>${kmh.toFixed(kmh < 10 ? 1 : 0)} km/h</b>`}<br>` +
-      `${h.lat.toFixed(5)}°N ${h.lon.toFixed(5)}°E<br>UTM ${u.zone}${u.hemi} ${u.E.toFixed(0)} E ${u.N.toFixed(0)} N<br>Elevation ${h.elev.toFixed(0)} m`;
+    this.text.innerHTML = `<b>${dir} ${h.heading.toFixed(0).padStart(3, '0')}°</b>${h.mode === 'orbit' ? '' : ` · <b>${kmh.toFixed(kmh < 10 ? 1 : 0)} km/h</b>`} · Elevation ${h.elev.toFixed(0)} m<br>` +
+      `${h.lat.toFixed(5)}°N ${h.lon.toFixed(5)}°E<br>UTM ${u.zone}${u.hemi} ${u.E.toFixed(0)} E ${u.N.toFixed(0)} N`;
   }
 }

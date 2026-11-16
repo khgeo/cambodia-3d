@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=19">
+<link rel="stylesheet" href="css/app.css?v=20">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -105,7 +105,8 @@
   <div id="joy" class="joy" hidden><div class="knob"></div></div>
   <button class="fab" id="sceneToggle" aria-label="Panel">☰</button>
   <div id="layerPanel" hidden>
-    <div class="row lphead"><b>Layers</b><span id="lpHint" class="hint"></span><button id="lpClose" title="Close">✕</button></div>
+    <div class="row lphead"><b>Layers</b><span id="lpHint" class="hint"></span><button id="lpMin" title="Hide / show the layer list">▴</button><button id="lpClose" title="Close">✕</button></div>
+    <div id="lpContent">
     <div class="row lpctl">
       <button id="lpPlay">▶ Play tour</button>
       <button id="lpApart">⇕ Pull apart</button>
@@ -130,6 +131,7 @@
       <input type="range" id="lpFlood" min="0" max="100" value="20" disabled>
     </div>
     <div id="lpLegend"></div>
+    </div>
   </div>
   <div id="sectionPanel" hidden>
     <div class="row secbar"><b>Cross-section</b><span id="secHint" class="hint">Tap point A on the ground or on the inset map</span>
@@ -139,10 +141,10 @@
     <div id="secLegend"></div>
     <div class="seccredit">Soil: ISRIC SoilGrids 2.0 (250 m, CC BY 4.0) · Geology: Geology of Cambodia 2006, Open Development Cambodia / Save Cambodia's Wildlife (CC BY-SA 4.0)</div></div>
   </div>
-  <div id="hud" hidden><canvas width="180" height="180"></canvas><button class="hudzoom" title="Change inset-map zoom">⊕</button><div class="hudtext"></div></div>
+  <div id="hud" hidden><canvas width="240" height="150"></canvas><button class="hudzoom" title="Change inset-map zoom">⊕</button><div class="hudtext"></div></div>
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=19"></script>
+<script type="module" src="js/app.js?v=20"></script>
 </body>
 </html>
