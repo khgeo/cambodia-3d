@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=21">
+<link rel="stylesheet" href="css/app.css?v=22">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -67,6 +67,7 @@
     </div>
     <button id="layersBtn" class="primary" style="margin:8px 0 2px;background:#2f6a8a">🗂 Layers: pull apart &amp; explore</button>
     <button id="surveyBtn" class="primary" style="margin:8px 0 2px;background:#2d7a55">📐 Survey: measure, mark &amp; go to</button>
+    <button id="editBtn" class="primary" style="margin:8px 0 2px;background:#7a3d8a">✏️ Digitize: roads, buildings, trees</button>
     <button id="sectionBtn" class="primary" style="margin:8px 0 2px;background:#7a5230">✂ Cross-section: soil &amp; geology</button>
     <label class="lbl">Ground</label>
     <div class="seg" id="ground">
@@ -80,12 +81,14 @@
     <div class="row checks">
       <label><input type="checkbox" data-k="trees" checked> Trees</label>
       <label><input type="checkbox" data-k="buildings" checked> Buildings</label>
+      <label title="Village houses placed where the image shows built-up land next to a road and OpenStreetMap has no buildings"><input type="checkbox" data-k="houses" checked> Houses from image</label>
       <label><input type="checkbox" data-k="traffic" checked> Traffic &amp; people</label>
       <label><input type="checkbox" data-k="detail" checked> Ground detail &amp; grass</label>
       <label><input type="checkbox" data-k="shadows" checked> Shadows</label>
       <label><input type="checkbox" data-k="reflect" checked> Water reflections</label>
     </div>
-    <label class="lbl">Sun <input type="range" id="sun" min="4" max="80" value="38"></label>
+    <label class="lbl">Time of day <b id="hourLbl">09:30</b> <input type="range" id="hour" min="5" max="23.5" step="0.25" value="9.5"></label>
+    <div class="row wxrow"><button data-wx="clear" class="on" title="Clear sky">☀️</button><button data-wx="haze" title="Hazy / burning season">🌫️</button><button data-wx="rain" title="Monsoon rain">🌧️</button><button data-wx="storm" title="Thunderstorm">⛈️</button><button id="tourBtn" title="Cinematic flight around the area">🎥 Fly</button></div>
     <div id="lulc"></div>
     <div id="stats" class="info"></div>
   </div>
@@ -143,17 +146,47 @@
       <div class="row"><button id="svMark" class="primary">📍 Mark at pole (M)</button></div>
       <div class="row"><button id="svUndo">↶ Undo</button><button id="svClear">🗑 Clear</button><button id="svRover">🚶 Walk with rover</button></div>
       <div id="svResult"></div>
+      <div id="svAreaX" hidden>
+        <div class="row"><span>Design level</span><input type="number" id="svLevel" step="0.1" placeholder="m"><button id="svLevelGo">Cut / fill</button></div>
+        <div id="svCF" class="svhelp"></div>
+        <div class="row"><input id="svParcelName" placeholder="Parcel name (e.g. Plot 12)"><button id="svParcel">💾 Save</button></div>
+      </div>
       <canvas id="svProfile" width="480" height="170" hidden></canvas>
       <div class="svsec"><b>Go to a coordinate</b>
         <input id="svGoto" placeholder="11.5631, 104.9282 · or UTM 491500 1278000" autocomplete="off">
         <div class="row"><button id="svStake">🎯 Stake out</button><button id="svWalk">🚶 Walk there</button><button id="svJump">⤓ Jump</button></div>
         <div id="svGotoMsg" class="svhelp"></div>
       </div>
+      <div class="svsec"><b>Stake-out list</b> <span id="svStakeInfo" class="svhelp"></span>
+        <div class="row"><button id="svCsvIn">📂 Import CSV</button><button id="svPrev">◀</button><button id="svNext">▶</button></div>
+        <input type="file" id="svCsvFile" accept=".csv,.txt" hidden>
+      </div>
+      <div class="svsec"><b>Parcels</b> <span id="svParcelCount"></span><div id="svParcels"></div></div>
       <div class="svsec"><b>Points</b> <span id="svCount"></span>
         <div id="svList"></div>
         <div class="row"><button id="svCsv">⬇ CSV</button><button id="svGeo">⬇ GeoJSON</button><button id="svKml">⬇ KML</button></div>
       </div>
       <div class="svhelp">Heights are from the terrain model (about ±5–10 m), not real GNSS. Distances use true heights, not the exaggerated view.</div>
+    </div>
+  </div>
+  <div id="editPanel" class="rpanel" hidden>
+    <div class="row lphead"><b>✏️ Digitize</b><span id="edHint" class="hint"></span><button id="edMin" title="Hide / show">▴</button><button id="edClose" title="Close">✕</button></div>
+    <div id="edContent">
+      <div class="row svtabs edtabs"><button data-et="road" class="on">🛣 Road</button><button data-et="building">🏠 Building</button><button data-et="tree">🌴 Tree</button><button data-et="pond">💧 Pond</button><button data-et="delete" title="Tap a feature to delete it">🗑</button></div>
+      <div id="edHelp" class="svhelp"></div>
+      <div class="edopt" data-for="road"><div class="row"><span>Type</span><select id="edRoad"></select></div></div>
+      <div class="edopt" data-for="building">
+        <div class="row"><span>Floors</span><input type="number" id="edFloors" min="1" max="40" value="1"><span>Roof</span><select id="edRoof"></select></div>
+        <div class="row"><span>Walls</span><select id="edWall"></select><span>Roof</span><select id="edRoofC"></select></div>
+        <div class="row"><label><input type="checkbox" id="edRect" checked> Rectangle (3 taps)</label><label><input type="checkbox" id="edStilt"> On stilts</label></div>
+      </div>
+      <div class="edopt" data-for="tree"><div class="row"><span>Kind</span><select id="edTree"></select></div></div>
+      <div class="row edact"><button id="edFinish" class="primary">✓ Finish</button><button id="edUndo">↶ Undo</button><button id="edCancel">✕ Cancel</button></div>
+      <div class="svsec"><b>In this area</b> <span id="edCount"></span>
+        <div class="row" style="margin-top:6px"><button id="edExport">⬇ GeoJSON</button><button id="edImport">⬆ Import</button><button id="edClear">🗑 Clear</button></div>
+        <input type="file" id="edFile" accept=".geojson,.json" hidden>
+        <div class="svhelp">Saved in this browser. New roads can be driven on. Import works with GeoJSON from QGIS (lines → roads, polygons → buildings, points → trees).</div>
+      </div>
     </div>
   </div>
   <div id="sectionPanel" hidden>
@@ -168,6 +201,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=21"></script>
+<script type="module" src="js/app.js?v=22"></script>
 </body>
 </html>

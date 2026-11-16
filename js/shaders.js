@@ -90,15 +90,20 @@ vRoad = aRoad; vRoad2 = aRoad2; vWPos = (modelMatrix * vec4(transformed, 1.0)).x
   return m;
 }
 
+export const NIGHT = { value: 0 }; // 0 day … 1 night: lights up windows
 export function makeBuildingMaterial() {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82, metalness: 0.0, side: THREE.DoubleSide });
   m.onBeforeCompile = sh => {
+    sh.uniforms.uNight = NIGHT;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aWall; varying vec4 vWall;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvWall = aWall;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec4 vWall;')
+      .replace('#include <common>', '#include <common>\nvarying vec4 vWall; uniform float uNight;')
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+totalEmissiveRadiance += vec3(1.0, 0.7, 0.36) * winLit * uNight * 1.8;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
+float winLit = 0.0;
 if (vWall.z > 0.5) {
   float big = step(1.5, vWall.z);
   float fl = mod(vWall.y, 3.2);
@@ -106,9 +111,11 @@ if (vWall.z > 0.5) {
   float win = step(1.0, fl) * step(fl, 2.35) * step(0.75, c) * step(c, mix(1.9, 2.15, big))
             * step(0.9, vWall.y) * step(vWall.y, vWall.w - 0.6);
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.035, 0.05, 0.065), win * 0.88);
+  vec2 cell = floor(vec2(vWall.x / mix(3.4, 2.7, big), vWall.y / 3.2));
+  winLit = win * step(0.45, fract(sin(dot(cell + floor(vWall.w * 7.0), vec2(12.9898, 78.233))) * 43758.5453));
 }`);
   };
-  m.customProgramCacheKey = () => 'bldg-v1';
+  m.customProgramCacheKey = () => 'bldg-v2';
   return m;
 }
 

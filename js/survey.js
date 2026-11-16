@@ -2,7 +2,7 @@
 // (planimetric and 3D surface), draped on the terrain; go to / stake out a coordinate; walk with a GNSS rover pole.
 // Heights come from the terrain model (not exaggerated); this is a simulation, not survey-grade.
 import * as THREE from 'three';
-import { utm } from './hud.js?v=21';
+import { utm } from './hud.js?v=22';
 
 export const CODES = ['Point', 'Boundary corner', 'Tree', 'Well / water', 'Building corner', 'Road / track', 'Benchmark', 'Other'];
 const COL = { line: 0xffd23f, area: 0x29c7d9, point: 0xff6b3d, target: 0x37e07a };
@@ -56,7 +56,49 @@ export class Survey {
     this.w = world; this.tool = 'points'; this.points = []; this.verts = []; this.target = null; this.code = CODES[0]; this.n = 0;
     this.group = new THREE.Group(); world.scene.add(this.group);
     this.pole = this.makePole(); this.pole.visible = false; world.scene.add(this.pole);
-    this.active = false;
+    this.active = false; this.level = null; this.stakeList = []; this.stakeIdx = -1;
+    try { this.parcels = JSON.parse(localStorage.getItem('cambodia3d.parcels.v1') || '[]'); } catch (e) { this.parcels = []; }
+  }
+  sceneY(elev) { const D = this.D, w = this.w; return (elev - Math.max(D.hmin, 0)) * (w.exag ?? 1); }
+  /* ---- cut / fill to a design level inside the area ---- */
+  cutFill(level) {
+    const tri = this.drapeTris(); let cut = 0, fill = 0;
+    for (let i = 0; i < tri.length; i += 9) {
+      const ax = tri[i], az = tri[i + 2], bx = tri[i + 3], bz = tri[i + 5], cx = tri[i + 6], cz = tri[i + 8], A = Math.abs((bx - ax) * (cz - az) - (cx - ax) * (bz - az)) / 2;
+      const h = (this.real(ax, az) + this.real(bx, bz) + this.real(cx, cz) + 3 * this.real((ax + bx + cx) / 3, (az + bz + cz) / 3)) / 6, d = h - level;
+      if (d > 0) cut += A * d; else fill -= A * d;
+    }
+    return { cut, fill, net: cut - fill };
+  }
+  /* ---- parcels: saved polygons with a name and area, kept in this browser ---- */
+  saveParcel(name) {
+    if (this.verts.length < 3) return null; const m = this.measureArea();
+    const p = { id: Date.now().toString(36), name: name || 'Parcel ' + (this.parcels.length + 1), coords: this.verts.map(v => { const ll = this.toLL(v.x, v.z); return [+ll.lon.toFixed(7), +ll.lat.toFixed(7)]; }), area: m.A, area3: m.A3, per: m.per2 };
+    this.parcels.push(p); this.persist(); this.verts = []; this.redraw(); return p;
+  }
+  persist() { try { localStorage.setItem('cambodia3d.parcels.v1', JSON.stringify(this.parcels)); } catch (e) { } }
+  parcelsHere() { const F = this.w.F; return this.parcels.filter(p => p.coords.some(c => this.inside(F.x(c[0]), F.z(c[1])))); }
+  /* ---- stake-out list from a CSV of points ---- */
+  importCSV(txt) {
+    const lines = txt.split(/\r?\n/).filter(l => l.trim()); if (!lines.length) return 0;
+    const split = l => l.split(/[,;\t]/).map(v => v.trim().replace(/^"|"$/g, ''));
+    let head = split(lines[0]).map(h => h.toLowerCase()); const hasHead = head.some(h => /[a-z]/.test(h) && !/^-?\d/.test(h));
+    const col = (...names) => head.findIndex(h => names.includes(h));
+    const iId = hasHead ? col('id', 'name', 'point', 'pt', 'label') : -1, iLat = hasHead ? col('lat', 'latitude', 'y_lat') : -1, iLon = hasHead ? col('lon', 'lng', 'long', 'longitude', 'x_lon') : -1,
+      iE = hasHead ? col('e', 'easting', 'x', 'east') : -1, iN = hasHead ? col('n', 'northing', 'y', 'north') : -1;
+    const out = [];
+    (hasHead ? lines.slice(1) : lines).forEach((l, k) => {
+      const v = split(l); let ll = null;
+      if (iLat >= 0 && iLon >= 0) ll = { lat: +v[iLat], lon: +v[iLon] };
+      else if (iE >= 0 && iN >= 0) ll = utmInv(+v[iE], +v[iN], 48, true);
+      else { const nums = v.map(Number).filter(n => !isNaN(n)); if (nums.length >= 2) ll = parseCoord(nums.slice(-2).join(' ')) || parseCoord(nums.slice(0, 2).join(' ')); }
+      if (ll && isFinite(ll.lat) && isFinite(ll.lon)) out.push({ id: iId >= 0 ? v[iId] : 'S' + (k + 1), lat: ll.lat, lon: ll.lon, done: false });
+    });
+    this.stakeList = out; this.stakeIdx = -1; return out.length;
+  }
+  stakeGo(i) {
+    if (!this.stakeList.length) return null; this.stakeIdx = (i + this.stakeList.length) % this.stakeList.length; const s = this.stakeList[this.stakeIdx];
+    return this.setTarget(s, s.id) ? s : false;
   }
   get D() { return this.w.D; }
   real(x, z) { return this.w.rawElevation(x, z); }
@@ -71,6 +113,7 @@ export class Survey {
       const ll = this.toLL(x, z), u = utm(ll.lat, ll.lon);
       this.points.push({ id: 'P' + (++this.n), code: this.code, x, z, ...ll, E: u.E, N: u.N, zone: u.zone, h: this.real(x, z), src: src || 'tap', t: new Date().toISOString() });
     } else this.verts.push({ x, z });
+    if (this.target && this.stakeIdx >= 0 && Math.hypot(this.target.x - x, this.target.z - z) < 0.5 && this.stakeList[this.stakeIdx]) { this.stakeList[this.stakeIdx].done = true; const pt = this.points[this.points.length - 1]; if (pt && this.tool === 'points') pt.code = 'Staked ' + this.stakeList[this.stakeIdx].id; }
     this.redraw(); this.onChange && this.onChange();
   }
   undo() { if (this.tool === 'points') { this.points.pop(); } else this.verts.pop(); this.redraw(); this.onChange && this.onChange(); }
@@ -167,6 +210,16 @@ export class Survey {
         const cx = V.reduce((s, p) => s + p.x, 0) / V.length, cz = V.reduce((s, p) => s + p.z, 0) / V.length, t = tag(fmtArea(m.A), '#29c7d9', true); t.position.set(cx, this.w.hAt(cx, cz) + 3, cz); g.add(t);
       }
     }
+    for (const p of this.parcelsHere()) {
+      const P = p.coords.map(c => ({ x: this.w.F.x(c[0]), z: this.w.F.z(c[1]) }));
+      this.ribbon(this.path(P, true).s, 0xff9f1c, Math.max(0.3, Math.max(this.D.W, this.D.H) / 1800));
+      const cx = P.reduce((s, q) => s + q.x, 0) / P.length, cz = P.reduce((s, q) => s + q.z, 0) / P.length, t = tag(`${p.name} · ${fmtArea(p.area)}`, '#ff9f1c'); t.position.set(cx, this.w.hAt(cx, cz) + 2, cz); g.add(t);
+    }
+    if (this.tool === 'area' && this.level != null && V.length > 2) {
+      const sh = new THREE.Shape(V.map(p => new THREE.Vector2(p.x, -p.z))), geo = new THREE.ShapeGeometry(sh).rotateX(-Math.PI / 2); geo.translate(0, this.sceneY(this.level), 0);
+      const plane = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xff3d7f, transparent: true, opacity: 0.35, side: THREE.DoubleSide, depthWrite: false })); plane.renderOrder = 6; g.add(plane);
+      const edge = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(V.map(p => new THREE.Vector3(p.x, this.sceneY(this.level), p.z))), new THREE.LineBasicMaterial({ color: 0xff3d7f })); g.add(edge);
+    }
     if (this.target) this.drawTarget();
   }
   /* ---- go to / stake out ---- */
@@ -222,6 +275,7 @@ export class Survey {
     const c = this.verts.map(v => { const ll = this.toLL(v.x, v.z); return [+ll.lon.toFixed(7), +ll.lat.toFixed(7), +this.real(v.x, v.z).toFixed(2)]; });
     if (this.tool === 'line' && c.length > 1) { const m = this.measureLine(); f.push({ type: 'Feature', properties: { kind: 'distance', horizontal_m: +m.d2.toFixed(2), along_ground_m: +m.d3.toFixed(2) }, geometry: { type: 'LineString', coordinates: c } }); }
     if (this.tool === 'area' && c.length > 2) { const m = this.measureArea(); f.push({ type: 'Feature', properties: { kind: 'area', area_m2: +m.A.toFixed(1), surface_area_m2: +m.A3.toFixed(1), perimeter_m: +m.per2.toFixed(2) }, geometry: { type: 'Polygon', coordinates: [[...c, c[0]]] } }); }
+    for (const p of this.parcels) f.push({ type: 'Feature', properties: { kind: 'parcel', name: p.name, area_m2: +p.area.toFixed(1), surface_area_m2: +p.area3.toFixed(1), perimeter_m: +p.per.toFixed(2) }, geometry: { type: 'Polygon', coordinates: [[...p.coords, p.coords[0]]] } });
     return JSON.stringify({ type: 'FeatureCollection', features: f }, null, 1);
   }
   kml() {

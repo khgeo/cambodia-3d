@@ -5,17 +5,19 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=21';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=21';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=21';
-import { buildTrees, GrassField } from './vegetation.js?v=21';
-import { RoadNet, Driver, Walker } from './modes.js?v=21';
-import { vehicleKit } from './vehicles.js?v=21';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=21';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=21';
-import { LayerStack } from './layers.js?v=21';
-import { Survey } from './survey.js?v=21';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=21';
+import * as G from './geo.js?v=22';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=22';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=22';
+import { buildTrees, GrassField } from './vegetation.js?v=22';
+import { RoadNet, Driver, Walker } from './modes.js?v=22';
+import { vehicleKit } from './vehicles.js?v=22';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=22';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=22';
+import { LayerStack } from './layers.js?v=22';
+import { Survey } from './survey.js?v=22';
+import { Editor } from './editor.js?v=22';
+import { Atmos } from './atmos.js?v=22';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=22';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -151,8 +153,9 @@ export class World {
 
   resize() { const w = this.container.clientWidth, h = this.container.clientHeight; if (!w || !h) return; this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.renderer.setSize(w, h); const pr = this.renderer.getPixelRatio() * 0.5; this.reflRT.setSize(Math.round(w * pr), Math.round(h * pr)); }
 
-  setSun(elev, env) {
-    this.sunDir.setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - elev), THREE.MathUtils.degToRad(140));
+  setSun(elev, env, az) {
+    if (az != null) this.sunAz = az;
+    this.sunDir.setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - elev), THREE.MathUtils.degToRad(this.sunAz ?? 140));
     this.sky.material.uniforms.sunPosition.value.copy(this.sunDir);
     const k = THREE.MathUtils.clamp((elev - 4) / 40, 0, 1);
     this.sun.color.set(0xffa860).lerp(new THREE.Color(0xfff3e2), k);
@@ -390,6 +393,7 @@ export class World {
     const prevMode = this.mode; this.setMode('orbit');
     this.clearGeometry();
     const exag = opts.exaggeration ?? 1, smoothOn = opts.smooth !== false;
+    if (!D.exclude0) { D.exclude0 = D.exclude.slice(); D.bmask0 = this.bmask.slice(); } else { D.exclude.set(D.exclude0); this.bmask.set(D.bmask0); }
     const { W, H, X0, Z0, X1, Z1, S, nx, nz, dx, dz, raw, hmin } = D, R = nx + 1;
     const rnd = G.mulberry32(Math.round(D.aoi.w * 1e4 + D.aoi.s * 1e3));
     D.stats.exag = exag;
@@ -608,6 +612,12 @@ export class World {
     say(`Building ${D.buildings.length} buildings…`); await tick();
     const bgeo = this.buildBuildings(D.buildings, rnd);
     if (bgeo) { const m = new THREE.Mesh(bgeo, makeBuildingMaterial()); m.castShadow = m.receiveShadow = true; this.buildingsMesh = m; this.root.add(m); }
+    // rural houses inferred from the image where OpenStreetMap has none (built-up pixels next to roads)
+    this.housesMesh = null; D.stats.houses = 0;
+    if (this.inferHouses !== false) {
+      const hs = this.inferHousesList(rnd); D.stats.houses = hs.length;
+      if (hs.length) { const g = this.buildBuildings(hs, rnd, { noStats: true }); if (g) { const m = new THREE.Mesh(g, makeBuildingMaterial()); m.castShadow = m.receiveShadow = true; this.housesMesh = m; this.root.add(m); } }
+    }
 
     /* 6. trees + near grass */
     say('Planting trees from the image…'); await tick();
@@ -642,6 +652,8 @@ export class World {
     if (keepView) { this.camera.position.copy(keepView.p); this.controls.target.copy(keepView.t); this.controls.update(); }
     else this.goView('overview', true);
     if (prevMode === 'walk') this.setMode('walk');
+    if (!this.editor) { try { if (JSON.parse(localStorage.getItem('cambodia3d.edits.v1') || '[]').length) this.editor = new Editor(this); } catch (e) {} }
+    if (this.editor) this.editor.rebuild();
     if (this.survey) this.survey.redraw();
     this.exag = exag; if (this.layers) { const t = this.layers.t; await this.layers.rebuild(); this.layers.setExplode(t, true); }
     if (this.U) { this.applySideGeology(); if (this.section) this.makeSection(this.section.A, this.section.B); }
@@ -680,7 +692,7 @@ export class World {
   }
 
   /* ---------- buildings ---------- */
-  buildBuildings(list, rnd) {
+  buildBuildings(list, rnd, opts = {}) {
     const pos = [], col = [], wall = [];
     const WALLS = [0xe9e4d8, 0xf1ece2, 0xe8dcc0, 0xd9d3c7, 0xefe2c9, 0xe6d3c3, 0xcfd6d2, 0xf3efe6];
     const ROOF_G = [0xa8452f, 0x9a3b2c, 0xb4583a, 0x3e6b98, 0x58708a, 0x8a8f94, 0x6f7377, 0x2f5e4b, 0xb05a3c];
@@ -696,8 +708,10 @@ export class World {
       let h = b.hdm > 20 ? b.hdm / 10 : b.lv > 0 ? b.lv * 3.2 + 0.6 : 0;
       if (!h) h = ({ 1: 3.6, 2: 6.8, 3: 13, 4: 9.5, 5: 7, 6: 7, 7: 7.4, 8: 9.5, 9: 4, 10: 3, 11: 6, 12: 6 })[t] || (area > 250 ? 7.0 : 3.6 + rnd() * 3.3);
       let gnd = Infinity; for (const p of ring) gnd = Math.min(gnd, this.hAt(p[0], p[1])); gnd -= 0.3;
+      if (b.stilt) { gnd += b.stilt; for (const p of ring) { const y0 = this.hAt(p[0], p[1]) - 0.2; for (const [dx, dz] of [[0, 0]]) { const px = p[0], pz = p[1], r = 0.13;
+        const cyl = [[px - r, pz - r], [px + r, pz - r], [px + r, pz + r], [px - r, pz + r]]; for (let k = 0; k < 4; k++) { const A = cyl[k], B2 = cyl[(k + 1) % 4], pc = new THREE.Color(0x6b5440).convertSRGBToLinear(); tri([A[0], y0, A[1]], [B2[0], y0, B2[1]], [B2[0], gnd, B2[1]], pc); tri([A[0], y0, A[1]], [B2[0], gnd, B2[1]], [A[0], gnd, A[1]], pc); } } } }
       const stone = t === 6 && area >= 1500; // large temple complexes: sandstone, flat, no windows
-      const wallC = new THREE.Color(stone ? 0x9a8c72 : WALLS[(rnd() * WALLS.length) | 0]).convertSRGBToLinear();
+      const wallC = new THREE.Color(b.wall != null ? b.wall : stone ? 0x9a8c72 : WALLS[(rnd() * WALLS.length) | 0]).convertSRGBToLinear();
       const winType = t === 9 || t === 10 || t === 6 || t === 11 ? 0 : (h > 6.5 || [3, 4, 7, 8].includes(t)) ? 2 : 1, top = gnd + h;
       let along = 0;
       for (let i = 0; i < ring.length; i++) {
@@ -709,15 +723,15 @@ export class World {
         along += L;
       }
       const ob = G.obb(ring), rect = ob ? area / (4 * ob.a * ob.b) : 0;
-      const pitched = ob && !big && rect > 0.78 && ![3, 4, 5, 9].includes(t) && h < 10 && ob.b > 1.5;
+      const pitched = b.roof ? (b.roof !== 'flat' && !!ob) : ob && !big && rect > 0.78 && ![3, 4, 5, 9].includes(t) && h < 10 && ob.b > 1.5;
       if (t === 11 && ob) {
         const r = Math.sqrt(area / Math.PI) * 0.9, g = new THREE.LatheGeometry([[0, 0], [r, 0], [r * 0.95, r * 0.6], [r * 0.55, r * 1.3], [r * 0.25, r * 1.9], [0.05, r * 3.2]].map(([x, y]) => new THREE.Vector2(x, y)), 12).toNonIndexed();
         const gp = g.attributes.position, gold = new THREE.Color(0xd8b25a).convertSRGBToLinear(), white = new THREE.Color(0xf2efe6).convertSRGBToLinear();
         for (let i = 0; i < gp.count; i++) push([gp.getX(i) + ob.cx, gp.getY(i) + top, gp.getZ(i) + ob.cz], gp.getY(i) > r * 1.3 ? gold : white, [0, 0, 0, 0]);
       } else if (pitched || (t === 6 && ob && area < 1500)) {
         const o = 0.45, pagoda = t === 6, P = (u, v, y) => [ob.cx + ob.ux * u + ob.vx * v, y, ob.cz + ob.uz * u + ob.vz * v];
-        const roofC = new THREE.Color(pagoda ? 0xc0562a : ROOF_G[(rnd() * ROOF_G.length) | 0]).convertSRGBToLinear(), gableC = new THREE.Color(0xd9a441).convertSRGBToLinear();
-        const tiers = pagoda ? [[1, 1, 0], [0.72, 0.8, 0.55]] : [[1, 1, 0]], hip = !pagoda && rnd() < 0.45;
+        const roofC = new THREE.Color(b.roofC != null ? b.roofC : pagoda ? 0xc0562a : ROOF_G[(rnd() * ROOF_G.length) | 0]).convertSRGBToLinear(), gableC = new THREE.Color(0xd9a441).convertSRGBToLinear();
+        const tiers = pagoda ? [[1, 1, 0], [0.72, 0.8, 0.55]] : [[1, 1, 0]], hip = !pagoda && (b.roof ? b.roof === 'hip' : rnd() < 0.45);
         let ybase = top;
         for (const [ka, kb, rise0] of tiers) {
           const A = ob.a * ka, B = ob.b * kb, rise = B * (pagoda ? 0.95 : 0.42 + rnd() * 0.12), y0 = ybase + (rise0 ? -rise * 0.15 : 0), y1 = y0 + rise;
@@ -742,11 +756,42 @@ export class World {
         }
       }
     }
-    this.D.stats.buildings = count;
+    if (!opts.noStats) this.D.stats.buildings = count;
     if (!pos.length) return null;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('aWall', new THREE.Float32BufferAttribute(wall, 4));
     g.computeVertexNormals(); return g;
+  }
+
+  // Khmer village houses: rectangles on built-up pixels within ~45 m of a road, facing it; skipped where OSM has buildings
+  inferHousesList(rnd) {
+    const D = this.D, { gw, gh, C, X0, Z0, cls, mw, mh, MR, exclude } = D, out = [], taken = new Map(), cap = this.mobile ? 350 : 900;
+    if (!this.net) return out;
+    const cellAt = (m, x, z) => m[Math.min(mh - 1, Math.max(0, ((z - Z0) / MR) | 0)) * mw + Math.min(mw - 1, Math.max(0, ((x - X0) / MR) | 0))];
+    const builtFrac = (x, z, r) => { const ci = ((x - X0) / C) | 0, cj = ((z - Z0) / C) | 0, n = Math.round(r / C); let a = 0, t = 0;
+      for (let j = cj - n; j <= cj + n; j++) for (let i = ci - n; i <= ci + n; i++) { if (i < 0 || j < 0 || i >= gw || j >= gh) continue; t++; if (cls[j * gw + i] === 5) a++; } return t ? a / t : 0; };
+    const osmNear = (x, z) => { for (let a = 0; a < 8; a++) { const ang = a * 0.785; for (const r of [6, 14]) if (this.bmask && cellAt(this.bmask, x + Math.cos(ang) * r, z + Math.sin(ang) * r) && !cellAt(D.wmask, x + Math.cos(ang) * r, z + Math.sin(ang) * r)) return true; } return false; };
+    const key = (x, z) => Math.floor(x / 12) + ',' + Math.floor(z / 12);
+    const clash = (x, z) => { for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const p of taken.get((Math.floor(x / 12) + i) + ',' + (Math.floor(z / 12) + j)) || []) if (Math.hypot(p[0] - x, p[1] - z) < 13) return true; return false; };
+    const step = 7;
+    for (let z = Z0 + 6; z < Z0 + D.H - 6 && out.length < cap; z += step) for (let x = X0 + 6; x < X0 + D.W - 6 && out.length < cap; x += step) {
+      const jx = x + (rnd() - .5) * 4, jz = z + (rnd() - .5) * 4;
+      if (builtFrac(jx, jz, 5) < 0.42 || cellAt(exclude, jx, jz)) continue;
+      const nr = this.net.near(jx, jz, 48)[0]; if (!nr) continue;
+      const road = this.net.roads[nr[0]], p = road.pts[nr[1]], q = road.pts[Math.min(road.pts.length - 1, nr[1] + 1)], pp = road.pts[Math.max(0, nr[1] - 1)];
+      if (nr[2] < road.hw + 6) continue;
+      if (clash(jx, jz) || osmNear(jx, jz)) continue;
+      let tx = q.x - pp.x, tz = q.z - pp.z; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+      const wd = 4.5 + rnd() * 3, dp = 6.5 + rnd() * 5, hw = wd / 2, hd = dp / 2; // long side along the road
+      const ring = [[-hd, -hw], [hd, -hw], [hd, hw], [-hd, hw]].map(([u, v]) => [jx + tx * u - tz * v, jz + tz * u + tx * v]);
+      if (ring.some(([rx, rz]) => cellAt(exclude, rx, rz) || rx < X0 + 1 || rz < Z0 + 1 || rx > X0 + D.W - 1 || rz > Z0 + D.H - 1)) continue;
+      const stilt = rnd() < 0.55 ? 1.8 + rnd() * 0.7 : 0;
+      out.push({ t: 1, hdm: 0, lv: 0, ring, stilt, roof: rnd() < 0.6 ? 'gable' : 'hip', roofC: [0x9b4a32, 0xa8452f, 0x8a8f94, 0x6f7377, 0x7c8a96, 0xb05a3c, 0x5f6b72][(rnd() * 7) | 0], wall: [0xa07a55, 0x8f6c4a, 0xd9cdb5, 0xe6dccb, 0xbfa27c, 0xc8d3d6][(rnd() * 6) | 0] });
+      (taken.get(key(jx, jz)) || taken.set(key(jx, jz), []).get(key(jx, jz))).push([jx, jz]);
+      // block the footprint for trees and for walking
+      for (let u = -hd; u <= hd; u += MR) for (let v = -hw; v <= hw; v += MR) { const cx = jx + tx * u - tz * v, cz = jz + tz * u + tx * v, i = Math.min(mw - 1, Math.max(0, ((cx - X0) / MR) | 0)), j = Math.min(mh - 1, Math.max(0, ((cz - Z0) / MR) | 0)); exclude[j * mw + i] = 1; if (this.bmask) this.bmask[j * mw + i] = 1; }
+    }
+    return out;
   }
 
   /* ---------- traffic ---------- */
@@ -925,6 +970,7 @@ export class World {
     if (kind === 'detail') this._grassUserOff = !on;
     if (kind === 'trees') (this.treeMeshes || []).forEach(m => m.visible = on);
     if (kind === 'buildings' && this.buildingsMesh) this.buildingsMesh.visible = on;
+    if (kind === 'houses' && this.housesMesh) this.housesMesh.visible = on;
     if (kind === 'traffic') { this.trafficOn = on; (this.vehMeshes || []).forEach(g => g.paint.visible = g.fixed.visible = on); }
     if (kind === 'shadows') this.sun.castShadow = on;
     if (kind === 'reflect') this.reflectOn = on;
@@ -997,6 +1043,8 @@ export class World {
     this.ensureUnderground(say).then(() => { this.layers.buildUnder(); this.onLayersReady && this.onLayersReady(); }).catch(e => console.warn(e));
     return this.layers;
   }
+  openEditor() { if (!this.editor) { this.editor = new Editor(this); this.editor.rebuild(); } this.editor.active = true; return this.editor; }
+  getAtmos() { if (!this.atmos) this.atmos = new Atmos(this); return this.atmos; }
   openSurvey() { if (!this.survey) this.survey = new Survey(this); this.survey.active = true; this.survey.redraw(); return this.survey; }
   startSection() { this.sectionPick = 'A'; this.clearSection(); this.onSectionHint && this.onSectionHint('Tap point A on the ground or on the inset map'); }
   pickSectionPoint(x, z) {
@@ -1043,12 +1091,14 @@ export class World {
   }
   groundAt(x, z) { return this.hAt ? this.hAt(x, z) : 0; }
   onTap(e) {
-    const svPick = this.survey && this.survey.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
-    if (!this.terrainMesh || (this.mode !== 'drive' && this.mode !== 'walk' && !this.sectionPick && !svPick)) return;
+    const edPick = this.editor && this.editor.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
+    const svPick = !edPick && this.survey && this.survey.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
+    if (!this.terrainMesh || (this.mode !== 'drive' && this.mode !== 'walk' && !this.sectionPick && !svPick && !edPick)) return;
     const r = this.renderer.domElement.getBoundingClientRect(), ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, this.camera);
     const hit = rc.intersectObjects([this.terrainMesh, ...(this.roadMesh ? [this.roadMesh] : [])], false)[0]; if (!hit) return;
     if (this.sectionPick) { this.pickSectionPoint(hit.point.x, hit.point.z); return; }
+    if (edPick) { this.editor.tap(hit.point.x, hit.point.z); return; }
     if (svPick) { this.survey.add(hit.point.x, hit.point.z); return; }
     if (this.mode === 'walk') { if (!this.walker.blocked(hit.point.x, hit.point.z)) this.walker.place(hit.point.x, hit.point.z); return; }
     if (this.mode === 'drive' && this.pickRoad) {
@@ -1091,10 +1141,11 @@ export class World {
       this.driver.step(dt);
       const f = this.driver, back = this.kit[f.kind].len * 2.4 + (this.cockpit ? 0 : 5);
       const tgtOff = this.mouse.inside ? -this.mouse.x * 1.4 : 0; this.lookOff += (tgtOff - this.lookOff) * Math.min(1, dt * 4);
-      const fw = f.fwd.clone().applyAxisAngle(new V3(0, 1, 0), this.lookOff), pitch = this.mouse.inside ? -this.mouse.y * 6 : 0;
+      this.lookPitch = (this.lookPitch || 0) + ((this.mouse.inside ? -this.mouse.y * 6 : 0) - (this.lookPitch || 0)) * Math.min(1, dt * 4);
+      const fw = f.fwd.clone().setY(0).normalize().applyAxisAngle(new V3(0, 1, 0), this.lookOff), pitch = this.lookPitch;
       const want = this.cockpit ? f.pos.clone().addScaledVector(f.fwd, f.kind.startsWith('moto') ? 0.1 : 0.6).add(new V3(0, f.kind.startsWith('moto') ? 1.75 : f.kind === 'pickup' ? 1.7 : 1.3, 0))
         : f.pos.clone().addScaledVector(fw, -back).add(new V3(0, 2.6 + back * 0.15, 0));
-      this.camera.position.lerp(want, this.cockpit || this._snap ? 1 : Math.max(0.2, 1 - Math.exp(-dt * 6))); this._snap = false;
+      this.camera.position.lerp(want, this.cockpit || this._snap ? 1 : 1 - Math.exp(-dt * 5)); this._snap = false;
       const look = f.pos.clone().addScaledVector(fw, 25); look.y += (this.cockpit ? 1.2 : 1.0) + pitch; this.camera.lookAt(look);
       if (this.playerMesh) this.playerMesh.visible = !this.cockpit || f.kind.startsWith('moto');
       focus = f.pos;
@@ -1108,6 +1159,7 @@ export class World {
     }
     if (this.layers) this.layers.step(dt);
     if (this.survey) this.survey.step(dt);
+    if (this.atmos) this.atmos.step(dt);
     if (this.grass) { if (this.grassOff) this.grass.group.visible = false; else this.grass.update(focus, this.mode === 'orbit' ? this.camera.position.distanceTo(focus) : 0); }
     const dist = this.mode === 'orbit' ? this.camera.position.distanceTo(focus) : 60;
     const half = THREE.MathUtils.clamp(dist * 0.9, 50, (this.extent || 2000) * 0.75), cam = this.sun.shadow.camera;

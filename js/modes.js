@@ -21,20 +21,37 @@ export class RoadNet {
 
 export class Driver {
   constructor(world, net, mesh, kind) { this.w = world; this.net = net; this.mesh = mesh; this.kind = kind; this.speed = 40 / 3.6; this.pos = new THREE.Vector3(); this.fwd = new THREE.Vector3(0, 0, 1); }
-  start(ri, k, dir) { this.ri = ri; this.dir = dir; const r = this.net.roads[ri]; this.s = r.pts[k].s; this.lastJump = null; }
+  start(ri, k, dir) { this.ri = ri; this.dir = dir; const r = this.net.roads[ri]; this.s = r.pts[k].s; this.lastJump = null; this._init = false; }
   reverse() { this.dir *= -1; }
+  // point on the driving lane at arc length s of road ri (clamped to the road)
+  lanePoint(ri, s, dir, out) {
+    const r = this.net.roads[ri], P = r.pts, L = P[P.length - 1].s; s = THREE.MathUtils.clamp(s, 0, L);
+    let lo = 0, hi = P.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (P[m].s <= s) lo = m; else hi = m; }
+    const a = P[lo], b = P[hi], t = THREE.MathUtils.clamp((s - a.s) / ((b.s - a.s) || 1), 0, 1);
+    // lane offset uses the direction over ±4 m so it does not jump at polyline vertices
+    const pa = this._at(P, s - 4), pb = this._at(P, s + 4); let tx = (pb.x - pa.x) * dir, tz = (pb.z - pa.z) * dir; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+    const off = r.oneway ? 0 : Math.max(0.8, r.hw * 0.5) * (this.kind.startsWith('moto') ? 1.35 : 1);
+    return out.set(a.x + (b.x - a.x) * t - tz * off, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t + tx * off);
+  }
+  _at(P, s) {
+    s = THREE.MathUtils.clamp(s, 0, P[P.length - 1].s); let lo = 0, hi = P.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (P[m].s <= s) lo = m; else hi = m; }
+    const a = P[lo], b = P[hi], t = THREE.MathUtils.clamp((s - a.s) / ((b.s - a.s) || 1), 0, 1); return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, z: a.z + (b.z - a.z) * t };
+  }
   step(dt) {
     let r = this.net.roads[this.ri]; const L = r.pts[r.pts.length - 1].s;
     this.s += this.speed * dt * this.dir;
     if (this.s < 0 || this.s > L) this.junction(this.s > L ? r.pts.length - 1 : 0);
-    r = this.net.roads[this.ri];
-    // locate on centreline
-    const P = r.pts; let lo = 0, hi = P.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (P[m].s <= this.s) lo = m; else hi = m; }
-    const a = P[lo], b = P[hi], t = THREE.MathUtils.clamp((this.s - a.s) / ((b.s - a.s) || 1), 0, 1);
-    let tx = (b.x - a.x) * this.dir, tz = (b.z - a.z) * this.dir; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
-    const off = r.oneway ? 0 : Math.max(0.8, r.hw * 0.5) * (this.kind.startsWith('moto') ? 1.35 : 1);
-    const x = a.x + (b.x - a.x) * t - tz * off, z = a.z + (b.z - a.z) * t + tx * off, y = a.y + (b.y - a.y) * t;
-    this.pos.set(x, y, z); this.fwd.set(tx, ((b.y - a.y) / l) * this.dir, tz).normalize();
+    // target = lane point now; heading = towards a point a few metres ahead (look-ahead smooths the corners)
+    const tgt = this._tgt || (this._tgt = new THREE.Vector3()), ahead = this._ahead || (this._ahead = new THREE.Vector3());
+    this.lanePoint(this.ri, this.s, this.dir, tgt);
+    const look = Math.max(3, Math.min(9, this.speed * 0.45));
+    this.lanePoint(this.ri, this.s + look * this.dir, this.dir, ahead);
+    const want = ahead.clone().sub(tgt); if (want.lengthSq() < 1e-6) want.copy(this.fwd); want.normalize();
+    if (!this._init) { this.pos.copy(tgt); this.fwd.copy(want); this._init = true; }
+    // critically-damped follow: position and heading glide instead of snapping segment to segment
+    const kp = 1 - Math.exp(-dt * 14), kh = 1 - Math.exp(-dt * 7);
+    this.pos.x += (tgt.x - this.pos.x) * kp; this.pos.z += (tgt.z - this.pos.z) * kp; this.pos.y += (tgt.y - this.pos.y) * (1 - Math.exp(-dt * 6));
+    this.fwd.lerp(want, kh).normalize();
     this.mesh.position.copy(this.pos); this.mesh.lookAt(this.pos.clone().add(this.fwd));
   }
   junction(k) {

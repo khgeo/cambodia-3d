@@ -69,6 +69,24 @@ More in the Layers panel:
 - **Flood level:** a water sheet set by a chosen elevation (a simple bathtub model, no flow). It reports the share of the area under water and the mean depth, and it works with the layers apart or together.
 - **Cross-section through the stack:** a section line drawn while the layers are apart is shown on every slab, joined by a light curtain.
 
+## Digitize: your own roads, buildings, trees and ponds
+**✏️ Digitize** opens the editor.
+- **Road:** tap along a route and choose the type (national, provincial, district, village street, laterite track or footpath). The road is draped on a smoothed long profile with shoulders and textured (asphalt with markings, concrete, laterite or dirt). Every new road joins the **Drive** network.
+- **Building:** a rectangle in 3 taps or any polygon, with floors, gable/hip/flat roof, wall and roof colours, and optional stilts (Khmer house). Built with the same builder as OSM buildings, so it has windows that light up at night.
+- **Tree:** coconut, sugar palm, mango/round, tall, rain tree or bush, using the same models as the forest.
+- **Pond:** water at bank level, with reflections.
+- **Delete:** tap a feature to delete it.
+
+Edits are saved in the browser and can be exported or imported as **GeoJSON** (works with QGIS).
+
+## Houses from the image
+OpenStreetMap has few buildings in rural Cambodia. When OSM has none nearby, village houses are placed on built-up pixels within about 45 m of a road. They are oriented to the road, with gable or hip roofs, wood or plaster walls, and many on stilts. They can be switched off with *Houses from image*. These are inferred, not mapped.
+
+## Time of day, weather, cinematic flight
+- **Time of day (05:00–23:30):** the sun moves east → south → west. Dusk turns orange. At night there are stars and moonlight, and building windows light up.
+- **Weather:** clear, haze (burning season), monsoon rain (falling rain, overcast, short visibility) and thunderstorm (wind-driven rain and lightning flashes).
+- **🎥 Fly:** a slow cinematic flight around and across the area. Any click or key stops it.
+
 ## Survey: measure, mark and go to
 Open **📐 Survey**. It has three tools:
 - **📍 Points:** tap to drop points. In Walk mode the surveyor carries a GNSS rover pole (antenna, controller and level bubble), and **Mark** (or the M key) records the point where the pole tip touches the ground. Each point gets an ID, a code (corner, tree, well…), lat/lon, UTM 48N E/N and an elevation. A stake with a flag and a label is drawn at each point.
@@ -81,6 +99,11 @@ Open **📐 Survey**. It has three tools:
 - **⤓ Jump** puts you on the spot.
 
 **Export:** CSV, GeoJSON (points plus the line or area) and KML.
+
+Also in the Survey panel:
+- **Cut / fill:** for an area, enter a design level (the mean elevation by default). A pink plane shows the level, and you get cut and fill volumes in m³, the net surplus or shortfall, and the number of truckloads.
+- **Parcels:** save a measured area as a named parcel. It is drawn in orange with a name and area label, kept in the browser, and included in the GeoJSON export.
+- **Stake-out list:** import a CSV of points (lat/lon or UTM E/N, with or without a header). Use ◀ ▶ to step through them. Marking a point within 0.5 m of a target counts it as staked.
 
 Heights come from the terrain model (a few metres of error). Measurements use the real heights, not the exaggerated view.
 

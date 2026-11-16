@@ -2,7 +2,7 @@
 // Above-ground layers (water, roads, plants, buildings, traffic) rise; derived map layers (land cover,
 // elevation, soil, geology) sink below the imagery surface. A level bar picks / isolates a layer.
 import * as THREE from 'three';
-import { UNITS, SOIL_CLASSES, geologyAt, soilAt } from './section.js?v=21';
+import { UNITS, SOIL_CLASSES, geologyAt, soilAt } from './section.js?v=22';
 
 export const LAYERS = [
   { id: 'traffic', short: 'Traffic & people', name: 'Traffic & people', c: '#ff8a3d', side: 1, on: true },
@@ -243,7 +243,7 @@ export class LayerStack {
     o.surface = [w.terrainMesh, this.floodMesh].filter(Boolean);
     o.water = [w.waterMesh].filter(Boolean);
     o.roads = [w.roadMesh, w.railMesh, w.bridgeMesh].filter(Boolean);
-    o.buildings = [w.buildingsMesh].filter(Boolean);
+    o.buildings = [w.buildingsMesh, w.housesMesh, w.editor && w.editor.group].filter(Boolean);
     o.trees = [...(w.treeMeshes || []), w.grass && w.grass.group].filter(Boolean);
     o.traffic = [...(w.vehMeshes || []).flatMap(g => [g.paint, g.fixed]), ...Object.values(w.pm || {})].filter(Boolean);
     for (const k in this.slab || {}) o[k] = [this.slab[k]];

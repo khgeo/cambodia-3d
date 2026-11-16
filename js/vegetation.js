@@ -1,10 +1,10 @@
 // Trees (leafy species, sugar & coconut palms, bushes) placed from imagery canopy, and a near-camera
 // field of grass, rice and forest understory that follows the viewer.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=21';
-import { mulberry32 } from './geo.js?v=21';
-import { makeGrassMaterial } from './shaders.js?v=21';
-import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=21';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=22';
+import { mulberry32 } from './geo.js?v=22';
+import { makeGrassMaterial } from './shaders.js?v=22';
+import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=22';
 
 let TEX = null;
 const texs = () => TEX || (TEX = foliageTextures());
@@ -58,6 +58,11 @@ export function buildTrees(ctx) {
     L[b < 0.5 ? 'round' : b < 0.75 ? 'wide' : 'tall'].push([x, z, s]);
     if (nb < 7 && rnd() < 0.3) L.bush.push([x + (rnd() - .5) * 3, z + (rnd() - .5) * 3, 0.9 + rnd() * 1.2]);
   }
+  return { meshes: instTrees(L, ctx), counts: { round: L.round.length, tall: L.tall.length, wide: L.wide.length, bush: L.bush.length, sugar: L.sugarA.length + L.sugarB.length, coco: L.coco.length } };
+}
+// instanced tree meshes for lists of [x, z, scale] per kind (used for the image-derived forest and for trees the user plants)
+export function instTrees(L, ctx) {
+  const { hAt, pxAt } = ctx, rnd = ctx.rnd || Math.random;
   const T = texs(), U = understoryKit();
   const kinds = {
     round: leafyTree('round', 3), tall: leafyTree('tall', 11), wide: leafyTree('wide', 17),
@@ -67,7 +72,7 @@ export function buildTrees(ctx) {
   const meshes = [], d = new THREE.Object3D(), col = new THREE.Color(), ref = new THREE.Color(0x4f7d32);
   const lm = leafMat(T.leaf), sm = solidMat(), sds = solidMat(THREE.DoubleSide), cm = solidMat();
   for (const [kind, list] of Object.entries(L)) {
-    if (!list.length) continue;
+    if (!list || !list.length) continue;
     const g = kinds[kind], parts = [], tint = [];
     if (g.solid) parts.push(inst(g.solid, sm, list.length));
     if (g.core) { const m = inst(g.core, cm, list.length); parts.push(m); tint.push(m); }
@@ -88,7 +93,7 @@ export function buildTrees(ctx) {
     });
     meshes.push(...parts);
   }
-  return { meshes, counts: { round: L.round.length, tall: L.tall.length, wide: L.wide.length, bush: L.bush.length, sugar: L.sugarA.length + L.sugarB.length, coco: L.coco.length } };
+  return meshes;
 }
 
 /* ---------- near-camera grass, rice and forest understory ---------- */
