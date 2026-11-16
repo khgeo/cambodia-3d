@@ -1,5 +1,5 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=20';
+import * as G from './geo.js?v=21';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -198,22 +198,22 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=20'); world = new World($('scene')); window.__world = world;
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=21'); world = new World($('scene')); window.__world = world;
     world.onModeChange = m => {
-      $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk';
+      $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk'; if (SV && !$('surveyPanel').hidden) svRender();
       if (m === 'drive' || m === 'walk') { setOn('views', m); showPanel('scenePanel', false); }
     };
     world.onHint = t => { $('driveHint').textContent = t; };
     world.onVehicle = k => { $('vehicle').value = k; };
     world.onSectionHint = t => { $('secHint').textContent = t; };
     world.onSection = async S => {
-      const { drawProfile, legendHTML } = await import('./section.js?v=20');
+      const { drawProfile, legendHTML } = await import('./section.js?v=21');
       $('sectionPanel').classList.remove('picking', 'min'); $('secMin').textContent = '▾';
       const cv = $('secCanvas'); cv.width = Math.min(1600, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio))); cv.height = Math.round(cv.width * 0.36);
       drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – ↺ for a new line, ▾ to minimise';
     };
-    const { joystick } = await import('./modes.js?v=20'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=20'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=21'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=21'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -249,7 +249,7 @@ document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.
 if (innerWidth < 640) showPanel('mapPanel', false);
 /* right-hand column: keep the layer panel under the inset map, never on top of it */
 const placeRight = () => {
-  const lp = $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
+  const lp = !$('surveyPanel').hidden ? $('surveyPanel') : $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
   document.body.classList.add('lp-open');
   if (innerWidth < 640) { lp.style.top = ''; lp.style.maxHeight = ''; return; }
   const top = hud.hidden ? 12 : hud.getBoundingClientRect().bottom + 8;
@@ -289,10 +289,11 @@ const lpLegend = () => {
 const lpStop = () => { LS.stop(); $('lpPlay').textContent = '▶ Play tour'; $('lpPlay').classList.remove('on'); };
 $('layersBtn').onclick = async () => {
   if (!world || !world.D) return;
+  if (!$('surveyPanel').hidden) $('svClose').onclick();
   $('layerPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
   if (world.mode !== 'orbit') world.setMode('orbit');
   $('lpHint').textContent = 'Preparing layers…';
-  const mod = await import('./layers.js?v=20'); LAYERS_DEF = mod.LAYERS;
+  const mod = await import('./layers.js?v=21'); LAYERS_DEF = mod.LAYERS;
   LS = await world.openLayers(t => { $('lpHint').textContent = t; });
   LS.onT = t => { $('lpExplode').value = Math.round(t * 100); };
   LS.onFocus = () => lpRender();
@@ -340,6 +341,82 @@ $('lpPlay').onclick = () => { if (!LS) return; if (LS.tour) { lpStop(); lpRender
 $('lpMin').onclick = () => { const c = $('layerPanel').classList.toggle('collapsed'); $('lpMin').textContent = c ? '▾' : '▴'; };
 $('lpClose').onclick = () => { $('layerPanel').hidden = true; placeRight(); if (LS) { lpStop(); LS.focus = null; LS.setExplode(0, true); world.goView('oblique'); } };
 
+/* survey: points, distance, area, go-to, rover */
+let SV = null, SVM = null;
+const svSay = t => { $('svHint').textContent = t || ''; };
+const SV_HELP = {
+  points: 'Tap the ground to drop a point, or walk with the rover and press <b>Mark</b> (or M) to record where the pole tip touches.',
+  line: 'Tap points along a route. Distance is measured along the ground, uphill and downhill. Undo removes the last point.',
+  area: 'Tap the corners of a plot or field. The area closes on its own. Both flat (map) area and 3D surface area are shown.',
+};
+const svRender = () => {
+  if (!SV) return; const tool = SV.tool, w = world;
+  document.querySelectorAll('.svtabs button').forEach(b => b.classList.toggle('on', b.dataset.tool === tool));
+  $('svHelp').innerHTML = SV_HELP[tool]; $('svCodeRow').hidden = tool !== 'points';
+  $('svMark').parentElement.hidden = w.mode !== 'walk';
+  const row = (k, v) => `<tr><td>${k}</td><td>${v}</td></tr>`, L = SVM.fmtLen, pct = v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+  let h = '';
+  if (tool === 'line') {
+    const m = SV.measureLine();
+    if (m) h = '<table>' + row('Along the ground (3D)', L(m.d3)) + row('Horizontal (map)', L(m.d2)) + row('Straight A→B', L(m.straight)) + row('Climb / descent', `+${m.up.toFixed(1)} / −${m.down.toFixed(1)} m`) +
+      row('Height change A→B', `${m.dh >= 0 ? '+' : ''}${m.dh.toFixed(1)} m (${pct(m.grade)})`) + row('Steepest (10 m)', m.maxS.toFixed(1) + '%') + row('Bearing A→B', `${m.brg.toFixed(1)}° ${SVM.dirName(m.brg)}`) + row('Points', SV.verts.length) + '</table>';
+    else h = '<span class="svhelp">Tap at least two points.</span>';
+    svProfile(m);
+  } else svProfile(null);
+  if (tool === 'area') {
+    const m = SV.measureArea();
+    if (m) h = '<table>' + row('Area (map)', SVM.fmtArea(m.A)) + row('Surface area (3D)', SVM.fmtArea(m.A3)) + row('Perimeter', `${L(m.per2)} (3D ${L(m.per3)})`) +
+      row('Elevation', `${m.hmin.toFixed(1)} – ${m.hmax.toFixed(1)} m`) + row('Mean elevation', m.hmean.toFixed(1) + ' m') + row('Corners', SV.verts.length) + '</table>';
+    else h = '<span class="svhelp">Tap at least three corners.</span>';
+  }
+  if (tool === 'points') { const p = SV.points[SV.points.length - 1]; h = p ? '<table>' + row('Last point', `${p.id} · ${p.code}`) + row('Lat, Lon', `${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}`) + row(`UTM ${p.zone}N`, `${p.E.toFixed(1)} E ${p.N.toFixed(1)} N`) + row('Elevation', p.h.toFixed(2) + ' m') + '</table>' : ''; }
+  $('svResult').innerHTML = h;
+  $('svCount').textContent = SV.points.length ? `(${SV.points.length})` : '';
+  $('svList').innerHTML = SV.points.slice().reverse().map(p => `<div><b>${p.id}</b><span title="${p.code}">${p.code} · ${p.E.toFixed(1)} ${p.N.toFixed(1)}</span><span>${p.h.toFixed(1)} m</span><button data-del="${p.id}" title="Delete">✕</button></div>`).join('') || '<span class="svhelp">No points yet.</span>';
+  $('svList').querySelectorAll('[data-del]').forEach(b => b.onclick = () => { SV.points = SV.points.filter(p => p.id !== b.dataset.del); SV.redraw(); svRender(); });
+};
+const svProfile = m => {
+  const cv = $('svProfile'); cv.hidden = !m; if (!m) return; const g = cv.getContext('2d'), W = cv.width, H = cv.height, s = m.s, L = 34, R = 8, T = 10, B = 22;
+  const hs = s.map(p => p.h), lo = Math.min(...hs), hi = Math.max(...hs), pad = Math.max(1, (hi - lo) * 0.15), e0 = lo - pad, e1 = hi + pad, X = d => L + d / m.d2 * (W - L - R), Y = e => T + (e1 - e) / (e1 - e0) * (H - T - B);
+  g.fillStyle = '#f7f4ee'; g.fillRect(0, 0, W, H);
+  g.beginPath(); g.moveTo(X(0), H - B); s.forEach(p => g.lineTo(X(p.d), Y(p.h))); g.lineTo(X(m.d2), H - B); g.closePath();
+  const gr = g.createLinearGradient(0, T, 0, H - B); gr.addColorStop(0, '#c9a46c'); gr.addColorStop(1, '#8a6a46'); g.fillStyle = gr; g.fill();
+  g.strokeStyle = '#2b2620'; g.lineWidth = 2; g.beginPath(); s.forEach((p, i) => i ? g.lineTo(X(p.d), Y(p.h)) : g.moveTo(X(p.d), Y(p.h))); g.stroke();
+  g.strokeStyle = 'rgba(255,210,63,.9)'; g.setLineDash([3, 3]); let acc = 0; SV.verts.forEach((v, i) => { if (i) { const q = SV.verts[i - 1]; acc += Math.hypot(v.x - q.x, v.z - q.z); } g.beginPath(); g.moveTo(X(acc), T); g.lineTo(X(acc), H - B); g.stroke(); }); g.setLineDash([]);
+  g.fillStyle = '#333'; g.font = '11px system-ui'; g.textAlign = 'right'; g.fillText(hi.toFixed(0) + ' m', L - 3, Y(hi) + 4); g.fillText(lo.toFixed(0) + ' m', L - 3, Y(lo) + 4);
+  g.textAlign = 'left'; g.fillText('0', L, H - 7); g.textAlign = 'right'; g.fillText(SVM.fmtLen(m.d2), W - R, H - 7); g.textAlign = 'center'; g.fillText('Elevation profile', W / 2, H - 7);
+};
+const svOpen = async () => {
+  if (!world || !world.D) return;
+  if (!$('layerPanel').hidden) $('lpClose').onclick();
+  SVM = await import('./survey.js?v=21'); SV = world.openSurvey(); SV.onChange = svRender;
+  SV.onArrive = () => { svSay('Arrived at the target'); if (SV.tool === 'points') $('svMark').classList.add('pulse'); setTimeout(() => $('svMark').classList.remove('pulse'), 2500); svRender(); };
+  if (!$('svCode').options.length) $('svCode').innerHTML = SVM.CODES.map(c => `<option>${c}</option>`).join('');
+  $('surveyPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); svRender();
+};
+$('surveyBtn').onclick = svOpen;
+$('svClose').onclick = () => { $('surveyPanel').hidden = true; if (SV) { SV.active = false; SV.pole.visible = false; } placeRight(); };
+$('svMin').onclick = () => { const c = $('surveyPanel').classList.toggle('collapsed'); $('svMin').textContent = c ? '▾' : '▴'; };
+document.querySelectorAll('.svtabs button').forEach(b => b.onclick = () => { SV.setTool(b.dataset.tool); svRender(); });
+$('svCode').onchange = e => { if (SV) SV.code = e.target.value; };
+$('svUndo').onclick = () => SV && SV.undo();
+$('svClear').onclick = () => { if (!SV) return; if (SV.tool === 'points') { if (SV.points.length && !confirm(`Delete all ${SV.points.length} points?`)) return; SV.points = []; SV.n = 0; } SV.clear(); svRender(); };
+$('svMark').onclick = () => { if (SV && world.mode === 'walk') { SV.markAtPole(); svSay(SV.tool === 'points' ? 'Point recorded' : 'Vertex added at the pole'); } };
+$('svRover').onclick = () => { if (!SV) return; const c = world.mode === 'orbit' ? world.controls.target : null; if (world.mode !== 'walk') world.teleport(c ? c.x : world.D.X0 + world.D.W / 2, c ? c.z : world.D.Z0 + world.D.H / 2, 'walk'); svSay('Walk with W A S D or the joystick · M marks'); svRender(); };
+const svTarget = () => {
+  const ll = SVM && SVM.parseCoord($('svGoto').value); if (!ll) { $('svGotoMsg').textContent = 'Could not read that. Try "11.5631, 104.9282" or "UTM 491500 1278000".'; return false; }
+  if (!SV.setTarget(ll, 'Target')) { $('svGotoMsg').textContent = `${ll.lat.toFixed(5)}, ${ll.lon.toFixed(5)} is outside this 3D area. Go back to the map and build an area there.`; return false; }
+  const T = SV.target; $('svGotoMsg').innerHTML = `${T.lat.toFixed(6)}, ${T.lon.toFixed(6)} · UTM ${T.E.toFixed(1)} E ${T.N.toFixed(1)} N · ground ${T.h.toFixed(1)} m`; return true;
+};
+$('svStake').onclick = () => { if (SV && svTarget()) { world.teleport(SV.target.x, SV.target.z, 'orbit'); svSay('Target set – the green line on the inset map points to it'); } };
+$('svWalk').onclick = () => { if (!SV || !svTarget()) return; SV.walkTo(); world.walker.auto.onBlocked = () => svSay('Blocked by a building or water – steer around it, then press Walk there again'); svSay('Walking to the target…'); svRender(); };
+$('svJump').onclick = () => { if (!SV || !svTarget()) return; const T = SV.target, fx = -Math.sin(world.walker.yaw), fz = -Math.cos(world.walker.yaw); world.teleport(T.x - fx * 0.6, T.z - fz * 0.6, 'walk'); svSay('You are at the target'); svRender(); };
+$('svGoto').onkeydown = e => { if (e.key === 'Enter') $('svStake').onclick(); };
+$('svCsv').onclick = () => SV && download('survey-points.csv', new Blob([SV.csv()], { type: 'text/csv' }));
+$('svGeo').onclick = () => SV && download('survey.geojson', new Blob([SV.geojson()], { type: 'application/geo+json' }));
+$('svKml').onclick = () => SV && download('survey.kml', new Blob([SV.kml()], { type: 'application/vnd.google-earth.kml+xml' }));
+addEventListener('keydown', e => { if (SV && SV.active && world.mode === 'walk' && (e.key === 'm' || e.key === 'M') && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) $('svMark').onclick(); });
+
 /* cross-section tool */
 $('sectionBtn').onclick = async () => {
   if (!world || !world.D) return;
@@ -356,4 +433,4 @@ $('secClose').onclick = () => { $('sectionPanel').hidden = true; if (world) { wo
 $('secWall').onchange = e => { if (!world) return; world.sectionWallOn = e.target.checked; if (world.sectionWall) world.sectionWall.visible = e.target.checked; };
 const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 $('secPng').onclick = () => $('secCanvas').toBlob(b => download('cross-section.png', b));
-$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=20'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
+$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=21'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };

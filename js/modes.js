@@ -82,10 +82,25 @@ export class Walker {
   step(dt, cam) {
     const k = this.keys; let fx = this.move.y, sx = this.move.x;
     if (k.KeyW || k.ArrowUp) fx += 1; if (k.KeyS || k.ArrowDown) fx -= 1; if (k.KeyA || k.ArrowLeft) sx -= 1; if (k.KeyD || k.ArrowRight) sx += 1;
+    // auto-walk to a target (go-to coordinate); any manual input takes over
+    let autoRun = false;
+    if (this.auto) {
+      if (fx || sx) this.auto = null;
+      else {
+        const dx = this.auto.x - this.pos.x, dz = this.auto.z - this.pos.z, d = Math.hypot(dx, dz);
+        if (d < 0.45) { const a = this.auto; this.auto = null; a.onArrive && a.onArrive(); }
+        else {
+          const want = Math.atan2(-dx, -dz); let da = want - this.yaw; da = Math.atan2(Math.sin(da), Math.cos(da)); this.yaw += da * Math.min(1, dt * 5);
+          fx = Math.abs(da) < 1.2 ? Math.min(1, d / 1.5 + 0.15) : 0; autoRun = d > 40;
+          const p0 = this.auto.last; this.auto.last = { x: this.pos.x, z: this.pos.z };
+          if (p0 && Math.hypot(p0.x - this.pos.x, p0.z - this.pos.z) < 1e-4 && fx > 0) { this.auto.stuck = (this.auto.stuck || 0) + dt; if (this.auto.stuck > 1.2) { const a = this.auto; this.auto = null; a.onBlocked && a.onBlocked(); } }
+        }
+      }
+    }
     const len = Math.hypot(fx, sx); if (len > 1) { fx /= len; sx /= len; }
     const m = this.w.mouse; // keep turning while the cursor rests near the screen edge
     if (m && m.inside) { const ex = Math.abs(m.x) - 0.82, ey = Math.abs(m.y) - 0.85; if (ex > 0) this.yaw -= Math.sign(m.x) * ex / 0.18 * 1.6 * dt; if (ey > 0) this.pitch = THREE.MathUtils.clamp(this.pitch - Math.sign(m.y) * ey / 0.15 * 0.8 * dt, -1.2, 1.0); }
-    const sp = (this.run ? 5.5 : 1.6) * dt;
+    const sp = (this.run || autoRun ? 5.5 : 1.6) * dt;
     const fwx = -Math.sin(this.yaw), fwz = -Math.cos(this.yaw), rx = -fwz, rz = fwx;
     const dx = (fwx * fx + rx * sx) * sp, dz = (fwz * fx + rz * sx) * sp;
     if (!this.blocked(this.pos.x + dx, this.pos.z + dz)) { this.pos.x += dx; this.pos.z += dz; }

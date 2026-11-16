@@ -5,16 +5,17 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=20';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=20';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=20';
-import { buildTrees, GrassField } from './vegetation.js?v=20';
-import { RoadNet, Driver, Walker } from './modes.js?v=20';
-import { vehicleKit } from './vehicles.js?v=20';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=20';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=20';
-import { LayerStack } from './layers.js?v=20';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=20';
+import * as G from './geo.js?v=21';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=21';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=21';
+import { buildTrees, GrassField } from './vegetation.js?v=21';
+import { RoadNet, Driver, Walker } from './modes.js?v=21';
+import { vehicleKit } from './vehicles.js?v=21';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=21';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=21';
+import { LayerStack } from './layers.js?v=21';
+import { Survey } from './survey.js?v=21';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=21';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -54,6 +55,7 @@ function roadStyle(cls, surf, lanes, widthDm, flags) {
   return { s, mk, lanes: Math.max(ln, 1), w };
 }
 
+const WALK_AMP = 0.42, WALK_CYCLE = 4 * 0.85 * Math.sin(WALK_AMP); // ≈1.4 m per stride cycle
 class Frame {
   constructor(a) {
     this.lon0 = (a.w + a.e) / 2; this.lat0 = (a.s + a.n) / 2;
@@ -211,7 +213,7 @@ export class World {
       for (const p of parts) for (const c of G.clipLine(p, X0, Z0, X1, Z1)) roads.push({ ...r, id, pts: c, st: roadStyle(r.cls, r.surf, r.lanes, r.wdm, r.flags) });
     }
     roads.sort((a, b) => RANK[a.cls] - RANK[b.cls]);
-    Object.assign(D, { roads, rails, waterways, landuse, buildings }); D.stats.roads = roads.length; this.views = null; this.U = null; this.section = null; if (this.layers) { this.layers.ioYears = null; this.layers.flood = null; this.layers.t = this.layers.target = 0; this.layers.stop(); }
+    Object.assign(D, { roads, rails, waterways, landuse, buildings }); D.stats.roads = roads.length; this.views = null; this.U = null; this.section = null; if (this.survey) { this.survey.verts = []; this.survey.points = []; this.survey.n = 0; this.survey.target = null; } if (this.layers) { this.layers.ioYears = null; this.layers.flood = null; this.layers.t = this.layers.target = 0; this.layers.stop(); }
 
     say('Loading terrain…');
     let elev;
@@ -640,6 +642,7 @@ export class World {
     if (keepView) { this.camera.position.copy(keepView.p); this.controls.target.copy(keepView.t); this.controls.update(); }
     else this.goView('overview', true);
     if (prevMode === 'walk') this.setMode('walk');
+    if (this.survey) this.survey.redraw();
     this.exag = exag; if (this.layers) { const t = this.layers.t; await this.layers.rebuild(); this.layers.setExplode(t, true); }
     if (this.U) { this.applySideGeology(); if (this.section) this.makeSection(this.section.A, this.section.B); }
     say('');
@@ -817,7 +820,7 @@ export class World {
           const a = src[Math.max(0, i - 1)], b = src[Math.min(src.length - 1, i + 1)], tx = b.x - a.x, tz = b.z - a.z, l = Math.hypot(tx, tz) || 1, x = src[i].x - tz / l * off, z = src[i].z + tx / l * off;
           P[i * 3] = x; P[i * 3 + 1] = hAt(x, z); P[i * 3 + 2] = z; if (i) S[i] = S[i - 1] + Math.hypot(P[i * 3] - P[i * 3 - 3], P[i * 3 + 2] - P[i * 3 - 1]);
         }
-        walkers.push({ P, S, L: S[S.length - 1], u: rnd() * S[S.length - 1], speed: 1.0 + rnd() * 0.6, pos: new V3(), fwd: new V3() });
+        walkers.push({ P, S, L: S[S.length - 1], u: rnd() * S[S.length - 1], speed: 1.1 + rnd() * 0.4, pos: new V3(), fwd: new V3() });
       }
     }
     // farmers in the rice fields and herds of cattle grazing near villages
@@ -836,10 +839,13 @@ export class World {
     const hw = human('walker'), hf = human('farmer'), c = new THREE.Color();
     this.people = { walkers, farmers, cows };
     this.pm = {
-      wc: mk(hw.cloth, animMaterial(this.uTime, 0.55, 6.5), Math.max(1, walkers.length)), wb: mk(hw.body, animMaterial(this.uTime, 0.55, 6.5), Math.max(1, walkers.length)),
+      wc: mk(hw.cloth, animMaterial(this.uTime, WALK_AMP, 0, false, true), Math.max(1, walkers.length)), wb: mk(hw.body, animMaterial(this.uTime, WALK_AMP, 0, false, true), Math.max(1, walkers.length)),
       fc: mk(hf.cloth, animMaterial(this.uTime, 0.12, 1.6), Math.max(1, farmers.length)), fb: mk(hf.body, animMaterial(this.uTime, 0.12, 1.6), Math.max(1, farmers.length)),
       cw: mk(cow(), animMaterial(this.uTime, 0.3, 2.2), Math.max(1, cows.length)),
     };
+    // leg swing driven by distance walked: one stride cycle = two steps of 2·leg·sin(amp)
+    const ph = this.people.phase = new Float32Array(Math.max(1, walkers.length)); walkers.forEach((v, i) => { v.ph0 = rnd() * 6.283; ph[i] = v.ph0; });
+    for (const k of ['wc', 'wb']) this.pm[k].geometry.setAttribute('aPhase', new THREE.InstancedBufferAttribute(ph, 1).setUsage(THREE.DynamicDrawUsage));
     this.pm.wc.count = this.pm.wb.count = walkers.length; this.pm.fc.count = this.pm.fb.count = farmers.length; this.pm.cw.count = cows.length;
     walkers.forEach((w, i) => this.pm.wc.setColorAt(i, c.set(SHIRTS[(rnd() * SHIRTS.length) | 0])));
     const d = new THREE.Object3D();
@@ -856,6 +862,7 @@ export class World {
       v.pos.set(P[lo * 3] + (P[hi * 3] - P[lo * 3]) * t, P[lo * 3 + 1] + (P[hi * 3 + 1] - P[lo * 3 + 1]) * t, P[lo * 3 + 2] + (P[hi * 3 + 2] - P[lo * 3 + 2]) * t);
       v.fwd.set(P[hi * 3] - P[lo * 3], 0, P[hi * 3 + 2] - P[lo * 3 + 2]).normalize();
       d.position.copy(v.pos); look.copy(v.pos).add(v.fwd); d.lookAt(look); d.updateMatrix(); this.pm.wc.setMatrixAt(i, d.matrix); this.pm.wb.setMatrixAt(i, d.matrix);
+      this.people.phase[i] = v.ph0 + v.u / WALK_CYCLE * 6.2832;
     });
     cows.forEach((cw, i) => {
       cw.timer -= dt; if (cw.timer <= 0) { cw.moving = Math.random() < 0.35 ? 0.35 : 0; cw.timer = 3 + Math.random() * 8; cw.head += (Math.random() - .5) * 1.5; }
@@ -867,6 +874,7 @@ export class World {
       d.position.copy(cw.pos); d.rotation.set(0, cw.head, 0); d.scale.setScalar(1); d.updateMatrix(); this.pm.cw.setMatrixAt(i, d.matrix);
     });
     for (const k of ['wc', 'wb', 'cw']) this.pm[k].instanceMatrix.needsUpdate = true;
+    for (const k of ['wc', 'wb']) { const at = this.pm[k].geometry.getAttribute('aPhase'); if (at) at.needsUpdate = true; }
   }
 
   /* ---------- planar water reflection at the nearest water level ---------- */
@@ -989,6 +997,7 @@ export class World {
     this.ensureUnderground(say).then(() => { this.layers.buildUnder(); this.onLayersReady && this.onLayersReady(); }).catch(e => console.warn(e));
     return this.layers;
   }
+  openSurvey() { if (!this.survey) this.survey = new Survey(this); this.survey.active = true; this.survey.redraw(); return this.survey; }
   startSection() { this.sectionPick = 'A'; this.clearSection(); this.onSectionHint && this.onSectionHint('Tap point A on the ground or on the inset map'); }
   pickSectionPoint(x, z) {
     if (this.sectionPick === 'A') { this.sectionA = { x, z }; this.sectionPick = 'B'; this.drawSectionMarkers(this.sectionA); this.onSectionHint && this.onSectionHint('Now tap point B'); return; }
@@ -1034,11 +1043,13 @@ export class World {
   }
   groundAt(x, z) { return this.hAt ? this.hAt(x, z) : 0; }
   onTap(e) {
-    if (!this.terrainMesh || (this.mode !== 'drive' && this.mode !== 'walk' && !this.sectionPick)) return;
+    const svPick = this.survey && this.survey.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
+    if (!this.terrainMesh || (this.mode !== 'drive' && this.mode !== 'walk' && !this.sectionPick && !svPick)) return;
     const r = this.renderer.domElement.getBoundingClientRect(), ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, this.camera);
     const hit = rc.intersectObjects([this.terrainMesh, ...(this.roadMesh ? [this.roadMesh] : [])], false)[0]; if (!hit) return;
     if (this.sectionPick) { this.pickSectionPoint(hit.point.x, hit.point.z); return; }
+    if (svPick) { this.survey.add(hit.point.x, hit.point.z); return; }
     if (this.mode === 'walk') { if (!this.walker.blocked(hit.point.x, hit.point.z)) this.walker.place(hit.point.x, hit.point.z); return; }
     if (this.mode === 'drive' && this.pickRoad) {
       const n = this.net.near(hit.point.x, hit.point.z, 30)[0]; if (!n) { this.onHint && this.onHint('No road there – tap closer to a road.'); return; }
@@ -1096,6 +1107,7 @@ export class World {
       this.controls.update(); focus = this.controls.target;
     }
     if (this.layers) this.layers.step(dt);
+    if (this.survey) this.survey.step(dt);
     if (this.grass) { if (this.grassOff) this.grass.group.visible = false; else this.grass.update(focus, this.mode === 'orbit' ? this.camera.position.distanceTo(focus) : 0); }
     const dist = this.mode === 'orbit' ? this.camera.position.distanceTo(focus) : 60;
     const half = THREE.MathUtils.clamp(dist * 0.9, 50, (this.extent || 2000) * 0.75), cam = this.sun.shadow.camera;

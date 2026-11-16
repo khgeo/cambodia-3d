@@ -44,6 +44,15 @@ export class Hud {
     ctx.save(); ctx.translate(px, py); ctx.rotate(hd);
     ctx.fillStyle = '#ff4d3d'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(7, 8); ctx.lineTo(0, 4); ctx.lineTo(-7, 8); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
+    // survey target: marker on the map, or an arrow at the edge pointing to it
+    const sv = w.survey && w.survey.active && w.survey.target, g = w.surveyHud;
+    if (sv) {
+      let [tx, ty] = toPx(sv.x, sv.z); const inside = tx > 6 && tx < S - 6 && ty > 6 && ty < T - 6;
+      ctx.strokeStyle = 'rgba(55,224,122,.9)'; ctx.setLineDash([4, 3]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(px, py);
+      if (!inside) { const k = Math.min(Math.abs((S / 2 - 8) / ((tx - px) || 1e-6)), Math.abs((T / 2 - 8) / ((ty - py) || 1e-6))); tx = px + (tx - px) * k; ty = py + (ty - py) * k; }
+      ctx.lineTo(tx, ty); ctx.stroke(); ctx.setLineDash([]);
+      ctx.fillStyle = '#37e07a'; ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(tx, ty, inside ? 6 : 4, 0, 7); ctx.fill(); ctx.stroke();
+    }
     // north arrow
     ctx.fillStyle = 'rgba(17,23,31,.7)'; ctx.beginPath(); ctx.arc(S - 16, 16, 12, 0, 7); ctx.fill();
     ctx.fillStyle = '#fff'; ctx.font = '700 11px system-ui'; ctx.textAlign = 'center'; ctx.fillText('N', S - 16, 14); ctx.beginPath(); ctx.moveTo(S - 16, 17); ctx.lineTo(S - 12, 25); ctx.lineTo(S - 20, 25); ctx.fill();
@@ -55,5 +64,6 @@ export class Hud {
     const u = utm(h.lat, h.lon), dir = DIRS[Math.round(h.heading / 45) % 8], kmh = (h.speedShown || 0) * 3.6;
     this.text.innerHTML = `<b>${dir} ${h.heading.toFixed(0).padStart(3, '0')}°</b>${h.mode === 'orbit' ? '' : ` · <b>${kmh.toFixed(kmh < 10 ? 1 : 0)} km/h</b>`} · Elevation ${h.elev.toFixed(0)} m<br>` +
       `${h.lat.toFixed(5)}°N ${h.lon.toFixed(5)}°E<br>UTM ${u.zone}${u.hemi} ${u.E.toFixed(0)} E ${u.N.toFixed(0)} N`;
+    if (sv && g) this.text.innerHTML += `<br><b style="color:#37e07a">🎯 ${g.d >= 1000 ? (g.d / 1000).toFixed(2) + ' km' : g.d.toFixed(g.d < 10 ? 2 : 1) + ' m'} · ${DIRS[Math.round(g.brg / 45) % 8]} ${g.brg.toFixed(0).padStart(3, '0')}° · Δh ${g.dh >= 0 ? '+' : ''}${g.dh.toFixed(1)} m</b>`;
   }
 }

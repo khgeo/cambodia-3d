@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=20">
+<link rel="stylesheet" href="css/app.css?v=21">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -66,6 +66,7 @@
       <button data-v="overview" class="on">Overview</button><button data-v="oblique">Oblique</button><button data-v="street">Low</button><button data-v="drive">🚗 Drive</button><button data-v="walk">🚶 Walk</button>
     </div>
     <button id="layersBtn" class="primary" style="margin:8px 0 2px;background:#2f6a8a">🗂 Layers: pull apart &amp; explore</button>
+    <button id="surveyBtn" class="primary" style="margin:8px 0 2px;background:#2d7a55">📐 Survey: measure, mark &amp; go to</button>
     <button id="sectionBtn" class="primary" style="margin:8px 0 2px;background:#7a5230">✂ Cross-section: soil &amp; geology</button>
     <label class="lbl">Ground</label>
     <div class="seg" id="ground">
@@ -133,6 +134,28 @@
     <div id="lpLegend"></div>
     </div>
   </div>
+  <div id="surveyPanel" hidden>
+    <div class="row lphead"><b>📐 Survey</b><span id="svHint" class="hint"></span><button id="svMin" title="Hide / show">▴</button><button id="svClose" title="Close">✕</button></div>
+    <div id="svContent">
+      <div class="row svtabs"><button data-tool="points" class="on">📍 Points</button><button data-tool="line">📏 Distance</button><button data-tool="area">⬠ Area</button></div>
+      <div id="svHelp" class="svhelp"></div>
+      <div class="row" id="svCodeRow"><span>Code</span><select id="svCode"></select></div>
+      <div class="row"><button id="svMark" class="primary">📍 Mark at pole (M)</button></div>
+      <div class="row"><button id="svUndo">↶ Undo</button><button id="svClear">🗑 Clear</button><button id="svRover">🚶 Walk with rover</button></div>
+      <div id="svResult"></div>
+      <canvas id="svProfile" width="480" height="170" hidden></canvas>
+      <div class="svsec"><b>Go to a coordinate</b>
+        <input id="svGoto" placeholder="11.5631, 104.9282 · or UTM 491500 1278000" autocomplete="off">
+        <div class="row"><button id="svStake">🎯 Stake out</button><button id="svWalk">🚶 Walk there</button><button id="svJump">⤓ Jump</button></div>
+        <div id="svGotoMsg" class="svhelp"></div>
+      </div>
+      <div class="svsec"><b>Points</b> <span id="svCount"></span>
+        <div id="svList"></div>
+        <div class="row"><button id="svCsv">⬇ CSV</button><button id="svGeo">⬇ GeoJSON</button><button id="svKml">⬇ KML</button></div>
+      </div>
+      <div class="svhelp">Heights are from the terrain model (about ±5–10 m), not real GNSS. Distances use true heights, not the exaggerated view.</div>
+    </div>
+  </div>
   <div id="sectionPanel" hidden>
     <div class="row secbar"><b>Cross-section</b><span id="secHint" class="hint">Tap point A on the ground or on the inset map</span>
       <label><input type="checkbox" id="secWall" checked> Cut wall in 3D</label>
@@ -145,6 +168,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=20"></script>
+<script type="module" src="js/app.js?v=21"></script>
 </body>
 </html>

@@ -69,6 +69,21 @@ More in the Layers panel:
 - **Flood level:** a water sheet set by a chosen elevation (a simple bathtub model, no flow). It reports the share of the area under water and the mean depth, and it works with the layers apart or together.
 - **Cross-section through the stack:** a section line drawn while the layers are apart is shown on every slab, joined by a light curtain.
 
+## Survey: measure, mark and go to
+Open **📐 Survey**. It has three tools:
+- **📍 Points:** tap to drop points. In Walk mode the surveyor carries a GNSS rover pole (antenna, controller and level bubble), and **Mark** (or the M key) records the point where the pole tip touches the ground. Each point gets an ID, a code (corner, tree, well…), lat/lon, UTM 48N E/N and an elevation. A stake with a flag and a label is drawn at each point.
+- **📏 Distance:** a route draped on the terrain. Results: distance along the ground (3D), horizontal distance, straight A→B, climb and descent, height change and grade, steepest slope over 10 m, and bearing. Each segment is labelled with its length and slope, and an elevation profile is drawn.
+- **⬠ Area:** a draped, filled polygon. Results: map area and 3D surface area (in m² and ha), 2D and 3D perimeter, and min/mean/max elevation.
+
+**Go to a coordinate:** accepts lat/lon in decimal or degrees-minutes-seconds, or UTM (zone 48N by default).
+- **🎯 Stake out** places a pulsing green beacon at the coordinate. The inset map shows a line to it and the distance, bearing and Δh.
+- **🚶 Walk there** walks you to it, running if it is far away.
+- **⤓ Jump** puts you on the spot.
+
+**Export:** CSV, GeoJSON (points plus the line or area) and KML.
+
+Heights come from the terrain model (a few metres of error). Measurements use the real heights, not the exaggerated view.
+
 ## Cross-section: soil and geology
 Tap **✂ Cross-section**, then tap point A and point B on the ground or on the inset map. A profile opens with these parts:
 - **Section:** the ground line at real elevation, with the vertical exaggeration stated. Under it are the soil layers, a weathered zone and the rock unit, drawn with geological patterns (sandstone dots, limestone bricks, granite crosses, volcanic v's and so on). Water along the line is marked.

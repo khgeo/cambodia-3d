@@ -1,7 +1,7 @@
 // Animated people (walkers, farmers with conical hats) and cattle. Limbs swing in the vertex shader:
 // each vertex carries aAnim = (pivotY, pivotZ, phase sign, 0); rotation is about the X axis through the pivot.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=20';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=21';
 
 function part(g, hex, anim = [0, 0, 0]) {
   g = g.index ? g.toNonIndexed() : g; const n = g.attributes.position.count, c = new THREE.Color(hex), col = new Float32Array(n * 3), an = new Float32Array(n * 4);
@@ -46,22 +46,23 @@ export function cow() {
   return mergeGeometries(p);
 }
 
-export function animMaterial(uTime, amp, speed, tinted) {
+// phased = the swing follows each walker's own distance travelled (attribute aPhase), so feet never slide
+export function animMaterial(uTime, amp, speed, tinted, phased) {
   const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
   m.onBeforeCompile = sh => {
     sh.uniforms.uTime = uTime; sh.uniforms.uAmp = { value: amp }; sh.uniforms.uSpeed = { value: speed };
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aAnim; uniform float uTime, uAmp, uSpeed;')
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 aAnim; uniform float uTime, uAmp, uSpeed;' + (phased ? '\nattribute float aPhase;' : ''))
       .replace('#include <begin_vertex>', `#include <begin_vertex>
 if (abs(aAnim.z) > 0.001) {
   vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
   float ph = fract(sin(dot(ip.xz, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831;
-  float a = sin(uTime * uSpeed + ph) * uAmp * aAnim.z;
+  float a = sin(${phased ? 'aPhase' : 'uTime * uSpeed + ph'}) * uAmp * aAnim.z;
   float c = cos(a), s = sin(a);
   vec3 q = transformed - vec3(0.0, aAnim.x, aAnim.y);
   transformed = vec3(q.x, q.y * c - q.z * s, q.y * s + q.z * c) + vec3(0.0, aAnim.x, aAnim.y);
 }`);
   };
-  m.customProgramCacheKey = () => 'anim-' + amp + '-' + speed;
+  m.customProgramCacheKey = () => 'anim-' + amp + '-' + speed + (phased ? '-ph' : '');
   return m;
 }
 
