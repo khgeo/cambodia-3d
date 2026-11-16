@@ -1,5 +1,5 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=16';
+import * as G from './geo.js?v=17';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -198,7 +198,7 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=16'); world = new World($('scene')); window.__world = world;
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=17'); world = new World($('scene')); window.__world = world;
     world.onModeChange = m => {
       $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk';
       if (m === 'drive' || m === 'walk') { setOn('views', m); showPanel('scenePanel', false); }
@@ -207,12 +207,12 @@ $('build').onclick = async () => {
     world.onVehicle = k => { $('vehicle').value = k; };
     world.onSectionHint = t => { $('secHint').textContent = t; };
     world.onSection = async S => {
-      const { drawProfile, legendHTML } = await import('./section.js?v=16');
+      const { drawProfile, legendHTML } = await import('./section.js?v=17');
       const cv = $('secCanvas'); cv.width = Math.min(1600, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio))); cv.height = Math.round(cv.width * 0.36);
       drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – tap ↺ New line to draw another';
     };
-    const { joystick } = await import('./modes.js?v=16'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=16'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=17'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=17'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -246,6 +246,56 @@ $('pickRoad').onclick = () => world && world.chooseRoad();
 $('run').onclick = e => { if (!world) return; world.walker.run = !world.walker.run; e.target.classList.toggle('on2', world.walker.run); };
 document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.setMode('orbit'); setOn('views', ''); showPanel('scenePanel', true); });
 if (innerWidth < 640) showPanel('mapPanel', false);
+/* layer explorer */
+let LS = null, LAYERS_DEF = null;
+const lpRender = () => {
+  if (!LS) return; const list = $('lpList'); list.innerHTML = '';
+  for (const L of LAYERS_DEF) {
+    const st = LS.state[L.id], av = LS.available(L.id), row = document.createElement('div');
+    row.className = 'lprow' + (av ? '' : ' na') + (LS.focus === L.id ? ' focus' : '') + (L.id === 'surface' ? ' ground' : '');
+    row.innerHTML = `<input type="checkbox" ${st.on ? 'checked' : ''} ${av && L.id !== 'surface' ? '' : 'disabled'}><i style="background:${L.c}"></i><span title="${L.name}">${L.name}${av ? '' : L.under ? ' …' : ''}</span><input type="range" min="0" max="100" value="${Math.round(st.op * 100)}" ${av ? '' : 'disabled'}>`;
+    const [cb, , , op] = row.children;
+    cb.onclick = e => { e.stopPropagation(); LS.setOn(L.id, cb.checked); const sc = document.querySelector(`#scenePanel input[data-k="${L.id}"]`); if (sc) sc.checked = cb.checked; };
+    op.oninput = e => { e.stopPropagation(); LS.setOp(L.id, op.value / 100); }; op.onclick = e => e.stopPropagation();
+    row.onclick = () => { if (!av) return; if (LS.tour) lpStop(); LS.setFocus(L.id); if (LS.target === 0 && L.side !== 0) { LS.setExplode(1); LS.frameCamera(); } lpRender(); };
+    list.appendChild(row);
+  }
+  lpLegend();
+};
+const lpLegend = () => {
+  const id = LS.focus, el = $('lpLegend'); if (!id) { el.innerHTML = '<span style="color:#8fa2b4">Tap a layer to isolate it. Tap it again to show all.</span>'; return; }
+  const L = LAYERS_DEF.find(l => l.id === id), leg = LS.legend && LS.legend[id];
+  let h = `<b>${L.name}</b><br>`;
+  if (leg) h += leg.map(([n, c]) => `<span class="lg"><i style="background:${c}"></i>${n}</span>`).join('');
+  if (id === 'elev' && LS.elevInfo) h += `${Math.round(LS.elevInfo.lo)}–${Math.round(LS.elevInfo.hi)} m · contour every ${LS.elevInfo.step} m (bold every ${LS.elevInfo.step * 5} m)`;
+  if (id === 'geology') h += '<br><span style="color:#8fa2b4">Geology of Cambodia 2006 (ODC)</span>';
+  if (id === 'topsoil' || id === 'subsoil') h += '<br><span style="color:#8fa2b4">USDA texture, ISRIC SoilGrids 250 m</span>';
+  if (id === 'lulc') h += '<br><span style="color:#8fa2b4">Classified from the imagery – the same map that places the trees, grass and rice</span>';
+  el.innerHTML = h;
+};
+const lpStop = () => { LS.stop(); $('lpPlay').textContent = '▶ Play tour'; $('lpPlay').classList.remove('on'); };
+$('layersBtn').onclick = async () => {
+  if (!world || !world.D) return;
+  $('layerPanel').hidden = false; if (innerWidth < 900) showPanel('scenePanel', false);
+  if (world.mode !== 'orbit') world.setMode('orbit');
+  $('lpHint').textContent = 'Preparing layers…';
+  const mod = await import('./layers.js?v=17'); LAYERS_DEF = mod.LAYERS;
+  LS = await world.openLayers(t => { $('lpHint').textContent = t; });
+  LS.onT = t => { $('lpExplode').value = Math.round(t * 100); };
+  LS.onFocus = () => lpRender();
+  world.onLayersReady = () => { $('lpHint').textContent = ''; lpRender(); };
+  world.onLayersCollapse = () => { $('lpExplode').value = 0; lpStop(); lpRender(); };
+  world.onLayerToggle = () => lpRender();
+  $('lpHint').textContent = world.U ? '' : 'Loading soil & geology…';
+  lpRender();
+  if (LS.t === 0) { LS.setExplode(1); LS.frameCamera(); }
+};
+$('lpExplode').oninput = e => { if (LS) { LS.setExplode(e.target.value / 100, true); } };
+$('lpApart').onclick = () => { if (LS) { LS.setExplode(1); LS.frameCamera(); } };
+$('lpTogether').onclick = () => { if (LS) { lpStop(); LS.setExplode(0); world.goView('oblique'); lpRender(); } };
+$('lpPlay').onclick = () => { if (!LS) return; if (LS.tour) { lpStop(); lpRender(); return; } LS.play(); $('lpPlay').textContent = '■ Stop tour'; $('lpPlay').classList.add('on'); };
+$('lpClose').onclick = () => { $('layerPanel').hidden = true; if (LS) { lpStop(); LS.focus = null; LS.setExplode(0, true); world.goView('oblique'); } };
+
 /* cross-section tool */
 $('sectionBtn').onclick = async () => {
   if (!world || !world.D) return;
@@ -261,4 +311,4 @@ $('secClose').onclick = () => { $('sectionPanel').hidden = true; if (world) { wo
 $('secWall').onchange = e => { if (!world) return; world.sectionWallOn = e.target.checked; if (world.sectionWall) world.sectionWall.visible = e.target.checked; };
 const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 $('secPng').onclick = () => $('secCanvas').toBlob(b => download('cross-section.png', b));
-$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=16'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
+$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=17'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };

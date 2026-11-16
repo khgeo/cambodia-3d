@@ -87,3 +87,28 @@ button.exit{background:#5a2d2d}
 #secLegend .lg{display:inline-flex;align-items:center;margin-right:10px;white-space:nowrap}
 #secLegend i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;border:1px solid rgba(255,255,255,.3)}
 .seccredit{margin-top:4px;color:#8fa2b4;font-size:10.5px}
+
+#layerPanel{position:absolute;right:12px;top:268px;width:268px;max-height:calc(100% - 290px);overflow:auto;z-index:7;background:rgba(17,23,31,.88);color:#e8eef4;border-radius:12px;padding:10px;box-sizing:border-box;font-size:12px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 28px rgba(0,0,0,.35)}
+#layerPanel[hidden]{display:none}
+#layerPanel .row{display:flex;gap:6px;align-items:center;margin:0 0 8px}
+#layerPanel .lphead b{font-size:14px}
+#layerPanel .lphead .hint{flex:1;color:#ffd88a;font-size:11px}
+#layerPanel .lpctl button{flex:1;padding:6px 4px;font-size:11.5px}
+#layerPanel button.on{background:#2f7fd0;color:#fff}
+.lpbody{display:flex;gap:8px}
+.lplevel{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:9.5px;color:#8fa2b4;width:34px}
+.lplevel input{writing-mode:vertical-lr;direction:rtl;-webkit-appearance:slider-vertical;appearance:slider-vertical;width:22px;flex:1;min-height:200px;margin:0;accent-color:#ffb547}
+#lpList{flex:1;display:flex;flex-direction:column;gap:2px}
+.lprow{display:grid;grid-template-columns:18px 12px 1fr 56px;align-items:center;gap:5px;padding:4px 5px;border-radius:7px;cursor:pointer;border-left:3px solid transparent}
+.lprow:hover{background:rgba(255,255,255,.06)}
+.lprow.focus{background:rgba(255,181,71,.18);border-left-color:#ffb547}
+.lprow.na{opacity:.4}
+.lprow.ground{border-top:1px dashed rgba(255,255,255,.35);border-bottom:1px dashed rgba(255,255,255,.35);margin:2px 0}
+.lprow i{width:12px;height:12px;border-radius:3px;display:block}
+.lprow span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lprow input[type=range]{width:56px;margin:0;accent-color:#9fc3e6}
+#lpLegend{margin-top:8px;line-height:1.6;font-size:11px}
+#lpLegend .lg{display:inline-flex;align-items:center;margin-right:8px;white-space:nowrap}
+#lpLegend .lg i{display:inline-block;width:11px;height:11px;border-radius:2px;margin-right:4px}
+@media (max-width:640px){#layerPanel{top:auto;bottom:10px;right:10px;left:10px;width:auto;max-height:52%}}

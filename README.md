@@ -48,6 +48,18 @@ When walking or driving with a mouse or trackpad, the view follows the cursor wi
 - **Vehicles:** cars, pickups, motorbikes (some with a passenger), Cambodian remorks, trucks and buses. Their bodies are built from side profiles with wheels, rims, lights and glass.
 - **People and cattle:** pedestrians walk along village roads, farmers in conical hats work in the rice fields, and small herds of cows graze near villages.
 
+## Layers: pull apart and explore
+**🗂 Layers** separates the landscape into an animated exploded stack around the satellite surface:
+- **Above the surface (they rise):** water · roads, rail and bridges · trees and plants · buildings · traffic and people.
+- **Below the surface (they sink):** land cover classified from the imagery · elevation (hypsometric tint, hillshade and contours) · topsoil 15–30 cm · subsoil 100–200 cm · geology.
+
+Controls:
+- **Level bar:** the vertical slider pulls the layers apart or puts them together.
+- **▶ Play tour:** opens the stack, slowly orbits it, and highlights one layer at a time.
+- **Isolate:** tap a layer to dim the others and show its legend. Tap it again to show all.
+- **Each layer:** a checkbox to show or hide it and a slider for its opacity.
+- **On screen:** each slab has a coloured frame and a label, and dashed corner posts tie the stack together.
+
 ## Cross-section: soil and geology
 Tap **✂ Cross-section**, then tap point A and point B on the ground or on the inset map. A profile opens with these parts:
 - **Section:** the ground line at real elevation, with the vertical exaggeration stated. Under it are the soil layers, a weathered zone and the rock unit, drawn with geological patterns (sandstone dots, limestone bricks, granite crosses, volcanic v's and so on). Water along the line is marked.

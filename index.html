@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=16">
+<link rel="stylesheet" href="css/app.css?v=17">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -65,6 +65,7 @@
     <div class="seg" id="views">
       <button data-v="overview" class="on">Overview</button><button data-v="oblique">Oblique</button><button data-v="street">Low</button><button data-v="drive">🚗 Drive</button><button data-v="walk">🚶 Walk</button>
     </div>
+    <button id="layersBtn" class="primary" style="margin:8px 0 2px;background:#2f6a8a">🗂 Layers: pull apart &amp; explore</button>
     <button id="sectionBtn" class="primary" style="margin:8px 0 2px;background:#7a5230">✂ Cross-section: soil &amp; geology</button>
     <label class="lbl">Ground</label>
     <div class="seg" id="ground">
@@ -103,6 +104,19 @@
   </div>
   <div id="joy" class="joy" hidden><div class="knob"></div></div>
   <button class="fab" id="sceneToggle" aria-label="Panel">☰</button>
+  <div id="layerPanel" hidden>
+    <div class="row lphead"><b>Layers</b><span id="lpHint" class="hint"></span><button id="lpClose" title="Close">✕</button></div>
+    <div class="row lpctl">
+      <button id="lpPlay">▶ Play tour</button>
+      <button id="lpApart">⇕ Pull apart</button>
+      <button id="lpTogether">⇣ Put together</button>
+    </div>
+    <div class="lpbody">
+      <div class="lplevel"><span>apart</span><input type="range" id="lpExplode" min="0" max="100" value="0" orient="vertical"><span>together</span></div>
+      <div id="lpList"></div>
+    </div>
+    <div id="lpLegend"></div>
+  </div>
   <div id="sectionPanel" hidden>
     <div class="row secbar"><b>Cross-section</b><span id="secHint" class="hint">Tap point A on the ground or on the inset map</span>
       <label><input type="checkbox" id="secWall" checked> Cut wall in 3D</label>
@@ -115,6 +129,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=16"></script>
+<script type="module" src="js/app.js?v=17"></script>
 </body>
 </html>

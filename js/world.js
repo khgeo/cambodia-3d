@@ -5,15 +5,16 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=16';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=16';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=16';
-import { buildTrees, GrassField } from './vegetation.js?v=16';
-import { RoadNet, Driver, Walker } from './modes.js?v=16';
-import { vehicleKit } from './vehicles.js?v=16';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=16';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=16';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=16';
+import * as G from './geo.js?v=17';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=17';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=17';
+import { buildTrees, GrassField } from './vegetation.js?v=17';
+import { RoadNet, Driver, Walker } from './modes.js?v=17';
+import { vehicleKit } from './vehicles.js?v=17';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=17';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=17';
+import { LayerStack } from './layers.js?v=17';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=17';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -163,7 +164,7 @@ export class World {
 
   clearGeometry() {
     this.root.traverse(o => { if (o.geometry) o.geometry.dispose(); });
-    this.root.clear(); this.vehicles = []; this.vehMeshes = []; this.driver = null; this.playerMesh = null;
+    this.root.clear(); this.railMesh = this.bridgeMesh = this.waterMesh = this.buildingsMesh = this.roadMesh = null; this.sideWalls = null; this.vehicles = []; this.vehMeshes = []; this.driver = null; this.playerMesh = null;
   }
 
   /* ================================================================ LOAD */
@@ -515,7 +516,7 @@ export class World {
       edge(line(X0, Z1, X1, Z1, nx)); edge(line(X1, Z1, X1, Z0, nz)); edge(line(X1, Z0, X0, Z0, nx)); edge(line(X0, Z0, X0, Z1, nz));
       const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); sg.setAttribute('color', new THREE.Float32BufferAttribute(scol, 3)); sg.computeVertexNormals();
       this.sidesMesh = new THREE.Mesh(sg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide })); this.root.add(this.sidesMesh);
-      const bp = new THREE.Mesh(new THREE.PlaneGeometry(W, H).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2e241c })); bp.position.y = bottom; this.root.add(bp); this.bottom = bottom;
+      const bp = new THREE.Mesh(new THREE.PlaneGeometry(W, H).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2e241c })); bp.position.y = bottom; this.root.add(bp); this.bottom = bottom; this.basePlate = bp;
       // height texture for water depth shading
       const hf = new Uint16Array(Hg.length); for (let i = 0; i < Hg.length; i++) hf[i] = THREE.DataUtils.toHalfFloat(Hg[i]);
       const ht = new THREE.DataTexture(hf, R, nz + 1, THREE.RedFormat, THREE.HalfFloatType); ht.magFilter = ht.minFilter = THREE.LinearFilter; ht.needsUpdate = true;
@@ -565,7 +566,7 @@ export class World {
       const RB2 = { pos: [], idx: [] };
       for (const pts of railPts) for (const o of [-0.5, 0.5]) ribbon(pts.map((p, i) => { const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], tx = b.x - a.x, tz = b.z - a.z, l = Math.hypot(tx, tz) || 1; return { x: p.x - tz / l * o, z: p.z + tx / l * o, y: p.y + 0.16, s: p.s }; }), 0.05, null, RB2);
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(RB2.pos, 3)); g.setIndex(RB2.idx); g.computeVertexNormals();
-      this.root.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xb8bcc2, metalness: 0.9, roughness: 0.3 })));
+      this.railMesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xb8bcc2, metalness: 0.9, roughness: 0.3 })); this.root.add(this.railMesh);
     }
     this.buildBridges(bridgeParts);
     this.net = new RoadNet(netRoads);
@@ -639,7 +640,8 @@ export class World {
     if (keepView) { this.camera.position.copy(keepView.p); this.controls.target.copy(keepView.t); this.controls.update(); }
     else this.goView('overview', true);
     if (prevMode === 'walk') this.setMode('walk');
-    this.exag = exag; if (this.U) { this.applySideGeology(); if (this.section) this.makeSection(this.section.A, this.section.B); }
+    this.exag = exag; if (this.layers) { const t = this.layers.t; await this.layers.rebuild(); this.layers.setExplode(t, true); }
+    if (this.U) { this.applySideGeology(); if (this.section) this.makeSection(this.section.A, this.section.B); }
     say('');
     return D.stats;
   }
@@ -671,7 +673,7 @@ export class World {
       }
     }
     const m = new THREE.Mesh(mergeGeometries(geos.map(x => { x.deleteAttribute('uv'); return x; })), new THREE.MeshStandardMaterial({ color: 0xb9b5ad, roughness: 0.85, side: THREE.DoubleSide }));
-    m.castShadow = m.receiveShadow = true; this.root.add(m);
+    m.castShadow = m.receiveShadow = true; this.root.add(m); this.bridgeMesh = m;
   }
 
   /* ---------- buildings ---------- */
@@ -911,6 +913,8 @@ export class World {
   }
 
   setVisible(kind, on) {
+    if (this.layers && ['trees', 'buildings', 'traffic'].includes(kind)) { this.layers.setOn(kind, on); this.onLayerToggle && this.onLayerToggle(kind, on); }
+    if (kind === 'detail') this._grassUserOff = !on;
     if (kind === 'trees') (this.treeMeshes || []).forEach(m => m.visible = on);
     if (kind === 'buildings' && this.buildingsMesh) this.buildingsMesh.visible = on;
     if (kind === 'traffic') { this.trafficOn = on; (this.vehMeshes || []).forEach(g => g.paint.visible = g.fixed.visible = on); }
@@ -930,6 +934,7 @@ export class World {
   }
   setMode(mode) {
     const prev = this.mode; this.mode = mode;
+    if (mode !== 'orbit' && this.layers && this.layers.t > 0) { this.layers.stop(); this.layers.setExplode(0, true); this.onLayersCollapse && this.onLayersCollapse(); }
     this.controls.enabled = mode === 'orbit';
     this.walker.active = mode === 'walk';
     this.camera.fov = mode === 'walk' ? 62 : 45; this.camera.updateProjectionMatrix();
@@ -965,6 +970,7 @@ export class World {
   /* ---------- underground: soil + geology, cross-sections ---------- */
   async ensureUnderground(say) {
     if (!this.U) { this.U = await loadUnderground(this, say); this.applySideGeology(); }
+    if (this.layers) this.layers.buildUnder();
     return this.U;
   }
   applySideGeology() {
@@ -977,6 +983,11 @@ export class World {
       const m = wallMesh(this, sampleLine(this, this.U, A, B, n), this.bottom, e); this.root.add(m); this.sideWalls.push(m);
     }
     if (this.sidesMesh) this.sidesMesh.visible = false;
+  }
+  async openLayers(say) {
+    if (!this.layers) { this.layers = new LayerStack(this); await this.layers.rebuild(); }
+    this.ensureUnderground(say).then(() => { this.layers.buildUnder(); this.onLayersReady && this.onLayersReady(); }).catch(e => console.warn(e));
+    return this.layers;
   }
   startSection() { this.sectionPick = 'A'; this.clearSection(); this.onSectionHint && this.onSectionHint('Tap point A on the ground or on the inset map'); }
   pickSectionPoint(x, z) {
@@ -1084,6 +1095,7 @@ export class World {
       }
       this.controls.update(); focus = this.controls.target;
     }
+    if (this.layers) this.layers.step(dt);
     if (this.grass) { if (this.grassOff) this.grass.group.visible = false; else this.grass.update(focus, this.mode === 'orbit' ? this.camera.position.distanceTo(focus) : 0); }
     const dist = this.mode === 'orbit' ? this.camera.position.distanceTo(focus) : 60;
     const half = THREE.MathUtils.clamp(dist * 0.9, 50, (this.extent || 2000) * 0.75), cam = this.sun.shadow.camera;
