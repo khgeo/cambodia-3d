@@ -29,9 +29,9 @@ export class Atmos {
     const wx = { clear: { turb: 4, ray: 2.2, sun: 1, fog: 1, exp: 1 }, haze: { turb: 10, ray: 3, sun: 0.75, fog: 0.55, exp: 0.95 }, rain: { turb: 18, ray: 0.6, sun: 0.25, fog: 0.22, exp: 0.85 }, storm: { turb: 20, ray: 0.3, sun: 0.12, fog: 0.15, exp: 0.75 } }[this.weather];
     const u = w.sky.material.uniforms; u.turbidity.value = wx.turb; u.rayleigh.value = lerp(wx.ray, 0.2, night); u.mieCoefficient.value = this.weather === 'clear' ? 0.004 : 0.012;
     w.setSun(Math.max(elev, -6), env, 180 - az);
-    w.sun.intensity *= wx.sun * (1 - night); w.hemi.intensity = lerp(w.hemi.intensity * (0.6 + 0.4 * wx.sun), 0.12, night);
+    w.sun.intensity *= wx.sun * (1 - night); w.hemi.intensity = lerp(w.hemi.intensity * (0.6 + 0.4 * wx.sun), 0.24, night);
     w.hemi.color.set(0xdfeaf5).lerp(new THREE.Color(0x3a4a78), night); w.hemi.groundColor.set(0x5a6640).lerp(new THREE.Color(0x10141c), night);
-    this.moon.intensity = 0.35 * night * (this.weather === 'clear' ? 1 : 0.3); this.moon.position.set(-0.4, 1, 0.3).multiplyScalar(1000);
+    this.moon.intensity = 0.55 * night * (this.weather === 'clear' ? 1 : 0.3); this.moon.position.set(-0.4, 1, 0.3).multiplyScalar(1000);
     w.renderer.toneMappingExposure = 0.62 * wx.exp * lerp(1, 1.35, night);
     NIGHT.value = clamp(night * 1.2 + dusk * 0.4, 0, 1) * (elev < 10 ? 1 : 0);
     const S = w.extent || 3000; w.scene.fog.near = S * 1.2 * wx.fog * (1 - night * 0.3); w.scene.fog.far = S * 5 * wx.fog;

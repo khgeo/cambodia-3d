@@ -101,7 +101,7 @@ export function makeBuildingMaterial() {
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying vec4 vWall; uniform float uNight;')
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-totalEmissiveRadiance += vec3(1.0, 0.7, 0.36) * winLit * uNight * 1.8;`)
+totalEmissiveRadiance += vec3(1.0, 0.62, 0.28) * winLit * uNight * 0.9;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 float winLit = 0.0;
 if (vWall.z > 0.5) {
