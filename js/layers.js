@@ -148,7 +148,7 @@ export class LayerStack {
   /* ---- deep Earth block: log-depth column from soil to the inner core ---- */
   buildDeep() {
     const D = this.w.D, w = this.w, c = document.createElement('canvas'); c.width = 2048; c.height = 1024; const g = c.getContext('2d');
-    const geoName = (UNITS[geologyAt(w.U || {}, w.F.lon(D.X0 + D.W / 2), w.F.lat(D.Z0 + D.H / 2))] || {}).n;
+    const gid = w.U ? geologyAt(w.U, w.F.lon(D.X0 + D.W / 2), w.F.lat(D.Z0 + D.H / 2)) : 0, geoName = gid ? UNITS[gid].n : null;
     DEEP.forEach(([a, b, n, col], i) => {
       const y0 = depthFrac(a) * c.height, y1 = depthFrac(b) * c.height; g.fillStyle = col; g.fillRect(0, y0, c.width, y1 - y0 + 1);
       g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, y1 - 2, c.width, 3);
@@ -234,6 +234,7 @@ export class LayerStack {
       const m = new THREE.Mesh(this.slabGeo, new THREE.MeshStandardMaterial({ map: t, roughness: 1, side: THREE.DoubleSide })); m.receiveShadow = true; m.visible = false; this.extra.add(m); this.slab[id] = m;
       this.legend[id] = id === 'geology' ? r.found.map(u => [(UNITS[u] || UNITS[0]).n, (UNITS[u] || UNITS[0]).c]) : r.found.map(s => [s, SOIL_CLASSES[s]]);
     }
+    if (this.slab.deep) { this.extra.remove(this.slab.deep); this.slab.deep = null; this.buildDeep(); }
     this.collect(); this.apply(true);
   }
   // which scene objects belong to which layer
