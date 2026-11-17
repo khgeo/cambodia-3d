@@ -23,9 +23,12 @@ export class Globe {
     this.w = world; this.on = false; this.opt = { clouds: true, night: true, wind: true, flights: true, temp: false, rain: false, storms: true, radar: true, sats: { resource: true, stations: true, visual: true, 'gps-ops': false, weather: false, starlink: false } };
     const sc = this.scene = new THREE.Scene(); sc.background = new THREE.Color(0x02040a);
     this.cam = new THREE.PerspectiveCamera(40, 1, 0.001, 200);
-    this.ctl = new OrbitControls(this.cam, world.renderer.domElement); this.ctl.enabled = false; this.ctl.enablePan = false; this.ctl.minDistance = 1.015; this.ctl.maxDistance = 9; this.ctl.enableDamping = true; this.ctl.dampingFactor = 0.08;
+    this.ctl = new OrbitControls(this.cam, world.renderer.domElement); this.ctl.enabled = false; this.ctl.enablePan = false; this.ctl.minDistance = 1.0003; this.ctl.maxDistance = 9; this.ctl.enableZoom = false; this.ctl.enableDamping = true; this.ctl.dampingFactor = 0.08;
+    // zoom by height above the ground, so you can go from space down to a few km smoothly
+    world.renderer.domElement.addEventListener('wheel', e => { if (!this.on || this.anim) return; e.preventDefault(); const d = this.cam.position.length(), alt = Math.min(8, Math.max(0.0003, (d - 1) * Math.exp(e.deltaY * 0.0012))); this.cam.position.setLength(1 + alt); }, { passive: false });
+    this.tiles = new Map();
     // stars
-    { const N = 4000, p = new Float32Array(N * 3); for (let i = 0; i < N; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(80); p.set([v.x, v.y, v.z], i * 3); }
+    { const N = 4000, p = new Float32Array(N * 3); for (let i = 0; i < N; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(50); p.set([v.x, v.y, v.z], i * 3); }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); sc.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.2, sizeAttenuation: false }))); }
     // earth with day / night
     const blank = (c) => { const cv = document.createElement('canvas'); cv.width = cv.height = 4; const g = cv.getContext('2d'); g.fillStyle = c; g.fillRect(0, 0, 4, 4); return new THREE.CanvasTexture(cv); };
@@ -42,9 +45,9 @@ export class Globe {
     // clouds
     this.cloudTex = blank('rgba(0,0,0,0)'); this.clouds = new THREE.Mesh(new THREE.SphereGeometry(1.006, 128, 64), new THREE.MeshLambertMaterial({ map: this.cloudTex, transparent: true, depthWrite: false })); sc.add(this.clouds);
     // atmosphere rim
-    sc.add(new THREE.Mesh(new THREE.SphereGeometry(1.06, 96, 48), new THREE.ShaderMaterial({ side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    this.rimU = { k: { value: 1 } }; sc.add(new THREE.Mesh(new THREE.SphereGeometry(1.06, 96, 48), new THREE.ShaderMaterial({ uniforms: this.rimU, side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
       vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position,1.0); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
-      fragmentShader: 'varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 3.0); gl_FragColor = vec4(0.35, 0.6, 1.0, 1.0) * f * 1.4; }' })));
+      fragmentShader: 'uniform float k; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 3.0); gl_FragColor = vec4(0.35, 0.6, 1.0, 1.0) * f * 1.4 * k; }' })));
     this.sunL = new THREE.DirectionalLight(0xffffff, 2.2); sc.add(this.sunL, new THREE.AmbientLight(0xffffff, 0.35));
     this.dyn = new THREE.Group(); sc.add(this.dyn);
     this.satObjs = {}; this.sats = {}; this.status = {};
@@ -53,10 +56,10 @@ export class Globe {
   placePlate() {
     const w = this.w, D = w.D; if (!D) return; if (this.plate) { this.scene.remove(this.plate); }
     const a = D.aoi, lat = (a.s + a.n) / 2, lon = (a.w + a.e) / 2; this.lat = lat; this.lon = lon;
-    const g = new THREE.Group(), real = Math.max(D.W, D.H) / 1000 / R_KM, S = Math.max(real, 0.006);
+    const g = new THREE.Group(), real = Math.max(D.W, D.H) / 1000 / R_KM, S = real; this.plateReal = real;
     const top = new THREE.MeshBasicMaterial({ map: w.texSat }), side = new THREE.MeshBasicMaterial({ color: 0x8a7a5c });
     const box = new THREE.Mesh(new THREE.BoxGeometry(S, S * 0.12, S), [side, side, top, side, side, side]); box.position.y = S * 0.06; g.add(box);
-    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.0004, 0.0004, 0.025, 6).translate(0, 0.0125, 0), new THREE.MeshBasicMaterial({ color: 0xffb547 })); g.add(pin);
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(S * 0.012, S * 0.012, S * 0.8, 6).translate(0, S * 0.4, 0), new THREE.MeshBasicMaterial({ color: 0xffb547 })); g.add(pin);
     const c = document.createElement('canvas'); c.width = 512; c.height = 96; const x = c.getContext('2d'); x.font = '700 40px system-ui, "Noto Sans Khmer", sans-serif'; x.fillStyle = '#ffb547'; x.strokeStyle = '#000'; x.lineWidth = 6;
     const txt = `Your 3D area · ${lat.toFixed(3)}°N ${lon.toFixed(3)}°E`; x.strokeText(txt, 8, 60); x.fillText(txt, 8, 60);
     const lab = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), sizeAttenuation: false, depthTest: false, transparent: true })); lab.center.set(0, 0); lab.scale.set(0.16, 0.03, 1); lab.renderOrder = 30; this.plateLab = lab;
@@ -68,14 +71,14 @@ export class Globe {
   /* ---------- enter / leave ---------- */
   async enter() {
     if (this.on) return; const w = this.w; this.on = true; w.controls.enabled = false; this.ctl.enabled = true; this.placePlate();
-    const p = xyz(this.lat, this.lon, 1); this.cam.position.copy(p.clone().multiplyScalar(1.03)); this.ctl.target.set(0, 0, 0); this.ctl.update();
-    this.anim = { t: 0, from: 1.03, to: 3.4, dir: p.clone().normalize() }; this.onToggle && this.onToggle(true);
+    const p = xyz(this.lat, this.lon, 1); this.cam.position.copy(p.clone().multiplyScalar(1.002)); this.ctl.target.set(0, 0, 0); this.ctl.update();
+    this.anim = { t: 0, from: 1.002, to: 3.4, dir: p.clone().normalize() }; this.onToggle && this.onToggle(true);
     if (!this.loaded) { this.loaded = true; this.loadBase(); }
     this.refresh(); clearInterval(this.timer); this.timer = setInterval(() => this.refresh(), 60000);
   }
   leave() {
     if (!this.on || (this.anim && this.anim.out)) return; const p = xyz(this.lat, this.lon, 1).normalize(), d = this.cam.position.length();
-    this.anim = { t: 0, from: d, to: 1.02, dir: p, start: this.cam.position.clone().normalize(), out: true };
+    this.anim = { t: 0, from: d, to: 1.0012, dir: p, start: this.cam.position.clone().normalize(), out: true };
   }
   finishLeave() { const w = this.w; this.on = false; this.ctl.enabled = false; w.controls.enabled = true; clearInterval(this.timer); w.clock.getDelta(); this.onToggle && this.onToggle(false); }
   /* ---------- data ---------- */
@@ -195,25 +198,75 @@ export class Globe {
     }
     this.onInfo && this.onInfo();
   }
+  // satellites we care most about get a label, their orbit, and (Earth observation) their ground track and swath
+  special(grp, name) {
+    const N = name.toUpperCase();
+    if (grp === 'resource') { const m = N.match(/^(LANDSAT [89]|SENTINEL-\d[A-D]?)\b/); if (!m) return null; const k = m[1], sw = /LANDSAT/.test(k) ? 185 : /SENTINEL-2/.test(k) ? 290 : /SENTINEL-1/.test(k) ? 250 : /SENTINEL-3/.test(k) ? 1270 : /SENTINEL-5P/.test(N) ? 2600 : 0;
+      return { label: k.replace('SENTINEL-', 'Sentinel-').replace('LANDSAT ', 'Landsat '), swath: sw, eo: true, optical: !/SENTINEL-1|SENTINEL-6/.test(k) }; }
+    if (grp === 'gps-ops') { const m = N.match(/PRN (\d+)/); return { label: m ? 'GPS ' + m[1] : name, gps: true }; }
+    if (grp === 'weather') { if (!/GOES|HIMAWARI|METEOSAT|FENGYUN|FY-|NOAA 2|METOP|SUOMI|GEO-KOMPSAT|INSAT|ELEKTRO/.test(N)) return null; return { label: name.replace(/\s*\(.*\)/, '').replace(/^(\w)(\w+)/, (a, b, c) => b + c.toLowerCase()) }; }
+    if (grp === 'stations') { if (/ISS \(ZARYA\)/.test(N)) return { label: 'ISS' }; if (/CSS \(TIANHE\)/.test(N)) return { label: 'Tiangong' }; }
+    return null;
+  }
   buildSatObj(grp) {
-    if (this.satObjs[grp]) { this.dyn.remove(this.satObjs[grp]); this.satObjs[grp].traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+    if (this.satObjs[grp]) { this.dyn.remove(this.satObjs[grp]); this.satObjs[grp].traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); }
     const [, col, sz] = SAT_GROUPS[grp], list = this.sats[grp].list, g = new THREE.Group(), geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(list.length * 3), 3));
-    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: col, size: sz, sizeAttenuation: false, depthWrite: false })); pts.frustumCulled = false; g.add(pts); g.userData.pts = pts;
-    const LAB = { stations: [/ISS \(ZARYA\)|CSS \(TIANHE\)/, n => n.includes('ISS') ? 'ISS' : 'Tiangong'], resource: [/^(LANDSAT|SENTINEL)/, n => n.replace(/\s*\(.*\)/, '').replace('SENTINEL-', 'Sentinel-').replace('LANDSAT ', 'Landsat ')] }[grp];
-    if (LAB) { g.userData.labels = []; for (const s of list.filter(s => LAB[0].test(s.name)).slice(0, 14)) { const c = document.createElement('canvas'); c.width = 256; c.height = 48; const x = c.getContext('2d'); x.font = '700 28px system-ui'; x.fillStyle = '#fff'; x.strokeStyle = '#000'; x.lineWidth = 5; const n = LAB[1](s.name); x.fillStyle = col; x.strokeText(n, 6, 34); x.fillText(n, 6, 34);
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), sizeAttenuation: false, depthTest: false, transparent: true })); sp.center.set(-0.05, 0.5); sp.scale.set(0.08, 0.015, 1); sp.renderOrder = 31; g.add(sp); g.userData.labels.push([s, sp]);
-      // one orbit ahead
-      const orb = [], now = Date.now(); for (let k = 0; k <= 120; k++) { const p = this.satPos(s.rec, new Date(now + k * 46e3)); if (p) orb.push(p); } g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(orb), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: grp === 'resource' ? 0.22 : 0.35 }))); } }
-    this.satObjs[grp] = g; this.dyn.add(g); g.userData.k = 0;
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: col, size: sz, sizeAttenuation: false, depthWrite: false })); pts.frustumCulled = false; g.add(pts); g.userData.pts = pts; g.userData.sp = [];
+    for (const s of list) { const sp0 = this.special(grp, s.name); if (!sp0) continue; s.sp = sp0;
+      const c = document.createElement('canvas'); c.width = 320; c.height = 52; const x = c.getContext('2d'); x.font = `700 ${sp0.eo ? 32 : 26}px system-ui`; x.fillStyle = col; x.strokeStyle = '#000'; x.lineWidth = 6;
+      if (sp0.eo) { x.beginPath(); x.arc(14, 26, 9, 0, 7); x.fill(); x.fillRect(0, 22, 28, 8); } x.strokeText(sp0.label, sp0.eo ? 34 : 6, 36); x.fillText(sp0.label, sp0.eo ? 34 : 6, 36);
+      const lab = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), sizeAttenuation: false, depthTest: true, transparent: true })); lab.center.set(sp0.eo ? 0.044 : -0.03, 0.5); lab.scale.set(sp0.eo ? 0.1 : 0.08, sp0.eo ? 0.01625 : 0.013, 1); lab.renderOrder = 31; g.add(lab);
+      const orbit = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: sp0.eo ? 0.55 : grp === 'gps-ops' ? 0.18 : 0.3 })); g.add(orbit);
+      const item = { s, lab, orbit }; if (sp0.eo) { item.track = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineDashedMaterial({ color: col, dashSize: 0.004, gapSize: 0.003, transparent: true, opacity: 0.7 })); g.add(item.track);
+        if (sp0.swath) { item.swath = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide })); g.add(item.swath); } }
+      g.userData.sp.push(item); }
+    this.satObjs[grp] = g; this.dyn.add(g); g.userData.k = 0; g.userData.orbAt = 0;
+    if (grp === 'resource') this.predictPasses();
+  }
+  ecf(rec, d) { const SJ = this.SJ, pv = SJ.propagate(rec, d); if (!pv || !pv.position) return null; return pv.position; }
+  // orbit drawn as a fixed ring in space (seen at this moment), ground track and swath for the next orbit
+  updateOrbits(g) {
+    const SJ = this.SJ, now = new Date(), gm = SJ.gstime(now);
+    for (const it of g.userData.sp) {
+      const rec = it.s.rec, per = 2 * Math.PI / rec.no * 60e3, ring = [], trk = [], L = [], Rr = [];
+      for (let k = 0; k <= 160; k++) { const d = new Date(now.getTime() + per * k / 160), e = this.ecf(rec, d); if (!e) continue; const f = SJ.eciToEcf(e, gm); ring.push(new THREE.Vector3(f.x / R_KM, f.z / R_KM, -f.y / R_KM)); }
+      it.orbit.geometry.dispose(); it.orbit.geometry = new THREE.BufferGeometry().setFromPoints(ring);
+      if (it.track) { for (let k = 0; k <= 200; k++) { const d = new Date(now.getTime() + per * k / 200), e = this.ecf(rec, d); if (!e) continue; const gd = SJ.eciToGeodetic(e, SJ.gstime(d)); trk.push([gd.latitude / D2R, gd.longitude / D2R]); }
+        it.track.geometry.dispose(); it.track.geometry = new THREE.BufferGeometry().setFromPoints(trk.map(([la, lo]) => xyz(la, lo, 1.0012))); it.track.computeLineDistances();
+        if (it.swath) { const hw = it.s.sp.swath / 2 / R_KM, pos = [], idx = [];
+          trk.forEach(([la, lo], k) => { const p = xyz(la, lo), q = xyz(...(trk[Math.min(trk.length - 1, k + 1)])), o = xyz(...(trk[Math.max(0, k - 1)])), t = q.clone().sub(o).normalize(), side = new THREE.Vector3().crossVectors(p, t).normalize();
+            for (const sg of [-1, 1]) { const v = p.clone().addScaledVector(side, sg * Math.tan(hw)).normalize().multiplyScalar(1.0011); pos.push(v.x, v.y, v.z); } if (k) { const a = (k - 1) * 2; if (Math.abs(lo - trk[k - 1][1]) < 90) idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } });
+          const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); sg.setIndex(idx); it.swath.geometry.dispose(); it.swath.geometry = sg; } }
+    }
   }
   satPos(rec, d) { const SJ = this.SJ, pv = SJ.propagate(rec, d); if (!pv || !pv.position) return null; const gd = SJ.eciToGeodetic(pv.position, SJ.gstime(d)); return xyz(gd.latitude / D2R, gd.longitude / D2R, 1 + gd.height / R_KM); }
   stepSats() {
-    const d = new Date();
+    const d = new Date(), t = performance.now();
     for (const [grp, g] of Object.entries(this.satObjs)) {
       if (!g.visible) continue; const list = this.sats[grp].list, arr = g.userData.pts.geometry.attributes.position.array, n = list.length, chunk = n > 800 ? Math.ceil(n / 6) : n; // big groups are updated in slices
       for (let c = 0; c < chunk; c++) { const i = (g.userData.k + c) % n, p = this.satPos(list[i].rec, d); if (p) arr.set([p.x, p.y, p.z], i * 3); } g.userData.k = (g.userData.k + chunk) % n; g.userData.pts.geometry.attributes.position.needsUpdate = true;
-      for (const [s, sp] of g.userData.labels || []) { const p = this.satPos(s.rec, d); if (p) sp.position.copy(p); }
+      for (const it of g.userData.sp) { const p = this.satPos(it.s.rec, d); if (p) { it.lab.position.copy(p); it.pos = p; } }
+      if (t - g.userData.orbAt > 30000) { g.userData.orbAt = t; this.updateOrbits(g); }
     }
+    if (this.satObjs['gps-ops'] && this.satObjs['gps-ops'].visible && (!this._gpsT || t - this._gpsT > 5000)) { this._gpsT = t; this.gpsVisible(); }
+  }
+  // which GPS satellites your area sees now (elevation above 10°) – useful for DGPS survey
+  gpsVisible() {
+    const g = this.satObjs['gps-ops']; if (!g || this.lat == null) return; const site = xyz(this.lat, this.lon), up = site.clone().normalize(), vis = [];
+    for (const it of g.userData.sp) { if (!it.pos) continue; const v = it.pos.clone().sub(site), el = Math.asin(v.dot(up) / v.length()) / D2R; if (el > 10) vis.push([it.s.sp.label.replace('GPS ', ''), Math.round(el)]); }
+    vis.sort((a, b) => b[1] - a[1]); this.status.gps = `GPS seen from your area now: ${vis.length} (PRN ${vis.map(([p, e]) => `${p}·${e}°`).join(', ')})`;
+  }
+  // next passes of Landsat / Sentinel over your area (within the swath), for the next 5 days
+  predictPasses() {
+    const g = this.satObjs.resource; if (!g || this.lat == null) return; const SJ = this.SJ, site = xyz(this.lat, this.lon), items = g.userData.sp.filter(i => i.s.sp.swath), out = [], t0 = Date.now(), step = 20e3, end = t0 + 5 * 864e5;
+    const sunUp = d => { const [sl, so] = sunLatLon(d); return xyz(sl, so).dot(site) > 0.1; };
+    let k = 0; const work = () => {
+      const it = items[k]; if (!it) { out.sort((a, b) => a.t - b.t); this.passes = out; this.status.passes = out.length ? 'Next passes over your area: ' + out.slice(0, 8).map(p => `${p.name} ${p.when}${p.dark ? ' (night)' : ''}`).join(' · ') : 'No Landsat / Sentinel pass over your area in the next 5 days'; this.onInfo && this.onInfo(); return; }
+      const hw = it.s.sp.swath / 2 / R_KM; let inPass = false, got = 0;
+      for (let t = t0; t < end && got < 2; t += step) { const d = new Date(t), e = this.ecf(it.s.rec, d); if (!e) break; const gd = SJ.eciToGeodetic(e, SJ.gstime(d)), ang = xyz(gd.latitude / D2R, gd.longitude / D2R).angleTo(site);
+        if (ang < hw) { if (!inPass) { inPass = true; got++; const dt = (t - t0) / 3600e3, loc = new Date(t + 7 * 3600e3); out.push({ name: it.s.sp.label, t, dark: it.s.sp.optical && !sunUp(d), when: dt < 24 ? `in ${Math.floor(dt)} h ${Math.round((dt % 1) * 60)} min` : `${loc.toISOString().slice(5, 10)} ${loc.toISOString().slice(11, 16)}` }); } } else inPass = false; }
+      k++; setTimeout(work, 0); };
+    work();
   }
   async loadFlights() {
     const rd = this.w.radar, proxy = rd ? rd.proxy : (localStorage.getItem('cambodia3d.flightProxy') || '');
@@ -257,8 +310,8 @@ export class Globe {
       if (this.routesDirty) { this.routesDirty = false; if (this.routes) { this.scene.remove(this.routes); this.routes.geometry.dispose(); } const pts = [];
         for (const f of this.simF) { const m = Math.max(8, Math.ceil(f.ang * 40)); for (let k = 0; k < m; k++) { const a = this.slerp(f.pa, f.pb, f.ang, k / m).multiplyScalar(1.004), b = this.slerp(f.pa, f.pb, f.ang, (k + 1) / m).multiplyScalar(1.004); pts.push(a, b); } }
         this.routes = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.12, depthWrite: false })); this.scene.add(this.routes); }
-      for (const f of this.simF) { f.f += f.v * dt * 60; if (f.f >= 1) { f.f = 0; [f.pa, f.pb] = [f.pb, f.pa]; } const h = Math.sin(Math.PI * f.f), p = this.slerp(f.pa, f.pb, f.ang, f.f).multiplyScalar(1.004 + 0.0015 * Math.min(1, h * 6)), q = this.slerp(f.pa, f.pb, f.ang, Math.min(1, f.f + 0.002));
-        put(p, q.sub(p).normalize(), [1, 0.82, 0.25]); } }
+      for (const f of this.simF) { f.f += f.v * dt * 60; if (f.f >= 1) { f.f = 0; [f.pa, f.pb] = [f.pb, f.pa]; } const h = Math.sin(Math.PI * f.f), pu = this.slerp(f.pa, f.pb, f.ang, f.f), qu = this.slerp(f.pa, f.pb, f.ang, f.f + 0.001), p = pu.clone().multiplyScalar(1.004 + 0.0015 * Math.min(1, h * 6));
+        put(p, qu.sub(pu).normalize(), [1, 0.82, 0.25]); } // heading = direction of travel along the route }
     // the radar's own aircraft (simulated or live) near your area
     const rd = this.w.radar; if (rd && rd.placed) for (const t of rd.targets.values()) { if (t.src === 'sim' && this.flightsLive) continue; const a = t.trk * D2R, p = xyz(t.lat, t.lon, 1.002 + t.alt / 1000 / R_KM * 8), nth = xyz(t.lat + 0.1, t.lon).sub(xyz(t.lat, t.lon)).normalize(), est = xyz(t.lat, t.lon + 0.1).sub(xyz(t.lat, t.lon)).normalize();
       put(p, nth.multiplyScalar(Math.cos(a)).add(est.multiplyScalar(Math.sin(a))), t.det ? [0.35, 1, 0.55] : [0.6, 0.7, 0.6]); }
@@ -285,6 +338,27 @@ export class Globe {
     this.radarLab.forEach((sp, i) => { const t = det[i]; sp.visible = !!t && this.cam.position.length() < 2.2; if (!t) return; sp.position.copy(xyz(t.lat, t.lon, 1.003 + t.alt / 1000 / R_KM * 8)); const txt = `${t.flight || t.type} FL${Math.round(t.alt / 0.3048 / 100)}`;
       if (sp.userData.t !== txt) { sp.userData.t = txt; const x = sp.userData.c.getContext('2d'); x.clearRect(0, 0, 256, 40); x.font = '700 26px ui-monospace, monospace'; x.fillStyle = '#7dffa0'; x.strokeStyle = '#000'; x.lineWidth = 5; x.strokeText(txt, 4, 30); x.fillText(txt, 4, 30); sp.material.map.needsUpdate = true; } });
   }
+  // high-resolution imagery (Esri World Imagery tiles) laid on the globe when you come close
+  tileMesh(z, x, y) {
+    const n = z < 8 ? 16 : 6, N = 2 ** z, pos = [], uv = [], idx = [], r = 1.0001;
+    for (let j = 0; j <= n; j++) { const my = y + j / n, lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * my / N))) / D2R; for (let i = 0; i <= n; i++) { const lon = (x + i / n) / N * 360 - 180, p = xyz(lat, lon, r); pos.push(p.x, p.y, p.z); uv.push(i / n, 1 - j / n); } }
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) { const a = j * (n + 1) + i; idx.push(a, a + n + 1, a + 1, a + 1, a + n + 1, a + n + 2); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ depthWrite: false })); m.renderOrder = 1 + z; m.visible = false; return m;
+  }
+  updateTiles(alt) {
+    const now = performance.now(), want = new Set(), c = this.cam.position.clone().normalize(), lat = Math.asin(c.y) / D2R, lon = Math.atan2(-c.z, c.x) / D2R;
+    const zf = Math.round(Math.log2(1 / Math.max(alt, 1e-4)) + 4.2), z = Math.min(18, zf);
+    if (z >= 5 && Math.abs(lat) < 84) {
+      for (const [zz, rad] of [[z, 3], [Math.max(4, z - 3), 1]]) { const N = 2 ** zz, tx = Math.floor((lon + 180) / 360 * N), ty = Math.floor((1 - Math.log(Math.tan((45 + lat / 2) * D2R)) / Math.PI) / 2 * N);
+        for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) { const y = ty + dy, x = ((tx + dx) % N + N) % N; if (y < 0 || y >= N) continue; want.add(`${zz}/${x}/${y}`); } }
+    }
+    for (const k of want) { let t = this.tiles.get(k); if (!t) { const [zz, x, y] = k.split('/').map(Number), m = this.tileMesh(zz, x, y); this.scene.add(m); t = { m, last: now }; this.tiles.set(k, t);
+        const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => { const tx = new THREE.Texture(im); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 4; tx.needsUpdate = true; m.material.map = tx; m.material.needsUpdate = true; m.visible = true; };
+        im.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zz}/${y}/${x}`; } t.last = now; t.m.userData.want = true; }
+    for (const [k, t] of this.tiles) { const keep = want.has(k); if (!keep && t.m.visible && now - t.last < 1500) continue; if (!keep) { this.scene.remove(t.m); t.m.geometry.dispose(); if (t.m.material.map) t.m.material.map.dispose(); t.m.material.dispose(); this.tiles.delete(k); } }
+    this.status.hires = z >= 5 ? `Imagery: Esri World Imagery, zoom level ${z}` : '';
+  }
   /* ---------- per frame ---------- */
   frame(dt) {
     const w = this.w, el = w.renderer.domElement, asp = el.clientWidth / Math.max(1, el.clientHeight); if (this.cam.aspect !== asp) { this.cam.aspect = asp; this.cam.updateProjectionMatrix(); }
@@ -292,12 +366,14 @@ export class Globe {
       const dir = A.out ? A.start.clone().lerp(A.dir, e).normalize() : A.dir.clone(); this.cam.position.copy(dir.multiplyScalar(d)); if (A.t >= 1) { this.anim = null; if (A.out) { this.finishLeave(); return; } } }
     else { this.ctl.rotateSpeed = Math.min(1, (this.cam.position.length() - 1) * 0.5); this.ctl.zoomSpeed = 0.8; this.ctl.update();
       // zooming right down onto the plate brings you back to the 3D scene
-      if (this.plate && this.cam.position.length() < 1.03 && this.cam.position.clone().normalize().dot(this.plate.position.clone().normalize()) > 0.9995) this.leave(); }
+      if (this.plate && this.cam.position.length() < 1.0012 && this.cam.position.clone().normalize().angleTo(this.plate.position.clone().normalize()) < this.plateReal * 0.8) this.leave(); }
     const [sl, so] = sunLatLon(); const s = xyz(sl, so); this.U.sun.value.copy(s); this.U.nightOn.value = this.opt.night ? 1 : 0; this.sunL.position.copy(s.clone().multiplyScalar(10));
     this.clouds.visible = this.opt.clouds; this.clouds.rotation.y += dt * 0.0; this.stepWind(Math.min(dt, 0.05)); if (this.SJ) this.stepSats(); this.stepFlights(Math.min(dt, 0.1)); this.stepRadar();
     if (this.temp) this.temp.visible = this.opt.temp; if (this.rain) this.rain.visible = this.opt.rain; if (this.storms) this.storms.visible = this.opt.storms;
     if ((this.opt.wind || this.opt.temp) && this.cam.position.length() < 2.2 && (!this._detT || performance.now() - this._detT > 4000)) { this._detT = performance.now(); this.loadDetail(); }
-    if (this.plate) { const k = Math.max(1, (this.cam.position.length() - 1) / 0.6); this.plate.scale.setScalar(Math.min(k, 6)); }
+    const dd = this.cam.position.length(), alt = dd - 1; if (this.plate) this.plate.scale.setScalar(Math.max(1, alt * 0.012 / this.plateReal));
+    this.cam.near = Math.max(0.00005, alt * 0.4); this.cam.far = 60; this.cam.updateProjectionMatrix(); this.rimU.k.value = Math.min(1, alt / 0.08);
+    if (!this._tileT || performance.now() - this._tileT > 400) { this._tileT = performance.now(); this.updateTiles(alt); }
     w.renderer.render(this.scene, this.cam);
   }
   info() { const d = new Date(); return { utc: d.toISOString().slice(11, 16), ...this.status, radar: this.w.radar && this.w.radar.placed ? `Radar: ${this.w.radar.range} km, ${this.w.radar.list().length} aircraft detected` : '', sats: Object.entries(this.sats).filter(([g]) => this.opt.sats[g]).map(([g, v]) => `${SAT_GROUPS[g][0]} ${v.list.length}`).join(' · '), flights: this.status.flights || (this.nFlights ? `Aircraft: ${this.nFlights} from the radar` : '') }; }

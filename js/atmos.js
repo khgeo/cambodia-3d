@@ -1,7 +1,7 @@
 // Time of day (sun path, dusk, night with lit windows and stars), weather (clear, hazy, monsoon rain, storm with
 // lightning) and a cinematic flight around the area.
 import * as THREE from 'three';
-import { NIGHT } from './shaders.js?v=45';
+import { NIGHT } from './shaders.js?v=46';
 
 const clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp;
 export class Atmos {
