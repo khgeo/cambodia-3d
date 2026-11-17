@@ -65,7 +65,7 @@ export class LcTrainer {
       const o = q * NF; let best = -1, bv = -Infinity;
       for (let a = 0; a < keys.length; a++) { const m = M[keys[a]]; let s = m.lp - 0.5 * m.ln; for (let k = 0; k < NF; k++) { const d = F[o + k] - m.mu[k]; s -= d * d / (2 * m.va[k]); } lp[a] = s; if (s > bv) { bv = s; best = a; } }
       let z = 0; for (let a = 0; a < keys.length; a++) z += Math.exp(lp[a] - bv); const post = 1 / z, c = cOf[best];
-      const v = !base || (post >= this.tau && mine[best]) ? c : base; // only what you taught can take cells over if (v !== D.lc[q]) changed++; D.lc[q] = v;
+      const v = !base || (post >= this.tau && mine[best]) ? c : base; if (v !== D.lc[q]) changed++; D.lc[q] = v; // only what you taught can take cells over
     }
     this.updateStats(); return changed;
   }
