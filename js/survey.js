@@ -2,7 +2,7 @@
 // (planimetric and 3D surface), draped on the terrain; go to / stake out a coordinate; walk with a GNSS rover pole.
 // Heights come from the terrain model (not exaggerated); this is a simulation, not survey-grade.
 import * as THREE from 'three';
-import { utm } from './hud.js?v=31';
+import { utm } from './hud.js?v=32';
 
 export const CODES = ['Point', 'Boundary corner', 'Tree', 'Well / water', 'Building corner', 'Road / track', 'Benchmark', 'Other'];
 const COL = { line: 0xffd23f, area: 0x29c7d9, point: 0xff6b3d, target: 0x37e07a };

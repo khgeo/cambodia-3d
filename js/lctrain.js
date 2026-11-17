@@ -49,23 +49,23 @@ export class LcTrainer {
   train() {
     const D = this.w.D, n = D.lcBase.length, here = D.aoi.w.toFixed(3) + ',' + D.aoi.s.toFixed(3);
     const user = this.samples.filter(s => this.useAll || s.a === here), stats = {}, add = (c, f, wt) => { const s = stats[c] || (stats[c] = { w: 0, m: new Float64Array(NF), q: new Float64Array(NF) }); s.w += wt; for (let k = 0; k < NF; k++) { s.m[k] += f[k] * wt; s.q[k] += f[k] * f[k] * wt; } };
-    for (const s of user) add(s.c, s.f, 6);
+    for (const s of user) add('u' + s.c, s.f, 4); // your samples form their own component of that class
     // background knowledge: random cells of the automatic map (not painted, not road/water/building from OSM)
     const per = {}; for (let t = 0; t < 40000; t++) { const q = (Math.random() * n) | 0, c = D.lcBase[q]; if (!c || c === 13 || (per[c] || 0) > 250 || this.painted[q] !== 255) continue; per[c] = (per[c] || 0) + 1; add(c, this.F.subarray(q * NF, q * NF + NF), 1); }
     const model = {};
     for (const [c, s] of Object.entries(stats)) { if (s.w < 5) continue; const mu = [], va = []; for (let k = 0; k < NF; k++) { const m = s.m[k] / s.w; mu.push(m); va.push(Math.max(1e-4, s.q[k] / s.w - m * m)); } model[c] = { mu, va, lp: Math.log(s.w), ln: va.reduce((a, v) => a + Math.log(v), 0) }; }
-    this.taught = new Set(user.map(s => s.c)); this.model = model; return { classes: Object.keys(model).length, userSamples: user.length };
+    this.model = model; return { classes: Object.keys(model).length, userSamples: user.length };
   }
   classify() {
-    const D = this.w.D, M = this.model; if (!M) return 0; const keys = Object.keys(M).map(Number), n = D.lcBase.length, F = this.F, lp = new Float64Array(keys.length);
+    const D = this.w.D, M = this.model; if (!M) return 0; const keys = Object.keys(M), cOf = keys.map(k => parseInt(k.replace('u', ''))), mine = keys.map(k => k[0] === 'u'), n = D.lcBase.length, F = this.F, lp = new Float64Array(keys.length);
     let changed = 0;
     for (let q = 0; q < n; q++) {
       if (this.painted[q] !== 255) { D.lc[q] = this.painted[q]; continue; }
       const base = D.lcBase[q]; if (this.fixed[q]) { D.lc[q] = base; continue; }
       const o = q * NF; let best = -1, bv = -Infinity;
       for (let a = 0; a < keys.length; a++) { const m = M[keys[a]]; let s = m.lp - 0.5 * m.ln; for (let k = 0; k < NF; k++) { const d = F[o + k] - m.mu[k]; s -= d * d / (2 * m.va[k]); } lp[a] = s; if (s > bv) { bv = s; best = a; } }
-      let z = 0; for (let a = 0; a < keys.length; a++) z += Math.exp(lp[a] - bv); const post = 1 / z, c = keys[best];
-      const v = !base || (post >= this.tau && this.taught.has(c)) ? c : base; // only classes you taught can take cells over if (v !== D.lc[q]) changed++; D.lc[q] = v;
+      let z = 0; for (let a = 0; a < keys.length; a++) z += Math.exp(lp[a] - bv); const post = 1 / z, c = cOf[best];
+      const v = !base || (post >= this.tau && mine[best]) ? c : base; // only what you taught can take cells over if (v !== D.lc[q]) changed++; D.lc[q] = v;
     }
     this.updateStats(); return changed;
   }
