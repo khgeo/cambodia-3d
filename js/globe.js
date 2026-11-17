@@ -311,7 +311,7 @@ export class Globe {
         for (const f of this.simF) { const m = Math.max(8, Math.ceil(f.ang * 40)); for (let k = 0; k < m; k++) { const a = this.slerp(f.pa, f.pb, f.ang, k / m).multiplyScalar(1.004), b = this.slerp(f.pa, f.pb, f.ang, (k + 1) / m).multiplyScalar(1.004); pts.push(a, b); } }
         this.routes = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.12, depthWrite: false })); this.scene.add(this.routes); }
       for (const f of this.simF) { f.f += f.v * dt * 60; if (f.f >= 1) { f.f = 0; [f.pa, f.pb] = [f.pb, f.pa]; } const h = Math.sin(Math.PI * f.f), pu = this.slerp(f.pa, f.pb, f.ang, f.f), qu = this.slerp(f.pa, f.pb, f.ang, f.f + 0.001), p = pu.clone().multiplyScalar(1.004 + 0.0015 * Math.min(1, h * 6));
-        put(p, qu.sub(pu).normalize(), [1, 0.82, 0.25]); } // heading = direction of travel along the route }
+        put(p, qu.sub(pu).normalize(), [1, 0.82, 0.25]); } } // heading = direction of travel along the route }
     // the radar's own aircraft (simulated or live) near your area
     const rd = this.w.radar; if (rd && rd.placed) for (const t of rd.targets.values()) { if (t.src === 'sim' && this.flightsLive) continue; const a = t.trk * D2R, p = xyz(t.lat, t.lon, 1.002 + t.alt / 1000 / R_KM * 8), nth = xyz(t.lat + 0.1, t.lon).sub(xyz(t.lat, t.lon)).normalize(), est = xyz(t.lat, t.lon + 0.1).sub(xyz(t.lat, t.lon)).normalize();
       put(p, nth.multiplyScalar(Math.cos(a)).add(est.multiplyScalar(Math.sin(a))), t.det ? [0.35, 1, 0.55] : [0.6, 0.7, 0.6]); }
