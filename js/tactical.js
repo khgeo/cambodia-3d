@@ -190,7 +190,7 @@ export class Tactical {
     const L = Math.hypot(B.x - A.x, B.z - A.z), n = Math.max(20, Math.ceil(L / 2)), oh = w.rawElevation(A.x, A.z) + this.obsH, th = w.rawElevation(B.x, B.z) + this.tgtH, prof = [];
     let blocked = -1;
     for (let i = 0; i <= n; i++) {
-      const t = i / n, x = A.x + (B.x - A.x) * t, z = A.z + (B.z - A.z) * t, g = w.rawElevation(x, z), s = i === 0 || i === n ? g : this.surface(x, z), ray = oh + (th - oh) * t;
+      const t = i / n, x = A.x + (B.x - A.x) * t, z = A.z + (B.z - A.z) * t, g = w.rawElevation(x, z), s = t * L < 15 || (1 - t) * L < 15 ? g : this.surface(x, z), ray = oh + (th - oh) * t; // own position's trees do not block
       prof.push({ d: t * L, g, s, ray }); if (blocked < 0 && i > 0 && i < n && s > ray) blocked = i;
     }
     // seen / hidden along the ground from the observer (each sample against the running horizon)
@@ -217,7 +217,7 @@ export class Tactical {
         const px = x + ca * d, pz = z + sa * d; if (px < D.X0 || px > D.X0 + D.W || pz < D.Z0 || pz > D.Z0 + D.H) break;
         const g = w.rawElevation(px, pz), ang = (g + this.tgtH - oh) / d, i = Math.floor((px - x + R) / st), j = Math.floor((pz - z + R) / st);
         if (i >= 0 && j >= 0 && i < N && j < N) vis[j * N + i] = ang >= maxA ? 2 : Math.max(vis[j * N + i], 1);
-        maxA = Math.max(maxA, (this.surface(px, pz) - oh) / d);
+        maxA = Math.max(maxA, ((d < 15 ? g : this.surface(px, pz)) - oh) / d);
       }
     }
     let seen = 0, tot = 0; const c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d'), im = g.createImageData(N, N);
