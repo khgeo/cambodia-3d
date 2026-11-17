@@ -2,9 +2,9 @@
 // spot heights, water, roads by class, railways, buildings, place names and landmarks (OpenStreetMap), your own
 // features, survey points, parcels and the tactical overlay; UTM grid with edge labels, bilingual legend,
 // scale bar, north arrows with grid convergence, location map and credits. PNG or PDF.
-import { LC } from './landcover.js?v=33';
-import { utm } from './hud.js?v=33';
-import { utmInv } from './survey.js?v=33';
+import { LC } from './landcover.js?v=34';
+import { utm } from './hud.js?v=34';
+import { utmInv } from './survey.js?v=34';
 
 const PAPER = { A4: [210, 297], A3: [297, 420], A2: [420, 594] };
 const SCALES = [1000, 2000, 2500, 5000, 7500, 10000, 15000, 20000, 25000, 50000, 100000];
@@ -213,7 +213,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
     for (const p of sv.points) { g.fillStyle = '#e04020'; g.beginPath(); g.moveTo(X(p.x), Y(p.z) - mm(0.9)); g.lineTo(X(p.x) + mm(0.8), Y(p.z) + mm(0.5)); g.lineTo(X(p.x) - mm(0.8), Y(p.z) + mm(0.5)); g.closePath(); g.fill(); g.fillStyle = '#111'; g.fillText(p.id, X(p.x) + mm(1), Y(p.z)); }
   }
   if (o.tac && world.tactical) {
-    const tc = world.tactical, { symbolURL } = await import('./tactical.js?v=33');
+    const tc = world.tactical, { symbolURL } = await import('./tactical.js?v=34');
     for (const f of tc.features.filter(f => tc.inAOI(f))) {
       const col = tc.color(f.side, f.code), P = f.coords.map(c => [F.x(c[0]), F.z(c[1])]); g.strokeStyle = g.fillStyle = col; g.lineWidth = mm(0.5);
       if (f.geom === 'point') { try { const im = await loadImg(await symbolURL(f.code, col)); const sz = mm(6); g.drawImage(im, X(P[0][0]) - sz / 2, Y(P[0][1]) - sz, sz, sz); if (f.label) { font(1.8, 700); g.textAlign = 'center'; g.fillText(f.label, X(P[0][0]), Y(P[0][1]) + mm(1.5)); } } catch (e) { } }
@@ -291,7 +291,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
   item((x, y, w, h) => { g.fillStyle = '#a9cdea'; g.strokeStyle = '#3f7fbf'; g.lineWidth = mm(0.15); g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h); }, T('Lake / pond / reservoir', 'បឹង / ស្រះ / អាងទឹក'));
   if ((D.buildings || []).length) item((x, y, w, h) => { g.fillStyle = '#3a3a3a'; g.fillRect(x + w * 0.1, y + h * 0.2, w * 0.25, h * 0.6); g.fillRect(x + w * 0.5, y + h * 0.1, w * 0.3, h * 0.7); }, T('Building (OpenStreetMap)', 'អគារ (OpenStreetMap)'));
   if ((world.housesList || []).length) item((x, y, w, h) => { g.fillStyle = '#5a5a5a'; for (const a of [0.1, 0.45, 0.75]) g.fillRect(x + w * a, y + h * 0.3, w * 0.18, h * 0.45); }, T('House (from the image)', 'ផ្ទះ (ពីរូបភាព)'));
-  item((x, y, w, h) => { g.strokeStyle = '#a8662e'; g.lineWidth = mm(0.14); g.beginPath(); g.moveTo(x, y + h * 0.3); g.lineTo(x + w, y + h * 0.3); g.stroke(); g.lineWidth = mm(0.32); g.beginPath(); g.moveTo(x, y + h * 0.75); g.lineTo(x + w, y + h * 0.75); g.stroke(); }, T(`Contour ${CI} m · index ${CI * IDX} m`, `ខ្សែកម្ពស់ ${KD(CI)} ម · ខ្សែមេ ${KD(CI * IDX)} ម`));
+  item((x, y, w, h) => { g.strokeStyle = '#a8662e'; g.lineWidth = mm(0.14); g.beginPath(); g.moveTo(x, y + h * 0.3); g.lineTo(x + w, y + h * 0.3); g.stroke(); g.lineWidth = mm(0.32); g.beginPath(); g.moveTo(x, y + h * 0.75); g.lineTo(x + w, y + h * 0.75); g.stroke(); }, T(`Contour ${CI} m, index ${CI * IDX} m`, `ខ្សែកម្ពស់ ${KD(CI)} ម, ខ្សែមេ ${KD(CI * IDX)} ម`));
   item((x, y, w, h) => { g.fillStyle = '#222'; g.beginPath(); g.arc(x + w * 0.3, y + h / 2, mm(0.45), 0, 7); g.fill(); font(1.8, 600); g.fillText(N(124), x + w * 0.42, y + h / 2); }, T('Spot height (m)', 'ចំណុចកម្ពស់ (ម)'));
   if (o.names) { if (LS !== 'simple') { cy += 1.5; heading(T('Places and landmarks', 'ទីកន្លែង និងទីសម្គាល់')); } item((x, y, w, h) => { g.fillStyle = '#b0302a'; g.beginPath(); g.moveTo(x + w / 2, y); g.lineTo(x + w / 2 + mm(1.1), y + h * 0.8); g.lineTo(x + w / 2 - mm(1.1), y + h * 0.8); g.closePath(); g.fill(); }, T('Pagoda / temple', 'វត្ត / ទីសក្ការៈ'));
     item((x, y, w, h) => { g.fillStyle = '#111'; g.fillRect(x + w / 2 - mm(0.12), y, mm(0.24), h); g.fillStyle = '#2f5fbf'; g.fillRect(x + w / 2, y, mm(1.1), mm(0.7)); }, T('School', 'សាលារៀន'));
