@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=58">
+<link rel="stylesheet" href="css/app.css?v=59">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -381,6 +381,7 @@
       </div>
       <div class="row"><button id="topoMake" class="primary">🗺️ Make map</button></div>
       <canvas id="topoPrev" hidden></canvas>
+      <div class="row"><label><input type="checkbox" id="topoBrief" checked> 📝 Add the GEOINT area brief to the PDF (extra A4 pages)</label></div>
       <div class="row"><button id="topoPNG" disabled>⬇ Download PNG</button><button id="topoPDF" disabled>⬇ Download PDF</button></div>
       <div class="svsec"><b>GeoPackage for QGIS</b>
         <div class="svhelp">All layers of this area (roads, water, buildings, houses, contours, spot heights, place names, land cover, image, your survey, digitized and tactical layers) with their map styles.</div>
@@ -402,6 +403,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=58"></script>
+<script type="module" src="js/app.js?v=59"></script>
 </body>
 </html>

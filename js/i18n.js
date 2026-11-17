@@ -140,6 +140,7 @@ export const KM = {
   'Time-lapse of all dates': 'ចលនាតាមពេលវេលានៃគ្រប់កាលបរិច្ឆេទ', 'Stop': 'ឈប់', 'Loading': 'កំពុងផ្ទុក',
   'That is a large surface – tap a single object': 'នោះជាផ្ទៃធំ – ចុចលើវត្ថុតែមួយ',
   'Sensitivity': 'ភាពរសើប',
+  'Add the GEOINT area brief to the PDF (extra A4 pages)': 'បន្ថែមរបាយការណ៍សង្ខេបភូមិសាស្ត្រទៅក្នុង PDF (ទំព័រ A4 បន្ថែម)', 'Preparing the brief…': 'កំពុងរៀបចំរបាយការណ៍…', 'Drawing the brief pages…': 'កំពុងគូរទំព័ររបាយការណ៍…', 'Could not make the PDF': 'មិនអាចបង្កើត PDF',
   'Contours': 'ខ្សែកម្ពស់', 'Grid': 'ក្រឡាចត្រង្គ', 'Your features': 'វត្ថុរបស់អ្នក', 'Survey points & parcels': 'ចំណុចវាស់ និងក្បាលដី', 'Tactical overlay': 'ស្រទាប់យុទ្ធសាស្ត្រ',
 };
 export let lang = 'en';
