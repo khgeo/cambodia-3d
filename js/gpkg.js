@@ -154,7 +154,8 @@ export async function exportGeoPackage(world, say = () => {}) {
     const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d'), st = db.prepare(`INSERT INTO "${name}" (zoom_level,tile_column,tile_row,tile_data) VALUES (0,?,?,?)`);
     for (let ty = 0; ty < nty; ty++) for (let tx = 0; tx < ntx; tx++) {
       g.clearRect(0, 0, 256, 256); g.drawImage(canvas, tx * 256, ty * 256, 256, 256, 0, 0, 256, 256);
-      const b = await new Promise(r => c.toBlob(r, type, 0.88)); st.run([tx, ty, new Uint8Array(await b.arrayBuffer())]);
+      const u = c.toDataURL(type, 0.88), bin = atob(u.slice(u.indexOf(',') + 1)), arr = new Uint8Array(bin.length); for (let q = 0; q < bin.length; q++) arr[q] = bin.charCodeAt(q);
+      st.run([tx, ty, arr]); if (((ty * ntx + tx) & 15) === 15) { say(`${title}: ${ty * ntx + tx + 1}/${ntx * nty}`); await new Promise(r => setTimeout(r, 0)); }
     }
     st.free();
   };
