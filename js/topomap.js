@@ -2,9 +2,9 @@
 // spot heights, water, roads by class, railways, buildings, place names and landmarks (OpenStreetMap), your own
 // features, survey points, parcels and the tactical overlay; UTM grid with edge labels, bilingual legend,
 // scale bar, north arrows with grid convergence, location map and credits. PNG or PDF.
-import { LC } from './landcover.js?v=24';
-import { utm } from './hud.js?v=24';
-import { utmInv } from './survey.js?v=24';
+import { LC } from './landcover.js?v=26';
+import { utm } from './hud.js?v=26';
+import { utmInv } from './survey.js?v=26';
 
 const PAPER = { A4: [210, 297], A3: [297, 420], A2: [420, 594] };
 const SCALES = [1000, 2000, 2500, 5000, 7500, 10000, 15000, 20000, 25000, 50000, 100000];
@@ -54,6 +54,32 @@ function chain(segs, eps) { // join marching-squares segments into polylines
   return out;
 }
 
+// elevation grid, contours (x,z polylines) and spot heights – shared by the map sheet and the GeoPackage export
+export function terrainData(world, ciOpt, S) {
+  const D = world.D;
+  const gs = Math.max(2, Math.min(D.W, D.H) / 500), nx = Math.ceil(D.W / gs) + 1, nz = Math.ceil(D.H / gs) + 1, E = new Float32Array(nx * nz);
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) E[j * nx + i] = world.rawElevation(D.X0 + i * gs, D.Z0 + j * gs);
+  for (let pass = 0; pass < 6; pass++) { const t = E.slice(); for (let j = 1; j < nz - 1; j++) for (let i = 1; i < nx - 1; i++) { const q = j * nx + i; E[q] = (t[q] * 4 + t[q - 1] + t[q + 1] + t[q - nx] + t[q + nx] + (t[q - nx - 1] + t[q - nx + 1] + t[q + nx - 1] + t[q + nx + 1]) * 0.5) / 10; } }
+  let lo = Infinity, hi = -Infinity; for (const v of E) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  const rng = Math.max(0.5, hi - lo), CI = ciOpt === 'auto' ? [0.5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100].find(v => rng / v <= 22) || 100 : +ciOpt, IDX = CI === 2.5 || CI === 25 ? 4 : 5;
+  const contours = [];
+  for (let L = Math.ceil(lo / CI) * CI; L <= hi; L += CI) {
+    const segs = [];
+    for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
+      const a = E[j * nx + i], b = E[j * nx + i + 1], c = E[(j + 1) * nx + i + 1], d = E[(j + 1) * nx + i], cs = (a > L) | (b > L) << 1 | (c > L) << 2 | (d > L) << 3; if (cs === 0 || cs === 15) continue;
+      const x0 = D.X0 + i * gs, z0 = D.Z0 + j * gs, it = (p, q) => (L - p) / ((q - p) || 1e-9);
+      const eT = [x0 + gs * it(a, b), z0], eR = [x0 + gs, z0 + gs * it(b, c)], eB = [x0 + gs * it(d, c), z0 + gs], eL = [x0, z0 + gs * it(a, d)];
+      const tbl = { 1: [[eL, eT]], 2: [[eT, eR]], 3: [[eL, eR]], 4: [[eR, eB]], 5: [[eL, eT], [eR, eB]], 6: [[eT, eB]], 7: [[eL, eB]], 8: [[eB, eL]], 9: [[eB, eT]], 10: [[eT, eR], [eB, eL]], 11: [[eB, eR]], 12: [[eR, eL]], 13: [[eR, eT]], 14: [[eT, eL]] };
+      for (const sgm of tbl[cs]) segs.push(sgm);
+    }
+    for (const line of chain(segs, gs * 0.01)) { let len = 0; for (let q = 1; q < line.length; q++) len += Math.hypot(line[q][0] - line[q - 1][0], line[q][1] - line[q - 1][1]); const closed = Math.hypot(line[0][0] - line[line.length - 1][0], line[0][1] - line[line.length - 1][1]) < gs * 1.5; if (len * 1000 / S > (closed ? 12 : 4)) contours.push({ L, line, len, idx: Math.abs(Math.round(L / CI)) % IDX === 0 }); }
+  }
+  const sp = []; const r = Math.max(3, Math.round(120 / gs));
+    for (let j = r; j < nz - r; j += Math.max(1, r >> 1)) for (let i = r; i < nx - r; i += Math.max(1, r >> 1)) { const v = E[j * nx + i]; let top = true; for (let b = -r; b <= r && top; b += 2) for (let a = -r; a <= r; a += 2) if (E[(j + b) * nx + i + a] > v) { top = false; break; } if (top && v - lo > rng * 0.15) sp.push([D.X0 + i * gs, D.Z0 + j * gs, v]); }
+    sp.sort((a, b) => b[2] - a[2]); const keep = []; for (const p of sp) if (!keep.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 300)) keep.push(p);
+  return { gs, nx, nz, E, lo, hi, rng, CI, IDX, contours, spots: keep.slice(0, 12) };
+}
+
 export async function makeTopoMap(world, o, say = () => {}) {
   const D = world.D, F = world.F, aoi = D.aoi, lang = o.lang || 'both', km = lang !== 'en', en = lang !== 'km';
   const T = (e, k) => lang === 'both' ? `${k} · ${e}` : lang === 'km' ? k : e, N = v => lang === 'km' ? KD(v) : String(v);
@@ -61,11 +87,11 @@ export async function makeTopoMap(world, o, say = () => {}) {
   // --- sheet geometry (mm) ---
   const [pw, ph] = PAPER[o.paper.slice(0, 2)], land = o.paper.endsWith('L'), W = land ? ph : pw, H = land ? pw : ph, k = o.dpi / 25.4;
   const M = 10, head = 16, side = land ? Math.max(78, W * 0.24) : 0, foot = land ? 0 : Math.max(82, H * 0.25);
-  const fw = W - 2 * M - side - (land ? 6 : 0), fh = H - 2 * M - head - foot - (land ? 0 : 6);
+  const fw = W - 2 * M - side - (land ? 12 : 0), fh = H - 2 * M - head - foot - (land ? 0 : 6);
   let S = o.scale === 'auto' ? SCALES.find(s => D.W * 1000 / s <= fw && D.H * 1000 / s <= fh) || 100000 : +o.scale;
   const mw = D.W * 1000 / S, mhh = D.H * 1000 / S, FW = Math.min(fw, mw), FH = Math.min(fh, mhh);
   // centre map + margin as one block
-  const fx = land ? M + (W - 2 * M - (FW + 6 + side)) / 2 : M + (W - 2 * M - FW) / 2, fy = land ? M + head + (fh - FH) / 2 : M + head + (fh - FH) / 2;
+  const fx = land ? M + 3 + (W - 2 * M - 3 - (FW + 9 + side)) / 2 : M + (W - 2 * M - FW) / 2, fy = land ? M + head + (fh - FH) / 2 : M + head + (fh - FH) / 2;
   const cv = document.createElement('canvas'); cv.width = Math.round(W * k); cv.height = Math.round(H * k); const g = cv.getContext('2d');
   const s = 1000 / S * k, cxm = D.X0 + D.W / 2 - FW / 2 * S / 1000, czm = D.Z0 + D.H / 2 - FH / 2 * S / 1000; // map shows the AOI centre
   const X = x => (fx + (x - cxm) * 1000 / S) * k, Y = z => (fy + (z - czm) * 1000 / S) * k, mm = v => v * k;
@@ -101,28 +127,12 @@ export async function makeTopoMap(world, o, say = () => {}) {
   }
   // elevation grid for hillshade and contours
   say('Contours…');
-  const gs = Math.max(2, Math.min(D.W, D.H) / 500), nx = Math.ceil(D.W / gs) + 1, nz = Math.ceil(D.H / gs) + 1, E = new Float32Array(nx * nz);
-  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) E[j * nx + i] = world.rawElevation(D.X0 + i * gs, D.Z0 + j * gs);
-  for (let pass = 0; pass < 6; pass++) { const t = E.slice(); for (let j = 1; j < nz - 1; j++) for (let i = 1; i < nx - 1; i++) { const q = j * nx + i; E[q] = (t[q] * 4 + t[q - 1] + t[q + 1] + t[q - nx] + t[q + nx] + (t[q - nx - 1] + t[q - nx + 1] + t[q + nx - 1] + t[q + nx + 1]) * 0.5) / 10; } }
-  let lo = Infinity, hi = -Infinity; for (const v of E) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+  const TD = terrainData(world, o.ci, S), { gs, nx, nz, E, lo, hi, rng, CI, IDX, contours } = TD;
   if (o.hill) {
     const hc = document.createElement('canvas'); hc.width = nx; hc.height = nz; const hg = hc.getContext('2d'), im = hg.createImageData(nx, nz), zf = 2.2;
     for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { const q = j * nx + i, dzdx = (E[j * nx + Math.min(nx - 1, i + 1)] - E[j * nx + Math.max(0, i - 1)]) / (2 * gs) * zf, dzdy = (E[Math.min(nz - 1, j + 1) * nx + i] - E[Math.max(0, j - 1) * nx + i]) / (2 * gs) * zf;
       const nl = Math.hypot(dzdx, dzdy, 1), sh = (-dzdx * -0.5 + -dzdy * -0.5 + 0.7) / nl / 0.97, v = Math.max(0, Math.min(1, sh)); const dark = 1 - v; im.data.set([40, 40, 60, Math.round(Math.max(0, dark - 0.25) * 170)], q * 4); }
     hg.putImageData(im, 0, 0); g.imageSmoothingEnabled = true; g.drawImage(hc, X(D.X0), Y(D.Z0), (nx - 1) * gs * s, (nz - 1) * gs * s);
-  }
-  const rng = Math.max(0.5, hi - lo), CI = o.ci === 'auto' ? [0.5, 1, 2, 2.5, 5, 10, 20, 25, 50, 100].find(v => rng / v <= 22) || 100 : +o.ci, IDX = CI === 2.5 || CI === 25 ? 4 : 5;
-  const contours = [];
-  for (let L = Math.ceil(lo / CI) * CI; L <= hi; L += CI) {
-    const segs = [];
-    for (let j = 0; j < nz - 1; j++) for (let i = 0; i < nx - 1; i++) {
-      const a = E[j * nx + i], b = E[j * nx + i + 1], c = E[(j + 1) * nx + i + 1], d = E[(j + 1) * nx + i], cs = (a > L) | (b > L) << 1 | (c > L) << 2 | (d > L) << 3; if (cs === 0 || cs === 15) continue;
-      const x0 = D.X0 + i * gs, z0 = D.Z0 + j * gs, it = (p, q) => (L - p) / ((q - p) || 1e-9);
-      const eT = [x0 + gs * it(a, b), z0], eR = [x0 + gs, z0 + gs * it(b, c)], eB = [x0 + gs * it(d, c), z0 + gs], eL = [x0, z0 + gs * it(a, d)];
-      const tbl = { 1: [[eL, eT]], 2: [[eT, eR]], 3: [[eL, eR]], 4: [[eR, eB]], 5: [[eL, eT], [eR, eB]], 6: [[eT, eB]], 7: [[eL, eB]], 8: [[eB, eL]], 9: [[eB, eT]], 10: [[eT, eR], [eB, eL]], 11: [[eB, eR]], 12: [[eR, eL]], 13: [[eR, eT]], 14: [[eT, eL]] };
-      for (const sgm of tbl[cs]) segs.push(sgm);
-    }
-    for (const line of chain(segs, gs * 0.01)) { let len = 0; for (let q = 1; q < line.length; q++) len += Math.hypot(line[q][0] - line[q - 1][0], line[q][1] - line[q - 1][1]); const closed = Math.hypot(line[0][0] - line[line.length - 1][0], line[0][1] - line[line.length - 1][1]) < gs * 1.5; if (len * 1000 / S > (closed ? 12 : 4)) contours.push({ L, line, len, idx: Math.abs(Math.round(L / CI)) % IDX === 0 }); }
   }
   for (const c of contours) { g.strokeStyle = '#a8662e'; g.lineWidth = mm(c.idx ? 0.32 : 0.14); g.beginPath(); c.line.forEach((p, q) => q ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.stroke(); }
   // water
@@ -161,11 +171,9 @@ export async function makeTopoMap(world, o, say = () => {}) {
     }
   }
   // spot heights: highest point + local summits
-  { const sp = []; const r = Math.max(3, Math.round(120 / gs));
-    for (let j = r; j < nz - r; j += Math.max(1, r >> 1)) for (let i = r; i < nx - r; i += Math.max(1, r >> 1)) { const v = E[j * nx + i]; let top = true; for (let b = -r; b <= r && top; b += 2) for (let a = -r; a <= r; a += 2) if (E[(j + b) * nx + i + a] > v) { top = false; break; } if (top && v - lo > rng * 0.15) sp.push([D.X0 + i * gs, D.Z0 + j * gs, v]); }
-    sp.sort((a, b) => b[2] - a[2]); const keep = []; for (const p of sp) if (!keep.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 300)) keep.push(p);
+  {
     font(1.9, 600); g.textAlign = 'left';
-    for (const [x, z, v] of keep.slice(0, 12)) { g.fillStyle = '#222'; g.beginPath(); g.arc(X(x), Y(z), mm(0.45), 0, 7); g.fill(); g.lineWidth = mm(0.5); g.strokeStyle = '#fff'; const t = '·' + N(Math.round(world.rawElevation(x, z))); g.strokeText(t.slice(1), X(x) + mm(0.8), Y(z)); g.fillText(t.slice(1), X(x) + mm(0.8), Y(z)); }
+    for (const [x, z, v] of TD.spots) { g.fillStyle = '#222'; g.beginPath(); g.arc(X(x), Y(z), mm(0.45), 0, 7); g.fill(); g.lineWidth = mm(0.5); g.strokeStyle = '#fff'; const t = '·' + N(Math.round(world.rawElevation(x, z))); g.strokeText(t.slice(1), X(x) + mm(0.8), Y(z)); g.fillText(t.slice(1), X(x) + mm(0.8), Y(z)); }
   }
   // place names and landmarks from OpenStreetMap
   if (o.names) {
@@ -205,7 +213,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
     for (const p of sv.points) { g.fillStyle = '#e04020'; g.beginPath(); g.moveTo(X(p.x), Y(p.z) - mm(0.9)); g.lineTo(X(p.x) + mm(0.8), Y(p.z) + mm(0.5)); g.lineTo(X(p.x) - mm(0.8), Y(p.z) + mm(0.5)); g.closePath(); g.fill(); g.fillStyle = '#111'; g.fillText(p.id, X(p.x) + mm(1), Y(p.z)); }
   }
   if (o.tac && world.tactical) {
-    const tc = world.tactical, { symbolURL } = await import('./tactical.js?v=24');
+    const tc = world.tactical, { symbolURL } = await import('./tactical.js?v=26');
     for (const f of tc.features.filter(f => tc.inAOI(f))) {
       const col = tc.color(f.side, f.code), P = f.coords.map(c => [F.x(c[0]), F.z(c[1])]); g.strokeStyle = g.fillStyle = col; g.lineWidth = mm(0.5);
       if (f.geom === 'point') { try { const im = await loadImg(await symbolURL(f.code, col)); const sz = mm(6); g.drawImage(im, X(P[0][0]) - sz / 2, Y(P[0][1]) - sz, sz, sz); if (f.label) { font(1.8, 700); g.textAlign = 'center'; g.fillText(f.label, X(P[0][0]), Y(P[0][1]) + mm(1.5)); } } catch (e) { } }
@@ -230,7 +238,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
   const drawGL = (v, x, y, align) => { const [a, b, c] = gl(v); g.textBaseline = 'middle'; g.textAlign = 'left'; font(1.6); const wa = g.measureText(a).width; font(2.6, 700); const wb = g.measureText(b).width; font(1.6); const wc = c ? g.measureText(c).width : 0;
     let x0 = align === 'center' ? x - (wa + wb + wc) / 2 : align === 'right' ? x - (wa + wb + wc) : x; g.fillStyle = '#111'; font(1.6); g.fillText(a, x0, y + mm(0.3)); font(2.6, 700); g.fillText(b, x0 + wa, y); if (c) { font(1.6); g.fillText(c, x0 + wa + wb, y + mm(0.3)); } };
   for (const [E_, a, b] of eLines) { const t = (mz0 - a[1]) / (b[1] - a[1]), xa = a[0] + (b[0] - a[0]) * t, t2 = (mz1 - a[1]) / (b[1] - a[1]), xb = a[0] + (b[0] - a[0]) * t2; if (xa > mx0 && xa < mx1) drawGL(E_, X(xa), mm(fy - 3.2), 'center'); if (xb > mx0 && xb < mx1) drawGL(E_, X(xb), mm(fy + FH + 3.2), 'center'); }
-  for (const [N_, a, b] of nLines) { const t = (mx0 - a[0]) / (b[0] - a[0]), za = a[1] + (b[1] - a[1]) * t, t2 = (mx1 - a[0]) / (b[0] - a[0]), zb = a[1] + (b[1] - a[1]) * t2; if (za > mz0 && za < mz1) drawGL(N_, mm(fx - 2.2), Y(za), 'right'); if (zb > mz0 && zb < mz1) drawGL(N_, mm(fx + FW + 2.2), Y(zb), 'left'); }
+  for (const [N_, a, b] of nLines) { const t = (mx0 - a[0]) / (b[0] - a[0]), za = a[1] + (b[1] - a[1]) * t, t2 = (mx1 - a[0]) / (b[0] - a[0]), zb = a[1] + (b[1] - a[1]) * t2; for (const [zz, xx] of [[za, fx - 3.1], [zb, fx + FW + 3.1]]) if (zz > mz0 && zz < mz1) { g.save(); g.translate(mm(xx), Y(zz)); g.rotate(-Math.PI / 2); drawGL(N_, 0, 0, 'center'); g.restore(); } } // northings read upwards on both sides
   // geographic corners
   const dms = (v, p, n) => { const a = Math.abs(v), d = Math.floor(a), m = Math.floor((a - d) * 60), s2 = ((a - d) * 60 - m) * 60; return `${d}°${String(m).padStart(2, '0')}'${s2.toFixed(0).padStart(2, '0')}"${v >= 0 ? p : n}`; };
   font(1.5); g.fillStyle = '#333';
@@ -243,7 +251,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
   font(2.3); g.fillStyle = '#333'; g.textAlign = 'left'; g.fillText(T(`Scale 1:${S.toLocaleString('en')}`, `មាត្រដ្ឋាន ១:${KD(S)}`), mm(fx), mm(M + 5));
   g.textAlign = 'right'; g.fillText(T(`Topographic map · UTM ${zone}N`, `ផែនទីសណ្ឋានដី · UTM ${KD(zone)}N`), mm(fx + FW), mm(M + 5));
   // ===== margin: legend, scale, north, location, credits =====
-  const lx = land ? fx + FW + 8 : M, ly = land ? M + head : fy + FH + 9, lw = land ? side : W - 2 * M;
+  const lx = land ? fx + FW + 9 : M, ly = land ? M + head : fy + FH + 9, lw = land ? side : W - 2 * M;
   const cols = land ? 2 : 4, colW = lw / cols, legBottom = land ? H - M - 96 : H - M - 2; let col = 0, cy = ly;
   const heading = (txt) => { font(2.4, 700); g.fillStyle = '#1f3f8f'; g.textAlign = 'left'; g.fillText(txt, mm(lx + col * colW), mm(cy + 1.5)); cy += 5; };
   const item = (draw, txt) => { const two = lang === 'both' && txt.includes(' · '), hgt = two ? 5.4 : 4.1; if (cy + hgt > legBottom) { col++; cy = ly + 5; } const x0 = lx + col * colW; draw(mm(x0), mm(cy), mm(8), mm(3)); g.fillStyle = '#222'; g.textAlign = 'left'; g.textBaseline = 'middle';

@@ -3,7 +3,7 @@
 // line of sight with profile, viewshed, GO / SLOW-GO / NO-GO mobility, range rings, own ↔ enemy measurement.
 // For planning and training from open data – confirm on the ground.
 import * as THREE from 'three';
-import { TO_SAT2TOPO } from './landcover.js?v=24';
+import { TO_SAT2TOPO } from './landcover.js?v=26';
 
 const KEY = 'cambodia3d.tac.v1';
 let CAT = null, MOB = null;
@@ -88,7 +88,7 @@ export class Tactical {
     }
   }
   async pointSymbol(f, p, col) {
-    const w = this.w, y = w.hAt(p.x, p.z), H = Math.max(12, Math.max(w.D.W, w.D.H) / 90), g = new THREE.Group(); g.position.set(p.x, y, p.z);
+    const w = this.w, y = w.hAt(p.x, p.z), H = Math.max(8, Math.max(w.D.W, w.D.H) / 150), g = new THREE.Group(); g.position.set(p.x, y, p.z);
     const pole = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.012, H * 0.012, H, 6).translate(0, H / 2, 0), new THREE.MeshBasicMaterial({ color: 0x222222 })); g.add(pole);
     const foot = new THREE.Mesh(new THREE.RingGeometry(H * 0.05, H * 0.09, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide })); foot.position.y = 0.2; g.add(foot);
     try {
@@ -97,7 +97,7 @@ export class Tactical {
       if (f.label) { x.font = '700 30px system-ui, "Noto Sans Khmer", sans-serif'; x.textAlign = 'center'; x.lineWidth = 6; x.strokeStyle = '#fff'; x.strokeText(f.label, S / 2, S + 32); x.fillStyle = col; x.fillText(f.label, S / 2, S + 32); }
       const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, sizeAttenuation: false, depthTest: false, transparent: true })); sp.center.set(0.5, f.label ? 44 / (S + 44) : 0); sp.renderOrder = 15;
-      const k = 0.075; sp.scale.set(k, k * c.height / S, 1); sp.position.y = H; g.add(sp);
+      const k = 0.042; sp.scale.set(k, k * c.height / S, 1); sp.position.y = H; g.add(sp);
     } catch (e) { console.warn(e); }
     g.userData.fid = f.id; this.group.add(g);
   }
@@ -170,7 +170,7 @@ export class Tactical {
     const c = document.createElement('canvas'), x = c.getContext('2d'); x.font = '700 30px system-ui, "Noto Sans Khmer", sans-serif'; const wd = Math.ceil(x.measureText(text).width) + 22; c.width = wd; c.height = 44;
     x.font = '700 30px system-ui, "Noto Sans Khmer", sans-serif'; x.fillStyle = 'rgba(255,255,255,.88)'; x.beginPath(); x.roundRect(0, 0, wd, 44, 8); x.fill(); x.fillStyle = col; x.textBaseline = 'middle'; x.fillText(text, 11, 23);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, sizeAttenuation: false, depthTest: false, transparent: true }));
-    s.center.set(0.5, -0.2); s.renderOrder = 16; const h = 0.026; s.scale.set(h * wd / 44, h, 1); s.position.set(p.x, this.w.hAt(p.x, p.z) + 1, p.z); (group || this.group).add(s); return s;
+    s.center.set(0.5, -0.2); s.renderOrder = 16; const h = 0.02; s.scale.set(h * wd / 44, h, 1); s.position.set(p.x, this.w.hAt(p.x, p.z) + 1, p.z); (group || this.group).add(s); return s;
   }
   drawPreview() {
     const w = this.w, g = this.prev; g.traverse(o => { if (o.geometry) o.geometry.dispose(); }); g.clear(); if (!this.verts.length || !w.hAt) return;
@@ -278,4 +278,40 @@ function clipSeg(P, a, b) { // parts of segment a–b inside polygon P (sampled)
   const n = 60, out = []; let run = [];
   for (let i = 0; i <= n; i++) { const p = { x: a.x + (b.x - a.x) * i / n, z: a.z + (b.z - a.z) * i / n }; if (inside(P, p.x, p.z)) run.push(p); else { if (run.length > 1) out.push(run); run = []; } }
   if (run.length > 1) out.push(run); return out;
+}
+
+// small 2D picture of a line or area symbol for the palette
+export function linePreview(code, col) {
+  const c = document.createElement('canvas'), W = 84, H = 26; c.width = W; c.height = H; const g = c.getContext('2d'); g.lineCap = g.lineJoin = 'round';
+  g.strokeStyle = g.fillStyle = col; g.lineWidth = 2; const y = H / 2, L = (x0, x1, yy = y) => { g.beginPath(); g.moveTo(x0, yy); g.lineTo(x1, yy); g.stroke(); };
+  const arrow = (x, yy, s = 6) => { g.beginPath(); g.moveTo(x + s, yy); g.lineTo(x - s * 0.4, yy - s * 0.8); g.lineTo(x - s * 0.4, yy + s * 0.8); g.closePath(); g.fill(); };
+  const dash = (a, b) => g.setLineDash([a, b]);
+  switch (code) {
+    case 'axis': case 'axis_planned': g.lineWidth = 7; g.globalAlpha = 0.85; if (code === 'axis_planned') dash(10, 5); L(6, W - 16); g.setLineDash([]); g.globalAlpha = 1; arrow(W - 10, y, 10); break;
+    case 'route': dash(6, 4); L(6, W - 12); g.setLineDash([]); arrow(W - 8, y); break;
+    case 'fire_direction': L(6, W - 12); arrow(W - 8, y); break;
+    case 'phase_line': g.strokeStyle = g.fillStyle = '#222'; dash(9, 5); L(4, W - 4); g.setLineDash([]); g.font = '700 10px system-ui'; g.fillText('PL', W / 2 - 7, y - 4); break;
+    case 'boundary_dash': g.strokeStyle = '#222'; dash(7, 5); L(4, W - 4); break;
+    case 'boundary_dashdot': g.strokeStyle = '#222'; dash(10, 3, 2, 3); g.setLineDash([10, 3, 2, 3]); L(4, W - 4); break;
+    case 'trench': L(4, W - 4, y - 2); for (let x = 8; x < W - 4; x += 7) L(x, x + 0.01, y - 2), g.beginPath(), g.moveTo(x, y - 2), g.lineTo(x, y + 4), g.stroke(); break;
+    case 'trench_zigzag': g.beginPath(); for (let x = 4, k = 0; x <= W - 4; x += 7, k++) (k ? g.lineTo(x, y + (k % 2 ? -4 : 4)) : g.moveTo(x, y)); g.stroke(); break;
+    case 'fortified_line': g.beginPath(); g.moveTo(4, y); for (let x = 4; x < W - 8; x += 10) { g.lineTo(x + 5, y); g.lineTo(x + 5, y - 5); g.lineTo(x + 10, y - 5); g.lineTo(x + 10, y); } g.stroke(); break;
+    case 'front_line': case 'boundary_arc': L(4, W - 4, y + 3); for (let x = 12; x < W - 6; x += 14) { g.beginPath(); g.arc(x, y + 3, 4, Math.PI, 0); g.stroke(); } break;
+    case 'obstacle_belt': case 'minefield_line': L(4, W - 4); for (let x = 10; x < W - 4; x += 12) { g.beginPath(); g.arc(x, y, 3, 0, 7); code === 'minefield_line' ? g.fill() : g.stroke(); } break;
+    case 'wire': case 'abatis': L(4, W - 4); for (let x = 10; x < W - 4; x += 12) { g.beginPath(); g.moveTo(x - 3, y - 3); g.lineTo(x + 3, y + 3); g.moveTo(x - 3, y + 3); g.lineTo(x + 3, y - 3); g.stroke(); } break;
+    case 'at_ditch': L(4, W - 4, y + 3); for (let x = 8; x < W - 6; x += 9) { g.beginPath(); g.moveTo(x, y + 3); g.lineTo(x + 3, y - 4); g.lineTo(x + 6, y + 3); g.fill(); } break;
+    case 'sector_line': L(4, W - 4); break;
+    case 'dimension': g.strokeStyle = g.fillStyle = '#222'; L(10, W - 10); arrow(W - 8, y, 5); g.save(); g.translate(8, y); g.rotate(Math.PI); arrow(0, 0, 5); g.restore(); break;
+    case 'fire_sector': g.globalAlpha = 0.25; g.beginPath(); g.moveTo(10, y + 8); g.arc(10, y + 8, 60, -0.45, 0.05); g.closePath(); g.fill(); g.globalAlpha = 1; g.stroke(); break;
+    case 'range_ring': dash(4, 3); g.beginPath(); g.arc(W / 2, y, 10, 0, 7); g.stroke(); g.beginPath(); g.arc(W / 2, y, 5, 0, 7); g.stroke(); break;
+    default: { // areas
+      const r = [8, 4, W - 16, H - 8]; g.globalAlpha = code === 'obstacle_area' || code === 'impassable' || code === 'minefield_area' ? 0.3 : 0.16; g.fillRect(...r); g.globalAlpha = 1;
+      if (code === 'zone') dash(6, 4); g.strokeRect(...r); g.setLineDash([]);
+      if (code === 'def_area') for (let x = r[0] + 4; x < r[0] + r[2]; x += 7) L(x, x + 0.01), g.beginPath(), g.moveTo(x, r[1]), g.lineTo(x, r[1] - 3), g.stroke();
+      if (code === 'obstacle_area' || code === 'impassable') { g.save(); g.beginPath(); g.rect(...r); g.clip(); g.lineWidth = 1; for (let x = -20; x < W; x += 6) { g.beginPath(); g.moveTo(x, H); g.lineTo(x + 20, 0); g.stroke(); if (code === 'impassable') { g.beginPath(); g.moveTo(x, 0); g.lineTo(x + 20, H); g.stroke(); } } g.restore(); }
+      if (code === 'minefield_area') for (let x = r[0] + 7; x < r[0] + r[2]; x += 10) { g.beginPath(); g.arc(x, y, 2.5, 0, 7); g.fill(); }
+      if (code === 'objective') { g.font = '700 9px system-ui'; g.fillText('OBJ', W / 2 - 9, y + 3); }
+    }
+  }
+  return c.toDataURL();
 }

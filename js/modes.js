@@ -39,7 +39,8 @@ export class Driver {
   }
   step(dt) {
     let r = this.net.roads[this.ri]; const L = r.pts[r.pts.length - 1].s;
-    this.s += this.speed * dt * this.dir;
+    const target = Math.min(this.speed, this.limit ?? Infinity); this.cur = this.cur ?? this.speed; this.cur += THREE.MathUtils.clamp(target - this.cur, -9 * dt, 3.5 * dt);
+    this.s += this.cur * dt * this.dir;
     if (this.s < 0 || this.s > L) this.junction(this.s > L ? r.pts.length - 1 : 0);
     // target = lane point now; heading = towards a point a few metres ahead (look-ahead smooths the corners)
     const tgt = this._tgt || (this._tgt = new THREE.Vector3()), ahead = this._ahead || (this._ahead = new THREE.Vector3());
@@ -93,6 +94,7 @@ export class Walker {
   blocked(x, z) {
     const D = this.w.D; if (!D || !this.w.bmask) return false;
     if (x < D.X0 + 1 || x > D.X0 + D.W - 1 || z < D.Z0 + 1 || z > D.Z0 + D.H - 1) return true;
+    const dr = this.w.driver; if (dr && dr.parked && this.w.playerMesh) { const dx = x - dr.pos.x, dz = z - dr.pos.z, f = dr.fwd, al = dx * f.x + dz * f.z, la = dx * f.z - dz * f.x, L = ((this.w.kit[dr.kind] || {}).len || 4.5) / 2 + 0.3; if (Math.abs(al) < L && Math.abs(la) < (dr.kind.startsWith('moto') ? 0.5 : 1.15)) return true; }
     const i = Math.min(D.mw - 1, ((x - D.X0) / D.MR) | 0), j = Math.min(D.mh - 1, ((z - D.Z0) / D.MR) | 0);
     return this.w.bmask[j * D.mw + i] > 0;
   }

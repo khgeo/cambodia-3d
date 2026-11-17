@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=25">
+<link rel="stylesheet" href="css/app.css?v=26">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -70,7 +70,7 @@
     <button id="editBtn" data-tip="Digitize: roads, buildings, trees">✏️</button>
     <button id="sectionBtn" data-tip="Cross-section: soil &amp; geology">✂️</button>
     <button id="tacBtn" data-tip="Tactical: symbols, line of sight, mobility">🎯</button>
-    <button id="topoBtn" data-tip="Export topographic map">🗺️</button>
+    <button id="topoBtn" data-tip="Export: topographic map &amp; GeoPackage">🗺️</button>
     <span class="grow"></span>
     <button class="langBtn" data-tip="ភាសាខ្មែរ / English">ខ្មែរ</button>
   </nav>
@@ -115,19 +115,17 @@
       <div id="stats" class="info"></div>
     </section>
   </div>
-  <div id="driveBar" class="bar" hidden>
+  <div id="driveBar" class="bar mini" hidden>
     <div class="hint" id="driveHint">Tap a road to start driving on it.</div>
     <div class="row">
-      <select id="vehicle"><option value="car">Car</option><option value="pickup">Pickup</option><option value="moto">Motorbike</option><option value="moto2">Motorbike + passenger</option><option value="tuktuk">Remork</option><option value="truck">Truck</option><option value="bus">Bus</option></select>
-      <label class="spd">Speed <input type="range" id="speed" min="5" max="100" value="40"> <b id="speedVal">40 km/h</b></label>
-    </div>
-    <div class="row">
-      <button id="reverse">⇄ Turn around</button><button id="cockpit">👁 Cockpit</button><button id="pickRoad">📍 Choose road</button><button class="exit" data-exit>✕ Exit</button>
+      <select id="vehicle" title="Vehicle"><option value="car">Car</option><option value="pickup">Pickup</option><option value="moto">Motorbike</option><option value="moto2">Motorbike + passenger</option><option value="tuktuk">Remork</option><option value="truck">Truck</option><option value="bus">Bus</option></select>
+      <label class="spd" title="Speed"><input type="range" id="speed" min="5" max="100" value="40"> <b id="speedVal">40 km/h</b></label>
+      <button id="reverse" title="Turn around">⇄</button><button id="cockpit" title="Cockpit">👁</button><button id="pickRoad" title="Choose road">📍</button><button id="drive2walk" title="Get out and walk">🚶</button><button class="exit" data-exit title="Exit (Esc)">✕</button>
     </div>
   </div>
-  <div id="walkBar" class="bar" hidden>
-    <div class="hint">Tap the inset map to jump anywhere · move the cursor to look (drag on touch) · joystick or WASD / arrows · tap the ground to jump there</div>
-    <div class="row"><button id="run">🏃 Run</button><button class="exit" data-exit>✕ Exit</button></div>
+  <div id="walkBar" class="bar mini" hidden>
+    <div class="hint">WASD / arrows · move the cursor to look · tap the ground or inset map to jump · Esc exits</div>
+    <div class="row"><button id="run" title="Run">🏃</button><button id="walk2drive" title="Back into the vehicle" hidden>🚗</button><button class="exit" data-exit title="Exit (Esc)">✕</button></div>
   </div>
   <div id="joy" class="joy" hidden><div class="knob"></div></div>
   <button class="fab" id="sceneToggle" aria-label="Panel">☰</button>
@@ -144,6 +142,7 @@
       <button data-nav="in" title="Zoom in">＋</button><button data-nav="out" title="Zoom out">－</button><button data-nav="all" title="See the whole stack">⤢</button>
     </div>
     <div class="row lpsp"><span>Spacing</span><input type="range" id="lpSpace" min="4" max="30" value="11"></div>
+    <div class="row lpsel"><button id="lpAll">☑ Select all</button><button id="lpNone">☐ Select none</button></div>
     <div class="lpbody">
       <div class="lplevel"><span>apart</span><input type="range" id="lpExplode" min="0" max="100" value="0" orient="vertical"><span>together</span></div>
       <div id="lpList"></div>
@@ -258,6 +257,10 @@
       <div class="row"><button id="topoMake" class="primary">🗺️ Make map</button></div>
       <canvas id="topoPrev" hidden></canvas>
       <div class="row"><button id="topoPNG" disabled>⬇ Download PNG</button><button id="topoPDF" disabled>⬇ Download PDF</button></div>
+      <div class="svsec"><b>GeoPackage for QGIS</b>
+        <div class="svhelp">All layers of this area (roads, water, buildings, houses, contours, spot heights, place names, land cover, image, your survey, digitized and tactical layers) with their map styles.</div>
+        <div class="row"><button id="gpkgBtn" class="primary" style="margin:0">⬇ Export GeoPackage (QGIS)</button></div>
+      </div>
     </div>
   </div>
   <div id="sectionPanel" hidden>
@@ -273,6 +276,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=24"></script>
+<script type="module" src="js/app.js?v=26"></script>
 </body>
 </html>

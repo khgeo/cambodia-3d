@@ -90,6 +90,11 @@ export const KM = {
   'Place name (English)': 'ឈ្មោះទីកន្លែង (អង់គ្លេស)', 'A3 landscape': 'A3 ផ្ដេក', 'A3 portrait': 'A3 បញ្ឈរ', 'A4 landscape': 'A4 ផ្ដេក', 'A4 portrait': 'A4 បញ្ឈរ', 'A2 landscape': 'A2 ផ្ដេក',
   'Land cover…': 'គម្របដី…', 'Contours…': 'ខ្សែកម្ពស់…', 'Water, roads and buildings…': 'ទឹក ផ្លូវ និងអគារ…', 'Place names (OpenStreetMap)…': 'ឈ្មោះទីកន្លែង (OpenStreetMap)…', 'Making PDF…': 'កំពុងបង្កើត PDF…',
   'tap the preview to open it full size': 'ចុចរូបមើលជាមុន ដើម្បីបើកទំហំពេញ', 'Refining land cover (13 classes)…': 'កំពុងកែលម្អគម្របដី (13 ថ្នាក់)…',
+  'Select all': 'ជ្រើសទាំងអស់', 'Select none': 'មិនជ្រើសទាំងអស់', 'Get out and walk': 'ចុះពីរថយន្ត ហើយដើរ', 'Back into the vehicle': 'ឡើងរថយន្តវិញ', 'Vehicle': 'យានយន្ត', 'Exit (Esc)': 'ចាកចេញ (Esc)',
+  'WASD / arrows · move the cursor to look · tap the ground or inset map to jump · Esc exits': 'WASD / ព្រួញ · រំកិលទស្សន៍ទ្រនិចដើម្បីមើល · ចុចលើដី ឬផែនទីតូចដើម្បីលោត · Esc ចាកចេញ',
+  'Export GeoPackage (QGIS)': 'នាំចេញ GeoPackage (QGIS)', 'Export: topographic map & GeoPackage': 'នាំចេញ៖ ផែនទីសណ្ឋានដី និង GeoPackage',
+  'GeoPackage for QGIS': 'GeoPackage សម្រាប់ QGIS', 'vector layers': 'ស្រទាប់វ៉ិចទ័រ', 'rasters': 'រ៉ាស្ទ័រ', 'Loading SQLite…': 'កំពុងផ្ទុក SQLite…', 'Vector layers…': 'ស្រទាប់វ៉ិចទ័រ…', 'Raster tiles…': 'ក្បឿងរ៉ាស្ទ័រ…', 'Writing file…': 'កំពុងសរសេរឯកសារ…',
+  'All layers of this area (roads, water, buildings, houses, contours, spot heights, place names, land cover, image, your survey, digitized and tactical layers) with their map styles.': 'ស្រទាប់ទាំងអស់នៃតំបន់នេះ (ផ្លូវ ទឹក អគារ ផ្ទះ ខ្សែកម្ពស់ ចំណុចកម្ពស់ ឈ្មោះទីកន្លែង គម្របដី រូបភាព ការវាស់វែង ឌីជីថលកម្ម និងយុទ្ធសាស្ត្រ) រួមទាំងរចនាប័ទ្មផែនទី។',
   'Contours': 'ខ្សែកម្ពស់', 'Grid': 'ក្រឡាចត្រង្គ', 'Your features': 'វត្ថុរបស់អ្នក', 'Survey points & parcels': 'ចំណុចវាស់ និងក្បាលដី', 'Tactical overlay': 'ស្រទាប់យុទ្ធសាស្ត្រ',
 };
 export let lang = 'en';

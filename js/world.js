@@ -5,23 +5,23 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=24';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=24';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=24';
-import { buildTrees, GrassField } from './vegetation.js?v=24';
-import { RoadNet, Driver, Walker } from './modes.js?v=24';
-import { vehicleKit } from './vehicles.js?v=24';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=24';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=24';
-import { LayerStack } from './layers.js?v=24';
-import { Survey } from './survey.js?v=24';
-import { Editor } from './editor.js?v=24';
-import { Atmos } from './atmos.js?v=24';
-import { NightLights } from './lights.js?v=24';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=24';
-import { Tactical, loadCatalog } from './tactical.js?v=24';
-import { SEASON } from './vegetation.js?v=24';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=24';
+import * as G from './geo.js?v=26';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=26';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=26';
+import { buildTrees, GrassField } from './vegetation.js?v=26';
+import { RoadNet, Driver, Walker } from './modes.js?v=26';
+import { vehicleKit } from './vehicles.js?v=26';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=26';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=26';
+import { LayerStack } from './layers.js?v=26';
+import { Survey } from './survey.js?v=26';
+import { Editor } from './editor.js?v=26';
+import { Atmos } from './atmos.js?v=26';
+import { NightLights } from './lights.js?v=26';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=26';
+import { Tactical, loadCatalog } from './tactical.js?v=26';
+import { SEASON } from './vegetation.js?v=26';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=26';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -246,7 +246,7 @@ export class World {
     const src = IMAGERY[opts.imagery] || IMAGERY.esri;
     let zi = Math.min(src.max, 19), ir;
     for (; zi > 10; zi--) { ir = G.tileRange(aoi, zi); if ((ir.x1 - ir.x0 + 1) * 256 <= this.maxTex && (ir.y1 - ir.y0 + 1) * 256 <= this.maxTex) break; }
-    const ntx = ir.x1 - ir.x0 + 1, nty = ir.y1 - ir.y0 + 1;
+    const ntx = ir.x1 - ir.x0 + 1, nty = ir.y1 - ir.y0 + 1; D.ir = ir; D.zi = zi;
     const img = document.createElement('canvas'); img.width = ntx * 256; img.height = nty * 256;
     const ictx = img.getContext('2d', { willReadFrequently: true }); ictx.fillStyle = '#6f7d5a'; ictx.fillRect(0, 0, img.width, img.height);
     const jobs = []; for (let x = ir.x0; x <= ir.x1; x++) for (let y = ir.y0; y <= ir.y1; y++) jobs.push([x, y]);
@@ -889,12 +889,25 @@ export class World {
     if (!this.vehMeshes) return;
     // car-following and overtaking within each lane: keep a safe gap; if the car ahead is slower and the road
     // is two-way, pull out to the left, pass and pull back in (Cambodia drives on the right)
+    const P = this.driver && this.playerMesh ? this.driver : null, pv = P && this.mode === 'drive' && !P.parked ? (P.cur ?? P.speed) : 0, pLen = P ? (this.kit[P.kind] || {}).len || 4.5 : 0;
     if (dt > 0) for (const G of this.trafficGroups || []) {
       G.sort((a, b) => a.u - b.u);
       for (let i = 0; i < G.length; i++) {
         const v = G[i]; let want = v.base;
+        // the player's vehicle (moving or parked) is an obstacle: follow it, or pass it on two-way roads
+        if (P && !v.passing) {
+          const dx = P.pos.x - v.pos.x, dz = P.pos.z - v.pos.z, along = dx * v.fwd.x + dz * v.fwd.z, lat = Math.abs(dx * v.fwd.z - dz * v.fwd.x);
+          if (along > 0 && along < 60 && lat < 2.1 + (v.t && v.t.startsWith('moto') ? -0.6 : 0)) {
+            const same = P.fwd.x * v.fwd.x + P.fwd.z * v.fwd.z > 0.3, gap = along - (v.len + pLen) / 2, safe = 4 + v.cur * 1.1, pSp = same ? pv : 0;
+            if (gap < safe) {
+              if (v.twoWay && pSp < v.base - 1.5 && gap < safe * 0.7) v.passing = { u: (v.u + along) % v.L, len: pLen, cur: pSp };
+              else want = Math.min(want, Math.max(0, pSp * Math.max(0, gap - 1.5) / safe));
+            }
+          }
+        }
         if (v.passing) {
           const p = v.passing, ahead = ((v.u - p.u) % v.L + v.L) % v.L;
+          if (p.cur !== undefined && !p.S) p.u = (p.u + p.cur * dt) % v.L; // pseudo-leader (the player's vehicle)
           want = v.base * 1.2 + 3; if (ahead > (v.len + p.len) / 2 + 7 && ahead < v.L / 2) v.passing = null;
         } else if (G.length > 1) {
           const ld = G[(i + 1) % G.length], gap = ((ld.u - v.u) % v.L + v.L) % v.L - (v.len + ld.len) / 2, safe = 4 + v.cur * 1.1;
@@ -1065,7 +1078,12 @@ export class World {
     this.controls.enabled = mode === 'orbit';
     this.walker.active = mode === 'walk';
     this.camera.fov = mode === 'walk' ? 62 : 45; this.camera.updateProjectionMatrix();
-    if (mode === 'walk' && prev !== 'walk') {
+    if (mode === 'walk' && prev === 'drive' && this.driver) {
+      // get out on the right-hand (kerb) side and leave the vehicle parked
+      const d = this.driver, f = d.fwd, n = Math.hypot(f.x, f.z) || 1, rx = -f.z / n, rz = f.x / n, off = (d.kind.startsWith('moto') ? 0.9 : 1.6) + 0.6;
+      let x = d.pos.x + rx * off, z = d.pos.z + rz * off; if (this.walker.blocked(x, z)) { x = d.pos.x - rx * off; z = d.pos.z - rz * off; }
+      this.walker.place(x, z, Math.atan2(-f.x, -f.z)); this.walker.pos.y = this.groundAt(x, z) + 1.65; d.parked = true; if (this.playerMesh) this.playerMesh.visible = true;
+    } else if (mode === 'walk' && prev !== 'walk') {
       const t = this.controls.target; let x = t.x, z = t.z;
       for (let r = 0; r < 60 && this.walker.blocked(x, z); r += 3) { x = t.x + r; }
       const dirv = new V3().subVectors(t, this.camera.position); this.walker.place(x, z, Math.atan2(-dirv.x, -dirv.z));
@@ -1202,6 +1220,7 @@ export class World {
     this.pickRoad = false; this._snap = true; this.onHint && this.onHint('Driving – the car follows the road network and turns at junctions.');
   }
   enterDrive() {
+    if (this.driver) this.driver.parked = false;
     this.setMode('drive'); this.flight = null;
     if (!this.driver) this.chooseRoad();
   }
@@ -1222,6 +1241,11 @@ export class World {
     this.waterNormal.offset.x += dt * 0.012; this.waterNormal.offset.y += dt * 0.007;
     let focus;
     if (this.mode === 'drive' && this.driver) {
+      { const d = this.driver, f = d.fwd; let lim = Infinity;
+        for (const v of this.vehicles || []) { const dx = v.pos.x - d.pos.x, dz = v.pos.z - d.pos.z, along = dx * f.x + dz * f.z; if (along <= 0 || along > 70) continue;
+          const lat = Math.abs(dx * f.z - dz * f.x); if (lat > 1.9) continue; const same = v.fwd.x * f.x + v.fwd.z * f.z, gap = along - ((v.len || 4) + ((this.kit[d.kind] || {}).len || 4.5)) / 2;
+          const safe = 4 + d.speed * 0.9; if (gap < safe) lim = Math.min(lim, Math.max(0, (same > 0.3 ? (v.cur ?? v.speed) : 0) * Math.max(0, gap - 1.5) / safe)); }
+        d.limit = lim; }
       this.driver.step(dt);
       const f = this.driver, back = this.kit[f.kind].len * 2.4 + (this.cockpit ? 0 : 5);
       const tgtOff = this.mouse.inside ? -this.mouse.x * 1.4 : 0; this.lookOff += (tgtOff - this.lookOff) * Math.min(1, dt * 4);
