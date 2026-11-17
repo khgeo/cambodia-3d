@@ -1,5 +1,6 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=23';
+import * as G from './geo.js?v=24';
+import { t, lang, setLang, initLang, onLang } from './i18n.js?v=24';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -80,10 +81,28 @@ $('labels').onchange = e => map.setLayoutProperty('labels', 'visibility', e.targ
 $('roadsOn').onchange = e => { const v = e.target.checked ? 'visible' : 'none'; map.setLayoutProperty('roadsOv', 'visibility', v); map.setLayoutProperty('roadsDet', 'visibility', v); refreshDetail(); };
 // panels can be hidden (⟨) and shown again (☰)
 const FAB = { mapPanel: 'mapToggle', scenePanel: 'sceneToggle' };
-function showPanel(id, on) { $(id).classList.toggle('hidden', !on); $(FAB[id]).classList.toggle('show', !on); }
+function showPanel(id, on) { $(id).classList.toggle('hidden', !on); $(FAB[id]).classList.toggle('show', !on); if (id === 'scenePanel' && typeof syncRail === 'function') syncRail(); }
 $('mapToggle').onclick = () => showPanel('mapPanel', true);
 $('sceneToggle').onclick = () => showPanel('scenePanel', true);
 document.querySelectorAll('.hideP').forEach(b => b.onclick = () => showPanel(b.dataset.panel, false));
+/* icon rail: flyout sections + tool panels */
+const FLY_T = { view: 'Views', display: 'Display', env: 'Environment', info: 'Land cover & statistics' };
+let flySec = 'view';
+function openFly(sec) {
+  flySec = sec; document.querySelectorAll('#scenePanel section[data-sec]').forEach(x => x.hidden = x.dataset.sec !== sec);
+  $('flyTitle').textContent = t(FLY_T[sec]); showPanel('scenePanel', true); syncRail();
+}
+document.querySelectorAll('#rail [data-fly]').forEach(b => b.onclick = () => {
+  const open = !$('scenePanel').classList.contains('hidden');
+  if (open && flySec === b.dataset.fly) { showPanel('scenePanel', false); syncRail(); } else openFly(b.dataset.fly);
+});
+function syncRail() {
+  const open = !$('scenePanel').classList.contains('hidden');
+  document.querySelectorAll('#rail [data-fly]').forEach(b => b.classList.toggle('on', open && b.dataset.fly === flySec));
+  const P = { layersBtn: 'layerPanel', surveyBtn: 'surveyPanel', editBtn: 'editPanel', sectionBtn: 'sectionPanel', tacBtn: 'tacPanel', topoBtn: 'topoPanel' };
+  for (const [b, p] of Object.entries(P)) if ($(b) && $(p)) $(b).classList.toggle('act', !$(p).hidden);
+}
+setInterval(syncRail, 500);
 
 /* search (Nominatim, Cambodia only) */
 let searchTimer;
@@ -181,10 +200,11 @@ function renderStats() {
     ` · ${((performance.now() - t0) / 1000).toFixed(1)} s` +
     (s.cloud && s.cloud.cloudPct > 0.5 ? `<br>☁ Clouds ${s.cloud.cloudPct.toFixed(0)}% of the image → filled ${s.cloud.filledPct.toFixed(0)}% from ` + Object.entries(s.cloud.sources).map(([k, n]) => `${k} (${n} tile${n > 1 ? 's' : ''})`).join(', ') +
       (world.lulc.cloud > 0.005 ? ` · ${(world.lulc.cloud * 100).toFixed(0)}% still unknown` : '') : '');
-  const tr2 = s.trees || {}; const L = world.lulc, cols = { tree: '#2c5a28', crop: '#86a84a', bare: '#b0703f', built: '#b8b2a6', water: '#3b6e8f' }, names = { tree: 'Tree canopy', crop: 'Crop / grass', bare: 'Bare soil', built: 'Built / roads', water: 'Water' };
-  $('lulc').innerHTML = '<label class="lbl">Land cover seen on the image</label><div class="bar2">' +
-    Object.keys(cols).map(k => `<span style="width:${(L[k] * 100).toFixed(1)}%;background:${cols[k]}"></span>`).join('') + '</div><div class="keys">' +
-    Object.keys(cols).map(k => `<div><i style="background:${cols[k]}"></i>${names[k]} ${(L[k] * 100).toFixed(0)}%</div>`).join('') + '</div>';
+  const LCm = world.LC, P = world.D.lcPct || {};
+  const keys = Object.keys(P).map(Number).filter(k => k > 0).sort((a, b) => P[b] - P[a]);
+  $('lulc').innerHTML = `<label class="lbl">Land cover · ${keys.length} classes${world.D.lcIO ? ' (image + Esri 10 m + OSM)' : ' (image + OSM)'}</label><div class="bar2">` +
+    keys.map(k => `<span style="width:${(P[k] * 100).toFixed(2)}%;background:${LCm[k].c}" title="${LCm[k].en}"></span>`).join('') + '</div><div class="lcl">' +
+    keys.map(k => `<i style="background:${LCm[k].c}"></i><span data-lc="${k}">${lang === 'km' ? LCm[k].km : LCm[k].en}</span><b>${(P[k] * 100).toFixed(1)}%</b>`).join('') + '</div>';
   $('credit').innerHTML = `${world.credit} · Soil: ISRIC SoilGrids · Geology: ODC 2006 · Land cover 2017–2025: Esri | Impact Observatory · Terrain: Mapzen/AWS Terrain Tiles · ${OSM_CREDIT} · Geoinformatics and Research Lab, RUPP`;
 }
 async function rebuild() {
@@ -198,7 +218,7 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=23'); world = new World($('scene')); window.__world = world;
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=24'); world = new World($('scene')); window.__world = world;
     world.onModeChange = m => {
       $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk'; if (SV && !$('surveyPanel').hidden) svRender();
       if (m === 'drive' || m === 'walk') { setOn('views', m); showPanel('scenePanel', false); }
@@ -207,13 +227,13 @@ $('build').onclick = async () => {
     world.onVehicle = k => { $('vehicle').value = k; };
     world.onSectionHint = t => { $('secHint').textContent = t; };
     world.onSection = async S => {
-      const { drawProfile, legendHTML } = await import('./section.js?v=23');
+      const { drawProfile, legendHTML } = await import('./section.js?v=24');
       $('sectionPanel').classList.remove('picking', 'min'); $('secMin').textContent = '▾';
       const cv = $('secCanvas'); cv.width = Math.min(1600, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio))); cv.height = Math.round(cv.width * 0.36);
       drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – ↺ for a new line, ▾ to minimise';
     };
-    const { joystick } = await import('./modes.js?v=23'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=23'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=24'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=24'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -259,13 +279,15 @@ document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.
 if (innerWidth < 640) showPanel('mapPanel', false);
 /* right-hand column: keep the layer panel under the inset map, never on top of it */
 const placeRight = () => {
-  const lp = ['surveyPanel', 'editPanel', 'layerPanel'].map($).find(e => !e.hidden) || $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
+  const lp = ['surveyPanel', 'editPanel', 'tacPanel', 'topoPanel', 'layerPanel'].map($).find(e => !e.hidden) || $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
   document.body.classList.add('lp-open');
   if (innerWidth < 640) { lp.style.top = ''; lp.style.maxHeight = ''; return; }
   const top = hud.hidden ? 12 : hud.getBoundingClientRect().bottom + 8;
   lp.style.top = top + 'px'; lp.style.maxHeight = (innerHeight - top - 12) + 'px';
 };
 addEventListener('resize', placeRight);
+const RP = { layerPanel: 'lpClose', surveyPanel: 'svClose', editPanel: 'edClose', tacPanel: 'tacClose', topoPanel: 'topoClose' };
+function closeOthers(keep) { for (const [p, c] of Object.entries(RP)) if (p !== keep && $(p) && !$(p).hidden && $(c)) $(c).onclick(); }
 /* layer explorer */
 let LS = null, LAYERS_DEF = null;
 const lpRender = () => {
@@ -299,11 +321,11 @@ const lpLegend = () => {
 const lpStop = () => { LS.stop(); $('lpPlay').textContent = '▶ Play tour'; $('lpPlay').classList.remove('on'); };
 $('layersBtn').onclick = async () => {
   if (!world || !world.D) return;
-  if (!$('surveyPanel').hidden) $('svClose').onclick(); if (!$('editPanel').hidden) $('edClose').onclick();
+  closeOthers('layerPanel');
   $('layerPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
   if (world.mode !== 'orbit') world.setMode('orbit');
   $('lpHint').textContent = 'Preparing layers…';
-  const mod = await import('./layers.js?v=23'); LAYERS_DEF = mod.LAYERS;
+  const mod = await import('./layers.js?v=24'); LAYERS_DEF = mod.LAYERS;
   LS = await world.openLayers(t => { $('lpHint').textContent = t; });
   LS.onT = t => { $('lpExplode').value = Math.round(t * 100); };
   LS.onFocus = () => lpRender();
@@ -362,7 +384,7 @@ const SV_HELP = {
 const svRender = () => {
   if (!SV) return; const tool = SV.tool, w = world;
   document.querySelectorAll('.svtabs button').forEach(b => b.classList.toggle('on', b.dataset.tool === tool));
-  $('svHelp').innerHTML = SV_HELP[tool]; $('svCodeRow').hidden = tool !== 'points';
+  $('svHelp').innerHTML = t(SV_HELP[tool]); $('svCodeRow').hidden = tool !== 'points';
   $('svMark').parentElement.hidden = w.mode !== 'walk';
   const row = (k, v) => `<tr><td>${k}</td><td>${v}</td></tr>`, L = SVM.fmtLen, pct = v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
   let h = '';
@@ -405,8 +427,8 @@ const svProfile = m => {
 };
 const svOpen = async () => {
   if (!world || !world.D) return;
-  if (!$('layerPanel').hidden) $('lpClose').onclick(); if (!$('editPanel').hidden) $('edClose').onclick();
-  SVM = await import('./survey.js?v=23'); SV = world.openSurvey(); SV.onChange = svRender;
+  closeOthers('surveyPanel');
+  SVM = await import('./survey.js?v=24'); SV = world.openSurvey(); SV.onChange = svRender;
   SV.onArrive = () => { svSay('Arrived at the target'); if (SV.tool === 'points') $('svMark').classList.add('pulse'); setTimeout(() => $('svMark').classList.remove('pulse'), 2500); svRender(); };
   if (!$('svCode').options.length) $('svCode').innerHTML = SVM.CODES.map(c => `<option>${c}</option>`).join('');
   $('surveyPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); svRender();
@@ -486,9 +508,9 @@ const edRender = () => {
 const fillSel = (id, obj, val) => { $(id).innerHTML = Object.entries(obj).map(([k, v]) => `<option value="${k}" ${k === val ? 'selected' : ''}>${typeof v === 'string' ? v : v.name}</option>`).join(''); };
 $('editBtn').onclick = async () => {
   if (!world || !world.D) return;
-  if (!$('layerPanel').hidden) $('lpClose').onclick(); if (!$('surveyPanel').hidden) $('svClose').onclick();
+  closeOthers('editPanel');
   if (world.mode !== 'orbit') world.setMode('orbit');
-  EDM = await import('./editor.js?v=23'); ED = world.openEditor(); ED.onChange = edRender;
+  EDM = await import('./editor.js?v=24'); ED = world.openEditor(); ED.onChange = edRender;
   ED.onHover = p => { $('edSnapKind').textContent = p && p.kind ? '→ ' + p.kind : ''; };
   if (!$('edRoad').options.length) { fillSel('#edRoad'.slice(1), EDM.ROAD_TYPES, ED.opts.road); fillSel('edRoof', EDM.ROOFS, ED.opts.roof); fillSel('edWall', EDM.WALLS, ED.opts.wall); fillSel('edRoofC', EDM.ROOF_COLS, ED.opts.roofC); fillSel('edTree', EDM.TREES, ED.opts.tree); }
   $('editPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); edRender();
@@ -508,6 +530,97 @@ $('edFile').onchange = async e => { const f = e.target.files[0]; if (!f || !ED) 
 $('edClear').onclick = () => { if (ED && confirm('Delete everything you added in this area?')) ED.clearAll(); };
 addEventListener('keydown', e => { if (!ED || !ED.active || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; if (e.key === 'Enter') $('edFinish').onclick(); if (e.key === 'Escape') ED.cancel(); if ((e.ctrlKey || e.metaKey) && e.key === 'z') ED.undo(); });
 
+/* tactical */
+let TC = null, TCM = null, TCAT = null;
+const tacLines = () => Object.entries(TCAT.catalog).filter(([, d]) => d.geom !== 'point');
+const nm = d => lang === 'km' ? d.km : d.en;
+async function tacRender() {
+  if (!TC) return; const CAT = TCAT;
+  $('tacConv').innerHTML = Object.entries(CAT.conventions).map(([k, v]) => `<option value="${k}" ${k === TC.conv ? 'selected' : ''}>${lang === 'km' ? v[0] : v[1]}</option>`).join('');
+  const pts = Object.entries(CAT.catalog).filter(([, d]) => d.geom === 'point');
+  const urls = await Promise.all(pts.map(([c]) => TCM.symbolURL(c, TC.color(TC.side, c))));
+  $('tacSyms').innerHTML = pts.map(([c, d], i) => `<button data-code="${c}" title="${nm(d)}" class="${TC.code === c && TC.mode === 'place' ? 'on' : ''}"><img src="${urls[i]}" alt=""></button>`).join('');
+  $('tacSyms').querySelectorAll('button').forEach(b => b.onclick = () => { TC.code = b.dataset.code; TC.mode = 'place'; TC.cancel(); tacRender(); $('tacHint').textContent = nm(CAT.catalog[TC.code]); });
+  $('tacLines').innerHTML = tacLines().map(([c, d]) => `<button data-code="${c}" class="${TC.code === c && TC.mode === 'place' ? 'on' : ''}"><i style="background:${TC.color(TC.side, c)}"></i>${nm(d)}</button>`).join('');
+  $('tacLines').querySelectorAll('button').forEach(b => b.onclick = () => { TC.code = b.dataset.code; TC.mode = 'place'; TC.cancel(); tacRender(); const g = CAT.catalog[TC.code].geom;
+    $('tacHint').textContent = g === 'sector' ? t('Tap the centre, then the two edges') : g === 'circle' ? t('Tap the centre') : g === 'dimension' ? t('Tap two points') : t('Tap points, then ✓ Finish'); });
+  document.querySelectorAll('#tacPanel [data-am]').forEach(b => b.classList.toggle('on', TC.mode === b.dataset.am));
+  setOn('tacSide', TC.side);
+}
+const tacTab = k => { document.querySelectorAll('.tactabs button').forEach(b => b.classList.toggle('on', b.dataset.tt === k)); document.querySelectorAll('#tacPanel [data-tp]').forEach(d => d.hidden = d.dataset.tp !== k); };
+document.querySelectorAll('.tactabs button').forEach(b => b.onclick = () => { tacTab(b.dataset.tt); if (TC && b.dataset.tt !== 'ana' && /los|viewshed|ring|measure/.test(TC.mode)) { TC.mode = 'place'; tacRender(); } });
+$('tacBtn').onclick = async () => {
+  if (!world || !world.D) return; closeOthers('tacPanel'); if (world.mode !== 'orbit') world.setMode('orbit');
+  TCM = await import('./tactical.js?v=24'); TCAT = (await TCM.loadCatalog()).CAT;
+  TC = await world.openTactical(); TC.onChange = () => {}; TC.onMsg = m => $('tacHint').textContent = t(m); TC.onResult = tacResult;
+  $('tacPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); tacRender();
+};
+$('tacClose').onclick = () => { $('tacPanel').hidden = true; if (TC) { TC.active = false; TC.cancel(); } placeRight(); };
+$('tacMin').onclick = () => { const c = $('tacPanel').classList.toggle('collapsed'); $('tacMin').textContent = c ? '▾' : '▴'; };
+seg('tacSide', v => { if (TC) { TC.side = v; tacRender(); } });
+$('tacConv').onchange = e => { TC.conv = e.target.value; TC.rebuild(); tacRender(); };
+$('tacLabel').oninput = e => { if (TC) TC.label = e.target.value.trim(); };
+document.querySelectorAll('#tacPanel [data-am]').forEach(b => b.onclick = () => {
+  if (!TC) return; TC.mode = TC.mode === b.dataset.am ? 'place' : b.dataset.am; TC.cancel(); tacRender();
+  const H = { los: 'Tap the observer, then the target', viewshed: 'Tap the observation point', ring: 'Tap the centre of the range rings', move: 'Tap a symbol, then its new place', delete: 'Tap a symbol, line or area to delete it' };
+  $('tacHint').textContent = TC.mode === 'place' ? '' : t(H[TC.mode]);
+});
+$('tacObs').oninput = e => TC && (TC.obsH = +e.target.value || 0); $('tacTgt').oninput = e => TC && (TC.tgtH = +e.target.value || 0);
+$('tacR').oninput = e => TC && (TC.vsR = Math.max(100, +e.target.value || 1500));
+$('tacRings').oninput = e => TC && (TC.rings = e.target.value.split(/[ ,;]+/).map(Number).filter(v => v > 0));
+$('tacVeh').onchange = e => TC && (TC.vehicle = e.target.value); $('tacSeason').onchange = e => TC && (TC.season = e.target.value);
+$('tacMob').onclick = () => { if (TC) { $('tacHint').textContent = t('Working…'); setTimeout(() => TC.mobilityMap(), 30); } };
+$('tacOE').onclick = () => { if (TC && !TC.ownEnemy()) $('tacHint').textContent = t('Place at least one own and one enemy symbol first'); };
+$('tacClearA').onclick = () => { if (TC) { TC.clearAnalysis(); $('tacRes').innerHTML = ''; $('tacProf').hidden = true; } };
+$('tacFinish').onclick = () => TC && TC.finish(); $('tacUndo').onclick = () => TC && TC.undo(); $('tacCancel').onclick = () => TC && TC.cancel();
+$('tacExport').onclick = () => TC && download('tactical-overlay.geojson', new Blob([TC.geojson()], { type: 'application/geo+json' }));
+$('tacClearAll').onclick = () => { if (TC && confirm(t('Delete every tactical symbol in this area?'))) TC.clearAll(); };
+addEventListener('keydown', e => { if (!TC || !TC.active || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; if (e.key === 'Enter') TC.finish(); if ((e.ctrlKey || e.metaKey) && e.key === 'z') TC.undo(); });
+function tacResult(r) {
+  $('tacHint').textContent = ''; const L = v => v >= 1000 ? (v / 1000).toFixed(2) + ' km' : v.toFixed(0) + ' m', row = (k, v) => `<tr><td>${t(k)}</td><td><b>${v}</b></td></tr>`;
+  if (r.kind === 'los') {
+    $('tacRes').innerHTML = `<table style="width:100%">${row('Line of sight', r.visible ? '✅ ' + t('Visible') : '⛔ ' + t('Hidden') + ' (' + L(r.blockAt) + ')')}${row('Horizontal (map)', L(r.L))}${row('Along the ground (3D)', L(r.d3))}${row('Height change A→B', (r.dh >= 0 ? '+' : '') + r.dh.toFixed(1) + ' m')}${row('Bearing A→B', r.brg.toFixed(1) + '° · ' + r.mils.toFixed(0) + ' mil')}${row('Ground seen from A', r.seenPct.toFixed(0) + '%')}</table>`;
+    const cv = $('tacProf'); cv.hidden = false; const g = cv.getContext('2d'), W = cv.width, H = cv.height, P = r.prof, lo = Math.min(...P.map(p => p.g)), hi = Math.max(...P.map(p => Math.max(p.s, p.ray))), pad = (hi - lo) * 0.1 + 1;
+    const X = d => 30 + d / r.L * (W - 38), Y = e => 8 + (hi + pad - e) / (hi - lo + 2 * pad) * (H - 30);
+    g.fillStyle = '#f7f4ee'; g.fillRect(0, 0, W, H);
+    g.fillStyle = 'rgba(46,125,50,.35)'; g.beginPath(); g.moveTo(X(0), Y(P[0].g)); P.forEach(p => g.lineTo(X(p.d), Y(p.s))); P.slice().reverse().forEach(p => g.lineTo(X(p.d), Y(p.g))); g.fill();
+    g.fillStyle = '#c9a46c'; g.beginPath(); g.moveTo(X(0), H - 22); P.forEach(p => g.lineTo(X(p.d), Y(p.g))); g.lineTo(X(r.L), H - 22); g.fill();
+    g.strokeStyle = r.visible ? '#178a45' : '#c0392b'; g.setLineDash([6, 4]); g.lineWidth = 2; g.beginPath(); g.moveTo(X(0), Y(P[0].ray)); g.lineTo(X(r.L), Y(P[P.length - 1].ray)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#333'; g.font = '11px system-ui'; g.fillText('A', X(0) - 2, Y(P[0].ray) - 4); g.fillText('B', X(r.L) - 8, Y(P[P.length - 1].ray) - 4); g.fillText(hi.toFixed(0) + ' m', 2, Y(hi) + 4); g.fillText(lo.toFixed(0) + ' m', 2, Y(lo) + 4); g.fillText(L(r.L), W - 50, H - 6);
+    g.fillStyle = 'rgba(46,125,50,.8)'; g.fillText(t('green = trees / buildings'), 40, H - 6);
+  } else { $('tacProf').hidden = true; }
+  if (r.kind === 'viewshed') $('tacRes').innerHTML = `${t('Viewshed')}: <b>${r.seenPct.toFixed(0)}%</b> ${t('of the ground within')} ${L(r.R)} ${t('is visible from an observer')} ${r.obsH} m ${t('above ground')} (${t('green')} ${t('visible')}, ${t('red')} ${t('hidden')}).`;
+  if (r.kind === 'mobility') $('tacRes').innerHTML = `${t(r.vehicle)} · ${t(r.season === 'wet' ? 'Wet season' : 'Dry season')}: <b style="color:#2ecc40">GO ${r.go.toFixed(0)}%</b> · <b style="color:#ffc400">SLOW-GO ${r.slow.toFixed(0)}%</b> · <b style="color:#e62828">NO-GO ${r.no.toFixed(0)}%</b>`;
+}
+
+/* topographic map */
+let TOPO = null;
+$('topoBtn').onclick = async () => {
+  if (!world || !world.D) return; closeOthers('topoPanel');
+  $('topoPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
+  if ($('topoTitle').dataset.aoi !== JSON.stringify(world.D.aoi)) {
+    const a = world.D.aoi, lat = (a.s + a.n) / 2, lon = (a.w + a.e) / 2, rev = l => fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=14&accept-language=${l}`).then(r => r.json()).catch(() => null);
+    const [e, k] = await Promise.all([rev('en'), rev('km')]); const pick = r => r && r.address ? (r.address.village || r.address.suburb || r.address.town || r.address.city_district || r.address.county || r.address.state || '') : '';
+    $('topoTitle').value = pick(e); $('topoTitleKm').value = pick(k) || pick(e); $('topoTitle').dataset.aoi = JSON.stringify(a);
+  }
+};
+$('topoClose').onclick = () => { $('topoPanel').hidden = true; placeRight(); };
+$('topoMin').onclick = () => { const c = $('topoPanel').classList.toggle('collapsed'); $('topoMin').textContent = c ? '▾' : '▴'; };
+$('topoMake').onclick = async () => {
+  if (!world || !world.D) return; const M = await import('./topomap.js?v=24'); $('topoMake').disabled = true;
+  try {
+    TOPO = await M.makeTopoMap(world, { paper: $('topoPaper').value, scale: $('topoScale').value, ci: $('topoCI').value, lang: $('topoLang').value, dpi: +$('topoDPI').value, title: $('topoTitle').value.trim(), titleKm: $('topoTitleKm').value.trim(),
+      names: $('topoNames').checked, hill: $('topoHill').checked, image: $('topoImg').checked, mine: $('topoMine').checked, survey: $('topoSurvey').checked, tac: $('topoTac').checked }, m => $('topoHint').textContent = t(m));
+    const pv = $('topoPrev'); pv.hidden = false; pv.width = 520; pv.height = Math.round(520 * TOPO.canvas.height / TOPO.canvas.width); pv.getContext('2d').drawImage(TOPO.canvas, 0, 0, pv.width, pv.height);
+    pv.onclick = () => TOPO.canvas.toBlob(b => window.open(URL.createObjectURL(b), '_blank'));
+    $('topoPNG').disabled = $('topoPDF').disabled = false; $('topoHint').textContent = `1:${TOPO.scale.toLocaleString('en')} · ${t('tap the preview to open it full size')}`;
+  } catch (e) { console.error(e); $('topoHint').textContent = 'Error: ' + e.message; }
+  $('topoMake').disabled = false;
+};
+const topoName = ext => `topo-${($('topoTitle').value || 'map').replace(/[^A-Za-z0-9]+/g, '_')}-1_${TOPO.scale}.${ext}`;
+$('topoPNG').onclick = () => TOPO && TOPO.canvas.toBlob(b => download(topoName('png'), b));
+$('topoPDF').onclick = async () => { if (!TOPO) return; $('topoHint').textContent = t('Making PDF…'); const M = await import('./topomap.js?v=24'); await M.toPDF(TOPO, topoName('pdf')); $('topoHint').textContent = ''; };
+
 /* cross-section tool */
 $('sectionBtn').onclick = async () => {
   if (!world || !world.D) return;
@@ -524,4 +637,9 @@ $('secClose').onclick = () => { $('sectionPanel').hidden = true; if (world) { wo
 $('secWall').onchange = e => { if (!world) return; world.sectionWallOn = e.target.checked; if (world.sectionWall) world.sectionWall.visible = e.target.checked; };
 const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 $('secPng').onclick = () => $('secCanvas').toBlob(b => download('cross-section.png', b));
-$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=23'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
+$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=24'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
+
+/* language */
+document.querySelectorAll('.langBtn').forEach(b => b.onclick = () => setLang(lang === 'km' ? 'en' : 'km'));
+onLang.push(() => { if (TC && !$('tacPanel').hidden) tacRender(); if (world && world.D && world.D.lcPct) renderStats(); $('flyTitle').textContent = t(FLY_T[flySec]); });
+initLang();

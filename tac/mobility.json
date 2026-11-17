@@ -1,0 +1,30 @@
+{
+  "_about": "Cross-country mobility rules. Slope thresholds in percent; land-cover classes follow Sat2Topo (1 Water, 2 Built-up, 3 Road/paved, 4 Trees/forest, 5 Grass/shrub, 6 Cropland/rice field, 7 Bare land). Values: GO, SLOW, NO. Edit to match your doctrine or vehicles.",
+  "profiles": {
+    "wheeled": {
+      "name": "Wheeled vehicles",
+      "slope": [15, 30],
+      "landcover_dry": {"1": "NO", "2": "SLOW", "3": "GO", "4": "NO", "5": "GO", "6": "GO", "7": "GO"},
+      "landcover_wet": {"1": "NO", "2": "SLOW", "3": "GO", "4": "NO", "5": "SLOW", "6": "NO", "7": "SLOW"},
+      "flooded": "NO",
+      "road_speed": 0.4
+    },
+    "tracked": {
+      "name": "Tracked vehicles",
+      "slope": [30, 45],
+      "landcover_dry": {"1": "NO", "2": "SLOW", "3": "GO", "4": "SLOW", "5": "GO", "6": "GO", "7": "GO"},
+      "landcover_wet": {"1": "NO", "2": "SLOW", "3": "GO", "4": "SLOW", "5": "GO", "6": "SLOW", "7": "GO"},
+      "flooded": "NO",
+      "road_speed": 0.6
+    },
+    "foot": {
+      "name": "Dismounted (foot)",
+      "slope": [30, 60],
+      "landcover_dry": {"1": "NO", "2": "GO", "3": "GO", "4": "SLOW", "5": "GO", "6": "GO", "7": "GO"},
+      "landcover_wet": {"1": "NO", "2": "GO", "3": "GO", "4": "SLOW", "5": "GO", "6": "SLOW", "7": "GO"},
+      "flooded": "SLOW",
+      "road_speed": 0.8
+    }
+  },
+  "cost": {"GO": 1.0, "SLOW": 3.0}
+}

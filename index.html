@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=23">
+<link rel="stylesheet" href="css/app.css?v=24">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -19,7 +19,7 @@
 <section id="mapView">
   <div id="map"></div>
   <div class="panel" id="mapPanel">
-    <div class="row top"><h1 style="flex:1">Cambodia 3D Landscape</h1><button class="hideP" data-panel="mapPanel" title="Hide panel">⟨</button></div>
+    <div class="row top"><h1 style="flex:1">Cambodia 3D Landscape</h1><button class="langBtn" title="ភាសាខ្មែរ / English">ខ្មែរ</button><button class="hideP" data-panel="mapPanel" title="Hide panel">⟨</button></div>
     <p class="sub">Pick an area, then turn the satellite image, terrain and OpenStreetMap roads, water and buildings into a 3D scene.</p>
     <div class="search">
       <input id="q" type="search" placeholder="Search a place in Cambodia…" autocomplete="off">
@@ -57,41 +57,63 @@
 <!-- ============ 3D scene ============ -->
 <section id="sceneView" hidden>
   <div id="scene"></div>
-  <div class="panel" id="scenePanel">
-    <div class="row top">
-      <button id="back">◀ Map</button><button class="hideP" data-panel="scenePanel" title="Hide panel">⟨</button>
-      <h1 id="aoiTitle">3D landscape</h1>
-    </div>
-    <div class="seg" id="views">
-      <button data-v="overview" class="on">Overview</button><button data-v="oblique">Oblique</button><button data-v="street">Low</button><button data-v="drive">🚗 Drive</button><button data-v="walk">🚶 Walk</button>
-    </div>
-    <button id="layersBtn" class="primary" style="margin:8px 0 2px;background:#2f6a8a">🗂 Layers: pull apart &amp; explore</button>
-    <button id="surveyBtn" class="primary" style="margin:8px 0 2px;background:#2d7a55">📐 Survey: measure, mark &amp; go to</button>
-    <button id="editBtn" class="primary" style="margin:8px 0 2px;background:#7a3d8a">✏️ Digitize: roads, buildings, trees</button>
-    <button id="sectionBtn" class="primary" style="margin:8px 0 2px;background:#7a5230">✂ Cross-section: soil &amp; geology</button>
-    <label class="lbl">Ground</label>
-    <div class="seg" id="ground">
-      <button data-v="sat" class="on">Satellite</button><button data-v="enhanced">Enhanced</button><button data-v="lulc">Stylised LULC</button>
-    </div>
-    <label class="lbl">Terrain height <b id="terrainVal">×1.5</b></label>
-    <input type="range" id="terrainH" min="0" max="3" step="0.25" value="1.5" class="wide">
-    <div class="row checks">
-      <label><input type="checkbox" id="smooth" checked> Smooth terrain &amp; grade roads</label>
-    </div>
-    <div class="row checks">
-      <label><input type="checkbox" data-k="trees" checked> Trees</label>
-      <label><input type="checkbox" data-k="buildings" checked> Buildings</label>
-      <label title="Village houses placed where the image shows built-up land next to a road and OpenStreetMap has no buildings"><input type="checkbox" data-k="houses" checked> Houses from image</label>
-      <label><input type="checkbox" data-k="traffic" checked> Traffic &amp; people</label>
-      <label><input type="checkbox" data-k="detail" checked> Ground detail &amp; grass</label>
-      <label><input type="checkbox" data-k="shadows" checked> Shadows</label>
-      <label><input type="checkbox" data-k="reflect" checked> Water reflections</label>
-    </div>
-    <label class="lbl">Time of day <b id="hourLbl">09:30</b> <input type="range" id="hour" min="5" max="23.5" step="0.25" value="9.5"></label>
-    <div class="row wxrow"><button data-wx="clear" class="on" title="Clear sky">☀️</button><button data-wx="haze" title="Hazy / burning season">🌫️</button><button data-wx="rain" title="Monsoon rain">🌧️</button><button data-wx="storm" title="Thunderstorm">⛈️</button><button id="tourBtn" title="Cinematic flight around the area">🎥 Fly</button><button id="recBtn" title="Record the view as a video">⏺ Rec</button></div>
-    <label class="lbl">Rice season <select id="season"><option value="image">As in the image</option><option value="planting">Jun–Jul · planting (flooded)</option><option value="growing">Aug–Oct · growing (green)</option><option value="ripening">Nov–Dec · ripening (golden)</option><option value="harvested">Jan–May · harvested (stubble)</option></select></label>
-    <div id="lulc"></div>
-    <div id="stats" class="info"></div>
+  <nav id="rail" aria-label="Tools">
+    <button id="back" data-tip="Back to the map">◀</button>
+    <hr>
+    <button data-fly="view" data-tip="Views, drive, walk, flight, video" class="on">🎥</button>
+    <button data-fly="display" data-tip="Ground, terrain and objects">🖼️</button>
+    <button data-fly="env" data-tip="Time, weather and rice season">🌤️</button>
+    <button data-fly="info" data-tip="Land cover and statistics">📊</button>
+    <hr>
+    <button id="layersBtn" data-tip="Layers: pull apart &amp; explore">🗂️</button>
+    <button id="surveyBtn" data-tip="Survey: measure, mark &amp; go to">📐</button>
+    <button id="editBtn" data-tip="Digitize: roads, buildings, trees">✏️</button>
+    <button id="sectionBtn" data-tip="Cross-section: soil &amp; geology">✂️</button>
+    <button id="tacBtn" data-tip="Tactical: symbols, line of sight, mobility">🎯</button>
+    <button id="topoBtn" data-tip="Export topographic map">🗺️</button>
+    <span class="grow"></span>
+    <button class="langBtn" data-tip="ភាសាខ្មែរ / English">ខ្មែរ</button>
+  </nav>
+  <div class="panel fly" id="scenePanel">
+    <div class="row top"><h1 id="flyTitle">Views</h1><button class="hideP" data-panel="scenePanel" title="Hide panel">✕</button></div>
+    <div class="aoiT" id="aoiTitle">3D landscape</div>
+    <section data-sec="view">
+      <div class="seg wrap" id="views">
+        <button data-v="overview" class="on">Overview</button><button data-v="oblique">Oblique</button><button data-v="street">Low</button><button data-v="drive">🚗 Drive</button><button data-v="walk">🚶 Walk</button>
+      </div>
+      <div class="row icons"><button id="tourBtn" title="Cinematic flight around the area">🎥 Fly</button><button id="recBtn" title="Record the view as a video">⏺ Rec</button></div>
+      <p class="tip">Esc leaves Drive or Walk.</p>
+    </section>
+    <section data-sec="display" hidden>
+      <label class="lbl">Ground</label>
+      <div class="seg" id="ground">
+        <button data-v="sat" class="on">Satellite</button><button data-v="enhanced">Enhanced</button><button data-v="lulc">Land cover</button>
+      </div>
+      <label class="lbl">Terrain height <b id="terrainVal">×1.5</b></label>
+      <input type="range" id="terrainH" min="0" max="3" step="0.25" value="1.5" class="wide">
+      <div class="chips">
+        <label><input type="checkbox" id="smooth" checked><span>⛰ Smooth terrain &amp; grade roads</span></label>
+        <label><input type="checkbox" data-k="trees" checked><span>🌳 Trees</span></label>
+        <label><input type="checkbox" data-k="buildings" checked><span>🏢 Buildings</span></label>
+        <label title="Village houses placed where the image shows built-up land next to a road and OpenStreetMap has no buildings"><input type="checkbox" data-k="houses" checked><span>🏠 Houses from image</span></label>
+        <label><input type="checkbox" data-k="traffic" checked><span>🚗 Traffic &amp; people</span></label>
+        <label><input type="checkbox" data-k="detail" checked><span>🌾 Ground detail &amp; grass</span></label>
+        <label><input type="checkbox" data-k="shadows" checked><span>🌗 Shadows</span></label>
+        <label><input type="checkbox" data-k="reflect" checked><span>💧 Water reflections</span></label>
+      </div>
+    </section>
+    <section data-sec="env" hidden>
+      <label class="lbl">Time of day <b id="hourLbl">09:30</b></label>
+      <input type="range" id="hour" min="5" max="23.5" step="0.25" value="9.5" class="wide">
+      <label class="lbl">Weather</label>
+      <div class="row wxrow"><button data-wx="clear" class="on" title="Clear sky">☀️</button><button data-wx="haze" title="Hazy / burning season">🌫️</button><button data-wx="rain" title="Monsoon rain">🌧️</button><button data-wx="storm" title="Thunderstorm">⛈️</button></div>
+      <label class="lbl">Rice season</label>
+      <select id="season" class="wide"><option value="image">As in the image</option><option value="planting">Jun–Jul · planting (flooded)</option><option value="growing">Aug–Oct · growing (green)</option><option value="ripening">Nov–Dec · ripening (golden)</option><option value="harvested">Jan–May · harvested (stubble)</option></select>
+    </section>
+    <section data-sec="info" hidden>
+      <div id="lulc"></div>
+      <div id="stats" class="info"></div>
+    </section>
   </div>
   <div id="driveBar" class="bar" hidden>
     <div class="hint" id="driveHint">Tap a road to start driving on it.</div>
@@ -191,6 +213,53 @@
       </div>
     </div>
   </div>
+  <div id="tacPanel" class="rpanel" hidden>
+    <div class="row lphead"><b>🎯 Tactical</b><span id="tacHint" class="hint"></span><button id="tacMin" title="Hide / show">▴</button><button id="tacClose" title="Close">✕</button></div>
+    <div id="tacContent">
+      <div class="row"><div class="seg" id="tacSide" style="flex:1"><button data-v="own" class="on">Own</button><button data-v="enemy">Enemy</button><button data-v="neutral">Neutral</button></div></div>
+      <div class="row"><span>Convention</span><select id="tacConv"></select></div>
+      <div class="row svtabs tactabs"><button data-tt="sym" class="on">Symbols</button><button data-tt="line">Lines & areas</button><button data-tt="ana">Analysis</button></div>
+      <div data-tp="sym"><div id="tacSyms" class="symgrid"></div></div>
+      <div data-tp="line" hidden><div id="tacLines" class="linelist"></div><div class="row edact"><button id="tacFinish" class="primary">✓ Finish</button><button id="tacUndo">↶ Undo</button><button id="tacCancel">✕ Cancel</button></div></div>
+      <div data-tp="ana" hidden>
+        <div class="row"><button data-am="los">👁 Line of sight</button><button data-am="viewshed">◎ Viewshed</button></div>
+        <div class="row"><button id="tacOE">⚔ Own ↔ enemy</button><button data-am="ring">◯ Range rings</button></div>
+        <div class="row"><span>Observer height</span><input type="number" id="tacObs" value="2" step="0.5"><span>Target height</span><input type="number" id="tacTgt" value="2" step="0.5"></div>
+        <div class="row"><span>Radius</span><input type="number" id="tacR" value="1500" step="100"><span>Rings (m)</span><input id="tacRings" value="500, 1000, 1500"></div>
+        <div class="svsec"><b>Mobility</b>
+          <div class="row"><select id="tacVeh"><option value="wheeled">Wheeled vehicles</option><option value="tracked">Tracked vehicles</option><option value="foot">Dismounted (foot)</option></select><select id="tacSeason"><option value="dry">Dry season</option><option value="wet">Wet season</option></select></div>
+          <div class="row"><button id="tacMob">🟩🟨🟥 GO / SLOW-GO / NO-GO</button></div>
+        </div>
+        <div id="tacRes" class="svhelp"></div>
+        <canvas id="tacProf" width="480" height="170" hidden></canvas>
+        <div class="row"><button id="tacClearA">Clear analysis</button></div>
+      </div>
+      <div class="row"><input id="tacLabel" placeholder="Label / unit name (optional)" style="flex:1"></div>
+      <div class="row"><button data-am="move">✥ Move</button><button data-am="delete">🗑 Delete</button><button id="tacExport">⬇ GeoJSON</button><button id="tacClearAll">Clear all</button></div>
+      <div class="svhelp">For planning and training from open data (terrain model, image land cover, OSM). Trees and buildings block sight; movement uses bare ground. Confirm by reconnaissance.</div>
+    </div>
+  </div>
+  <div id="topoPanel" class="rpanel" hidden>
+    <div class="row lphead"><b>🗺️ Topographic map</b><span id="topoHint" class="hint"></span><button id="topoMin" title="Hide / show">▴</button><button id="topoClose" title="Close">✕</button></div>
+    <div id="topoContent">
+      <div class="row"><span>Title</span><input id="topoTitle" placeholder="Place name (English)" style="flex:1"></div>
+      <div class="row"><span>ខ្មែរ</span><input id="topoTitleKm" placeholder="ឈ្មោះទីកន្លែង (ខ្មែរ)" style="flex:1"></div>
+      <div class="row"><span>Paper</span><select id="topoPaper"><option value="A3L">A3 landscape</option><option value="A3P">A3 portrait</option><option value="A4L">A4 landscape</option><option value="A4P">A4 portrait</option><option value="A2L">A2 landscape</option></select></div>
+      <div class="row"><span>Scale</span><select id="topoScale"><option value="auto">Auto</option><option>2500</option><option>5000</option><option>10000</option><option>15000</option><option>20000</option><option>25000</option><option>50000</option></select><span>Contour interval</span><select id="topoCI"><option value="auto">Auto</option><option>0.5</option><option>1</option><option>2</option><option>5</option><option>10</option><option>20</option></select></div>
+      <div class="row"><span>Language</span><select id="topoLang"><option value="both">Bilingual</option><option value="km">ខ្មែរ</option><option value="en">English</option></select><span>DPI</span><select id="topoDPI"><option>150</option><option selected>200</option><option>300</option></select></div>
+      <div class="chips">
+        <label><input type="checkbox" id="topoNames" checked><span>Place names from OpenStreetMap</span></label>
+        <label><input type="checkbox" id="topoHill" checked><span>Hillshade</span></label>
+        <label><input type="checkbox" id="topoImg"><span>Image backdrop</span></label>
+        <label><input type="checkbox" id="topoMine" checked><span>Your features</span></label>
+        <label><input type="checkbox" id="topoSurvey" checked><span>Survey points & parcels</span></label>
+        <label><input type="checkbox" id="topoTac"><span>Tactical overlay</span></label>
+      </div>
+      <div class="row"><button id="topoMake" class="primary">🗺️ Make map</button></div>
+      <canvas id="topoPrev" hidden></canvas>
+      <div class="row"><button id="topoPNG" disabled>⬇ Download PNG</button><button id="topoPDF" disabled>⬇ Download PDF</button></div>
+    </div>
+  </div>
   <div id="sectionPanel" hidden>
     <div class="row secbar"><b>Cross-section</b><span id="secHint" class="hint">Tap point A on the ground or on the inset map</span>
       <label><input type="checkbox" id="secWall" checked> Cut wall in 3D</label>
@@ -204,6 +273,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=23"></script>
+<script type="module" src="js/app.js?v=24"></script>
 </body>
 </html>

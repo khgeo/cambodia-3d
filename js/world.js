@@ -5,21 +5,23 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=23';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=23';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=23';
-import { buildTrees, GrassField } from './vegetation.js?v=23';
-import { RoadNet, Driver, Walker } from './modes.js?v=23';
-import { vehicleKit } from './vehicles.js?v=23';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=23';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=23';
-import { LayerStack } from './layers.js?v=23';
-import { Survey } from './survey.js?v=23';
-import { Editor } from './editor.js?v=23';
-import { Atmos } from './atmos.js?v=23';
-import { NightLights } from './lights.js?v=23';
-import { SEASON } from './vegetation.js?v=23';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=23';
+import * as G from './geo.js?v=24';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=24';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=24';
+import { buildTrees, GrassField } from './vegetation.js?v=24';
+import { RoadNet, Driver, Walker } from './modes.js?v=24';
+import { vehicleKit } from './vehicles.js?v=24';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=24';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=24';
+import { LayerStack } from './layers.js?v=24';
+import { Survey } from './survey.js?v=24';
+import { Editor } from './editor.js?v=24';
+import { Atmos } from './atmos.js?v=24';
+import { NightLights } from './lights.js?v=24';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=24';
+import { Tactical, loadCatalog } from './tactical.js?v=24';
+import { SEASON } from './vegetation.js?v=24';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=24';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -191,6 +193,7 @@ export class World {
     const F = this.F = new Frame(aoi), W = F.W, H = F.H, X0 = -W / 2, X1 = W / 2, Z0 = -H / 2, Z1 = H / 2, S = Math.max(W, H);
     const D = this.D = { aoi, W, H, X0, Z0, X1, Z1, S, stats: {} };
 
+    const ioP = loadIO(aoi, W, H); // Esri | Impact Observatory 10 m land cover, fetched while the rest loads
     say('Loading OSM tiles…');
     const tr = G.tileRange(aoi, G.TZ), tl = [];
     for (let x = tr.x0; x <= tr.x1; x++) for (let y = tr.y0; y <= tr.y1; y++) tl.push([x, y]);
@@ -362,6 +365,9 @@ export class World {
     const exclude = new Uint8Array(mw * mh); for (let i = 0; i < exclude.length; i++) exclude[i] = bmask[i] | rmask[i] | wmask[i];
     this.bmask = new Uint8Array(mw * mh); for (let i = 0; i < exclude.length; i++) this.bmask[i] = bmask[i] | wmask[i];
     Object.assign(D, { MR, mw, mh, C, gw, gh, cls, splatRice, exclude, nearB, wmask });
+    D.rmask = rmask; D.bmaskOSM = bmask; D.landuse = landuse;
+    say('Refining land cover (13 classes)…'); await tick();
+    const det = detailedLandCover(D, F, await ioP, (x, z) => this.rawElevation(x, z)); D.lc = det.lc; D.lcPct = det.pct; D.lcIO = det.io;
     D.nearBuilt = (x, z) => nearB[Math.min(gh - 1, Math.max(0, ((z - Z0) / C) | 0)) * gw + Math.min(gw - 1, Math.max(0, ((x - X0) / C) | 0))];
 
     this.terrainU = {
@@ -695,6 +701,7 @@ export class World {
     if (!this.lights) this.lights = new NightLights(this); this.lights.build();
     if (!this.editor) { try { if (JSON.parse(localStorage.getItem('cambodia3d.edits.v1') || '[]').length) this.editor = new Editor(this); } catch (e) {} }
     if (this.editor) this.editor.rebuild();
+    if (this.tactical) { this.tactical.clearAnalysis(); this.tactical.rebuild(); } else { try { if (JSON.parse(localStorage.getItem('cambodia3d.tac.v1') || '[]').length) loadCatalog().then(() => { this.tactical = this.tactical || new Tactical(this); this.tactical.rebuild(); }); } catch (e) {} }
     if (this.survey) this.survey.redraw();
     this.exag = exag; if (this.layers) { const t = this.layers.t; await this.layers.rebuild(); this.layers.setExplode(t, true); }
     if (this.U) { this.applySideGeology(); if (this.section) this.makeSection(this.section.A, this.section.B); }
@@ -1019,13 +1026,12 @@ export class World {
     if (style === 'enhanced' && D.px) { if (!this.texEnh) this.texEnh = this.mkTex(enhanceCanvas(D.img, D.px, D.gains)); tex = this.texEnh; }
     if (style === 'lulc' && D.px) {
       if (!this.texStyl) {
-        const c = document.createElement('canvas'), w = c.width = D.img.width, h = c.height = D.img.height, ctx = c.getContext('2d'), out = ctx.createImageData(w, h), s = D.px, o = out.data, g = D.gains, rnd = G.mulberry32(3);
-        const PAL = { 1: [52, 92, 112], 2: [44, 86, 40], 3: [128, 160, 74], 4: [176, 112, 72], 5: [184, 178, 166] };
-        for (let i = 0; i < s.length; i += 4) {
-          const r = wb(s[i], 0, g), gg = wb(s[i + 1], 1, g), b = wb(s[i + 2], 2, g), p = PAL[classify(r, gg, b)], lum = 0.75 + (r + gg + b) / 765 * 0.5, j = 0.94 + rnd() * 0.1;
-          o[i] = Math.min(255, (p[0] * 0.7 + r * 0.3) * lum * j); o[i + 1] = Math.min(255, (p[1] * 0.7 + gg * 0.3) * lum * j); o[i + 2] = Math.min(255, (p[2] * 0.7 + b * 0.3) * lum * j); o[i + 3] = 255;
-        }
-        ctx.putImageData(out, 0, 0); this.texStyl = this.mkTex(c);
+        const c = document.createElement('canvas'), w = c.width = D.img.width, h = c.height = D.img.height, g = c.getContext('2d');
+        g.drawImage(D.img, 0, 0);
+        const sx0 = D.pxX(this.F.lon(D.X0)), sx1 = D.pxX(this.F.lon(D.X0 + D.W)), sy0 = D.pxY(this.F.lat(D.Z0)), sy1 = D.pxY(this.F.lat(D.Z0 + D.H));
+        g.imageSmoothingEnabled = true; g.drawImage(lcCanvas(D, D.lc), sx0, sy0, sx1 - sx0, sy1 - sy0);
+        g.globalCompositeOperation = 'soft-light'; g.globalAlpha = 0.75; g.drawImage(D.img, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+        this.texStyl = this.mkTex(c);
       }
       tex = this.texStyl;
     }
@@ -1110,6 +1116,7 @@ export class World {
     this.ensureUnderground(say).then(() => { this.layers.buildUnder(); this.onLayersReady && this.onLayersReady(); }).catch(e => console.warn(e));
     return this.layers;
   }
+  async openTactical() { await loadCatalog(); if (!this.tactical) this.tactical = new Tactical(this); this.tactical.active = true; await this.tactical.rebuild(); return this.tactical; }
   openEditor() { if (!this.editor) { this.editor = new Editor(this); this.editor.rebuild(); } this.editor.active = true; return this.editor; }
   // rice-field stage: image (as photographed), planting (flooded), growing (green), ripening (golden), harvested (stubble)
   setSeason(k) {
@@ -1117,6 +1124,7 @@ export class World {
     this.terrainU.uSeason.value.set(S[0], S[1], S[2], S[3]); SEASON.h = S[4]; SEASON.col = S[5] != null ? new THREE.Color(S[5]) : null;
     if (this.grass) this.grass.center.set(1e9, 0, 1e9);
   }
+  get LC() { return LC; }
   getAtmos() { if (!this.atmos) this.atmos = new Atmos(this); return this.atmos; }
   openSurvey() { if (!this.survey) this.survey = new Survey(this); this.survey.active = true; this.survey.redraw(); return this.survey; }
   startSection() { this.sectionPick = 'A'; this.clearSection(); this.onSectionHint && this.onSectionHint('Tap point A on the ground or on the inset map'); }
@@ -1165,13 +1173,15 @@ export class World {
   groundAt(x, z) { return this.hAt ? this.hAt(x, z) : 0; }
   pxToMetres(p, px) { const d = this.camera.position.distanceTo(p); return Math.max(0.3, d * 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) / this.renderer.domElement.clientHeight * px); }
   onTap(e) {
-    const edPick = this.editor && this.editor.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
+    const tacPick = this.tactical && this.tactical.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
+    const edPick = !tacPick && this.editor && this.editor.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
     const svPick = !edPick && this.survey && this.survey.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
-    if (!this.terrainMesh || (this.mode !== 'drive' && this.mode !== 'walk' && !this.sectionPick && !svPick && !edPick)) return;
+    if (!this.terrainMesh || (this.mode !== 'drive' && this.mode !== 'walk' && !this.sectionPick && !svPick && !edPick && !tacPick)) return;
     const r = this.renderer.domElement.getBoundingClientRect(), ndc = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     const rc = new THREE.Raycaster(); rc.setFromCamera(ndc, this.camera);
     const hit = rc.intersectObjects([this.terrainMesh, ...(this.roadMesh ? [this.roadMesh] : [])], false)[0]; if (!hit) return;
     if (this.sectionPick) { this.pickSectionPoint(hit.point.x, hit.point.z); return; }
+    if (tacPick) { this.tactical.tap(hit.point.x, hit.point.z); return; }
     if (edPick) { this.editor.tapTol = this.pxToMetres(hit.point, e.pointerType === 'touch' ? 26 : 14); if (e.pointerType === 'touch') this.editor.hoverPt = null; this.editor.tap(hit.point.x, hit.point.z); return; }
     if (svPick) { this.survey.add(hit.point.x, hit.point.z); return; }
     if (this.mode === 'walk') { if (!this.walker.blocked(hit.point.x, hit.point.z)) this.walker.place(hit.point.x, hit.point.z); return; }
