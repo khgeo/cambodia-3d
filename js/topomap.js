@@ -2,12 +2,12 @@
 // spot heights, water, roads by class, railways, buildings, place names and landmarks (OpenStreetMap), your own
 // features, survey points, parcels and the tactical overlay; UTM grid with edge labels, bilingual legend,
 // scale bar, north arrows with grid convergence, location map and credits. PNG or PDF.
-import { LC } from './landcover.js?v=55';
-import { utm } from './hud.js?v=55';
-import { utmInv } from './survey.js?v=55';
+import { LC } from './landcover.js?v=56';
+import { utm } from './hud.js?v=56';
+import { utmInv } from './survey.js?v=56';
 
 const PAPER = { A4: [210, 297], A3: [297, 420], A2: [420, 594] };
-const SCALES = [1000, 2000, 2500, 5000, 7500, 10000, 15000, 20000, 25000, 50000, 100000];
+const SCALES = [1000, 2000, 2500, 5000, 7500, 10000, 12500, 15000, 20000, 25000, 50000, 100000];
 const KD = s => String(s).replace(/[0-9]/g, d => '០១២៣៤៥៦៧៨៩'[d]);
 const FONT = '"Noto Sans Khmer", system-ui, "Segoe UI", Arial, sans-serif';
 // road styles (mm on paper): casing colour, fill colour, width, dash
@@ -86,7 +86,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
   await document.fonts.load(`16px "Noto Sans Khmer"`).catch(() => { });
   // --- sheet geometry (mm) ---
   const [pw, ph] = PAPER[o.paper.slice(0, 2)], land = o.paper.endsWith('L'), W = land ? ph : pw, H = land ? pw : ph, k = o.dpi / 25.4;
-  const M = 10, head = 16, side = 0, foot = land ? Math.max(66, H * 0.3) : Math.max(86, H * 0.31); // legend in columns under the map
+  const M = 10, head = 16, side = 0, foot = land ? Math.max(60, H * 0.24) : Math.max(86, H * 0.31); // legend in columns under the map
   const fw = W - 2 * M - 12, fh = H - 2 * M - head - foot - 8;
   let S = o.scale === 'auto' ? SCALES.find(s => D.W * 1000 / s <= fw && D.H * 1000 / s <= fh) || 100000 : +o.scale;
   const mw = D.W * 1000 / S, mhh = D.H * 1000 / S, FW = Math.min(fw, mw), FH = Math.min(fh, mhh);
@@ -219,7 +219,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
     for (const p of sv.points) { g.fillStyle = '#e04020'; g.beginPath(); g.moveTo(X(p.x), Y(p.z) - mm(0.9)); g.lineTo(X(p.x) + mm(0.8), Y(p.z) + mm(0.5)); g.lineTo(X(p.x) - mm(0.8), Y(p.z) + mm(0.5)); g.closePath(); g.fill(); g.fillStyle = '#111'; g.fillText(p.id, X(p.x) + mm(1), Y(p.z)); }
   }
   if (o.tac && world.tactical) {
-    const tc = world.tactical, { symbolURL } = await import('./tactical.js?v=55');
+    const tc = world.tactical, { symbolURL } = await import('./tactical.js?v=56');
     for (const f of tc.features.filter(f => tc.inAOI(f))) {
       const col = tc.color(f.side, f.code), P = f.coords.map(c => [F.x(c[0]), F.z(c[1])]); g.strokeStyle = g.fillStyle = col; g.lineWidth = mm(0.5);
       if (f.geom === 'point') { try { const im = await loadImg(await symbolURL(f.code, col)); const sz = mm(6); g.drawImage(im, X(P[0][0]) - sz / 2, Y(P[0][1]) - sz, sz, sz); if (f.label) { font(1.8, 700); g.textAlign = 'center'; g.fillText(f.label, X(P[0][0]), Y(P[0][1]) + mm(1.5)); } } catch (e) { } }
@@ -253,9 +253,9 @@ export async function makeTopoMap(world, o, say = () => {}) {
   // ===== title =====
   const place = o.title || '', titleKm = o.titleKm || place, titleEn = place;
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#1f3f8f'; font(5.2, 700);
-  g.fillText(lang === 'en' ? `${titleEn.toUpperCase()}` : lang === 'km' ? titleKm : `${titleKm}${titleEn && titleKm !== titleEn ? ' - ' + titleEn.toUpperCase() : ''}`, mm(fx + FW / 2), mm(M + 5));
-  font(2.3); g.fillStyle = '#333'; g.textAlign = 'left'; g.fillText(T(`Scale 1:${S.toLocaleString('en')}`, `មាត្រដ្ឋាន ១:${KD(S)}`), mm(fx), mm(M + 5));
-  g.textAlign = 'right'; g.fillText(T(`Topographic map · UTM ${zone}N`, `ផែនទីសណ្ឋានដី · UTM ${KD(zone)}N`), mm(fx + FW), mm(M + 5));
+  g.fillText(lang === 'en' ? `${titleEn.toUpperCase()}` : lang === 'km' ? titleKm : `${titleKm}${titleEn && titleKm !== titleEn ? ' - ' + titleEn.toUpperCase() : ''}`, mm(W / 2), mm(M + 5));
+  font(2.3); g.fillStyle = '#333'; g.textAlign = 'left'; g.fillText(T(`Scale 1:${S.toLocaleString('en')}`, `មាត្រដ្ឋាន ១:${KD(S)}`), mm(M), mm(M + 5));
+  g.textAlign = 'right'; g.fillText(T(`Topographic map · UTM ${zone}N`, `ផែនទីសណ្ឋានដី · UTM ${KD(zone)}N`), mm(W - M), mm(M + 5));
   // ===== legend in columns under the map (sheet style: description ..... symbol, ក)/ខ) pairs), then scale, declination, location, credits =====
   const LG = o.legend || 'sheet', LX = M, LY = fy + FH + 9, LW = W - 2 * M, LB = H - M, RW = Math.max(62, LW * (land ? 0.27 : 0.33)), CA = LW - RW - 6;
   const NC = land ? 3 : 2, CW = CA / NC; let col = 0, cy = LY + 6;
@@ -331,23 +331,23 @@ export async function makeTopoMap(world, o, say = () => {}) {
   // declination diagram: grid north (vertical), true north (★) and magnetic north (half arrow), angles at the sheet centre (WMM-2025)
   const by0 = by, DH = Math.min(36, (LB - by) * 0.55), dW = bw * 0.5;
   { const lat0 = (aoi.s + aoi.n) / 2, lon0 = (aoi.w + aoi.e) / 2, cm = (zone - 1) * 6 - 180 + 3, gam = Math.atan(Math.tan((lon0 - cm) * Math.PI / 180) * Math.sin(lat0 * Math.PI / 180)) * 180 / Math.PI;
-    let dec = null, ann = 0; try { const MD = await import('./magdec.js?v=55'), r = MD.declination(lat0, lon0, new Date()); dec = r.decl; ann = r.annual; } catch (e) { }
+    let dec = null, ann = 0; try { const MD = await import('./magdec.js?v=56'), r = MD.declination(lat0, lon0, new Date()); dec = r.decl; ann = r.annual; } catch (e) { }
     const tA = -gam, mA = dec == null ? null : -gam + dec; // angles clockwise from grid north (deg)
     // drawn angles are exaggerated (min 6°) so the lines can be told apart; the numbers are the true values
-    const ex = v => Math.sign(v || 1) * Math.max(6, Math.abs(v)), dT = ex(tA), dM = mA == null ? null : dT + ex(mA - tA);
-    const ox = bx + dW / 2, oy = by + DH - 6, Lr = DH - 12, P = a => [ox + Math.sin(a * Math.PI / 180) * Lr, oy - Math.cos(a * Math.PI / 180) * Lr];
+    const ex = v => Math.sign(v || 1) * Math.max(10, Math.abs(v)), dT = ex(tA), dM = mA == null ? null : dT + ex(mA - tA);
+    const ox = bx + dW / 2, oy = by + DH - 6, Lr = DH - 12, P = (a, f = 1) => [ox + Math.sin(a * Math.PI / 180) * Lr * f, oy - Math.cos(a * Math.PI / 180) * Lr * f];
     const dm = v => { const a = Math.abs(v), d = Math.floor(a), m = (a - d) * 60; return `${N(d)}°${N(m.toFixed(m < 10 ? 1 : 0))}'`; };
     g.strokeStyle = '#111'; g.fillStyle = '#111'; g.lineWidth = mm(0.2);
-    g.beginPath(); g.moveTo(mm(ox), mm(oy)); g.lineTo(mm(ox), mm(oy - Lr - 2)); g.stroke(); font(1.5, 600); g.textAlign = 'center'; g.fillText(T('Grid north', 'ខ្សែក្រឡាចត្រង្គ'), mm(ox), mm(oy - Lr - 3.6));
-    const [tx, ty] = P(dT); g.beginPath(); g.moveTo(mm(ox), mm(oy)); g.lineTo(mm(tx), mm(ty)); g.stroke();
+    g.beginPath(); g.moveTo(mm(ox), mm(oy)); g.lineTo(mm(ox), mm(oy - Lr - 3)); g.stroke(); font(1.5, 600); g.textAlign = 'center'; g.fillText(T('Grid north', 'ខ្សែក្រឡាចត្រង្គ'), mm(ox), mm(oy - Lr - 4.6));
+    const [tx, ty] = P(dT, 0.86); g.beginPath(); g.moveTo(mm(ox), mm(oy)); g.lineTo(mm(tx), mm(ty)); g.stroke();
     { const sx = mm(tx), sy = mm(ty) - mm(0.8), R1 = mm(1.1), R2 = mm(0.45); g.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? R2 : R1; k ? g.lineTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r) : g.moveTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r); } g.closePath(); g.fill(); }
-    font(1.45, 600); g.textAlign = dT < 0 ? 'right' : 'left'; g.fillText(T('True north', 'ខាងជើងពិត'), mm(tx + (dT < 0 ? -1.6 : 1.6)), mm(ty - 0.8));
+    font(1.45, 600); g.textAlign = dT < 0 ? 'right' : 'left'; g.fillText(T('True north', 'ខាងជើងពិត'), mm(tx + (dT < 0 ? -1.8 : 1.8)), mm(ty - 0.6));
     const arc = (a0, a1, r, txt) => { const s0 = (-90 + Math.min(a0, a1)) * Math.PI / 180, s1 = (-90 + Math.max(a0, a1)) * Math.PI / 180; g.beginPath(); g.arc(mm(ox), mm(oy), mm(r), s0, s1); g.stroke(); const am = (a0 + a1) / 2, [qx, qy] = [ox + Math.sin(am * Math.PI / 180) * r, oy - Math.cos(am * Math.PI / 180) * r];
       const side = am < 0 ? -1 : 1; g.beginPath(); g.moveTo(mm(qx), mm(qy)); g.lineTo(mm(qx + side * 4), mm(qy)); g.stroke(); font(1.45); g.textAlign = side < 0 ? 'right' : 'left'; g.fillText(txt, mm(qx + side * 4.4), mm(qy)); };
-    g.lineWidth = mm(0.12); arc(0, dT, Lr * 0.45, dm(tA));
-    if (mA != null) { const [mx, my] = P(dM); g.lineWidth = mm(0.2); g.beginPath(); g.moveTo(mm(ox), mm(oy)); g.lineTo(mm(mx), mm(my)); g.stroke(); const ang = dM * Math.PI / 180, ux = Math.sin(ang), uy = -Math.cos(ang);
+    g.lineWidth = mm(0.12); arc(0, dT, Lr * 0.36, dm(tA));
+    if (mA != null) { const [mx, my] = P(dM, 0.7); g.lineWidth = mm(0.2); g.beginPath(); g.moveTo(mm(ox), mm(oy)); g.lineTo(mm(mx), mm(my)); g.stroke(); const ang = dM * Math.PI / 180, ux = Math.sin(ang), uy = -Math.cos(ang);
       g.beginPath(); g.moveTo(mm(mx), mm(my)); g.lineTo(mm(mx - ux * 3 - uy * 0.9), mm(my - uy * 3 + ux * 0.9)); g.lineTo(mm(mx - ux * 2.2), mm(my - uy * 2.2)); g.closePath(); g.fill();
-      font(1.45, 600); g.textAlign = dM < 0 ? 'right' : 'left'; g.fillText(T('Magnetic north', 'ទិសម៉ាញេទិច'), mm(mx + (dM < 0 ? -1.2 : 1.2)), mm(my - 1)); g.lineWidth = mm(0.12); arc(0, dM, Lr * 0.68, dm(mA)); }
+      font(1.45, 600); g.textAlign = dM < 0 ? 'right' : 'left'; g.fillText(T('Magnetic north', 'ទិសម៉ាញេទិច'), mm(mx + (dM < 0 ? -1.4 : 1.4)), mm(my + 0.6)); g.lineWidth = mm(0.12); arc(0, dM, Lr * 0.55, dm(mA)); }
     const KM_MON = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'], dt = new Date(), mon = dt.toLocaleString('en', { month: 'long' });
     font(1.35); g.fillStyle = '#222'; g.textAlign = 'center'; let ly2 = oy + 2.4;
     const cap = mA == null ? [T('At the centre of the sheet', 'នៅចំកណ្ដាលសន្លឹក')] : [T('At the centre of the sheet', 'នៅចំកណ្ដាលសន្លឹក'), T(`Magnetic declination ${dm(dec)} ${dec < 0 ? 'W' : 'E'}, ${mon} ${dt.getFullYear()}`, `កម្រិតផ្លៀងម៉ាញេទិច ${dm(dec)} ${dec < 0 ? 'ខាងលិច' : 'ខាងកើត'} ខែ${KM_MON[dt.getMonth()]} ឆ្នាំ${KD(dt.getFullYear())}`),
