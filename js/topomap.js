@@ -21,6 +21,17 @@ const RS = c => c <= 4 ? { k: 'Motorway / trunk', km: 'ផ្លូវជាត�
 const LC_SYM = { 3: 'tree', 4: 'tree2', 5: 'shrub', 6: 'orchard', 7: 'rice', 8: 'crop', 9: 'grass', 2: 'marsh', 11: 'sand' };
 
 function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
+// place names and landmarks: OpenStreetMap extract bundled with the site (data/places/<ix>_<iy>.json, 0.25° cells)
+async function localNames(aoi) {
+  const PL = new Set(['city', 'town', 'village', 'hamlet', 'suburb', 'neighbourhood', 'locality', 'isolated_dwelling']), out = [];
+  for (let i = Math.floor((aoi.w - 102) / 0.25); i <= Math.floor((aoi.e - 102) / 0.25); i++) for (let j = Math.floor((aoi.s - 10) / 0.25); j <= Math.floor((aoi.n - 10) / 0.25); j++) {
+    try { const a = await (await fetch(`data/places/${i}_${j}.json`)).json();
+      for (const [lon, lat, kind, nk, ne, rel, ele] of a) { if (lon < aoi.w || lon > aoi.e || lat < aoi.s || lat > aoi.n) continue; const tags = { 'name:km': nk, 'name:en': ne, religion: rel, ele };
+        if (PL.has(kind)) tags.place = kind === 'isolated_dwelling' ? 'hamlet' : kind; else if (kind === 'peak') tags.natural = 'peak'; else if (kind === 'river') tags.waterway = 'river'; else tags.amenity = kind === 'college' ? 'school' : kind === 'doctors' ? 'clinic' : kind;
+        out.push({ lat, lon, tags }); } } catch (e) { }
+  }
+  return out;
+}
 async function overpassNames(aoi) {
   const q = `[out:json][timeout:20];(node["place"~"city|town|village|hamlet|suburb|neighbourhood|locality"](${aoi.s},${aoi.w},${aoi.n},${aoi.e});` +
     `nwr["amenity"~"place_of_worship|school|hospital|clinic|marketplace|police|townhall|university|fuel"](${aoi.s},${aoi.w},${aoi.n},${aoi.e});nwr["natural"="peak"](${aoi.s},${aoi.w},${aoi.n},${aoi.e});` +
@@ -52,7 +63,9 @@ export async function makeTopoMap(world, o, say = () => {}) {
   const M = 10, head = 16, side = land ? Math.max(78, W * 0.24) : 0, foot = land ? 0 : Math.max(82, H * 0.25);
   const fw = W - 2 * M - side - (land ? 6 : 0), fh = H - 2 * M - head - foot - (land ? 0 : 6);
   let S = o.scale === 'auto' ? SCALES.find(s => D.W * 1000 / s <= fw && D.H * 1000 / s <= fh) || 100000 : +o.scale;
-  const mw = D.W * 1000 / S, mhh = D.H * 1000 / S, fx = M + (fw - Math.min(fw, mw)) / 2, fy = M + head + (fh - Math.min(fh, mhh)) / 2, FW = Math.min(fw, mw), FH = Math.min(fh, mhh);
+  const mw = D.W * 1000 / S, mhh = D.H * 1000 / S, FW = Math.min(fw, mw), FH = Math.min(fh, mhh);
+  // centre map + margin as one block
+  const fx = land ? M + (W - 2 * M - (FW + 6 + side)) / 2 : M + (W - 2 * M - FW) / 2, fy = land ? M + head + (fh - FH) / 2 : M + head + (fh - FH) / 2;
   const cv = document.createElement('canvas'); cv.width = Math.round(W * k); cv.height = Math.round(H * k); const g = cv.getContext('2d');
   const s = 1000 / S * k, cxm = D.X0 + D.W / 2 - FW / 2 * S / 1000, czm = D.Z0 + D.H / 2 - FH / 2 * S / 1000; // map shows the AOI centre
   const X = x => (fx + (x - cxm) * 1000 / S) * k, Y = z => (fy + (z - czm) * 1000 / S) * k, mm = v => v * k;
@@ -90,7 +103,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
   say('Contours…');
   const gs = Math.max(2, Math.min(D.W, D.H) / 500), nx = Math.ceil(D.W / gs) + 1, nz = Math.ceil(D.H / gs) + 1, E = new Float32Array(nx * nz);
   for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) E[j * nx + i] = world.rawElevation(D.X0 + i * gs, D.Z0 + j * gs);
-  for (let pass = 0; pass < 3; pass++) { const t = E.slice(); for (let j = 1; j < nz - 1; j++) for (let i = 1; i < nx - 1; i++) { const q = j * nx + i; E[q] = (t[q] * 4 + t[q - 1] + t[q + 1] + t[q - nx] + t[q + nx] + (t[q - nx - 1] + t[q - nx + 1] + t[q + nx - 1] + t[q + nx + 1]) * 0.5) / 10; } }
+  for (let pass = 0; pass < 6; pass++) { const t = E.slice(); for (let j = 1; j < nz - 1; j++) for (let i = 1; i < nx - 1; i++) { const q = j * nx + i; E[q] = (t[q] * 4 + t[q - 1] + t[q + 1] + t[q - nx] + t[q + nx] + (t[q - nx - 1] + t[q - nx + 1] + t[q + nx - 1] + t[q + nx + 1]) * 0.5) / 10; } }
   let lo = Infinity, hi = -Infinity; for (const v of E) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
   if (o.hill) {
     const hc = document.createElement('canvas'); hc.width = nx; hc.height = nz; const hg = hc.getContext('2d'), im = hg.createImageData(nx, nz), zf = 2.2;
@@ -109,7 +122,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
       const tbl = { 1: [[eL, eT]], 2: [[eT, eR]], 3: [[eL, eR]], 4: [[eR, eB]], 5: [[eL, eT], [eR, eB]], 6: [[eT, eB]], 7: [[eL, eB]], 8: [[eB, eL]], 9: [[eB, eT]], 10: [[eT, eR], [eB, eL]], 11: [[eB, eR]], 12: [[eR, eL]], 13: [[eR, eT]], 14: [[eT, eL]] };
       for (const sgm of tbl[cs]) segs.push(sgm);
     }
-    for (const line of chain(segs, gs * 0.01)) { let len = 0; for (let q = 1; q < line.length; q++) len += Math.hypot(line[q][0] - line[q - 1][0], line[q][1] - line[q - 1][1]); if (len * 1000 / S > 3) contours.push({ L, line, len, idx: Math.abs(Math.round(L / CI)) % IDX === 0 }); }
+    for (const line of chain(segs, gs * 0.01)) { let len = 0; for (let q = 1; q < line.length; q++) len += Math.hypot(line[q][0] - line[q - 1][0], line[q][1] - line[q - 1][1]); const closed = Math.hypot(line[0][0] - line[line.length - 1][0], line[0][1] - line[line.length - 1][1]) < gs * 1.5; if (len * 1000 / S > (closed ? 12 : 4)) contours.push({ L, line, len, idx: Math.abs(Math.round(L / CI)) % IDX === 0 }); }
   }
   for (const c of contours) { g.strokeStyle = '#a8662e'; g.lineWidth = mm(c.idx ? 0.32 : 0.14); g.beginPath(); c.line.forEach((p, q) => q ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.stroke(); }
   // water
@@ -129,7 +142,8 @@ export async function makeTopoMap(world, o, say = () => {}) {
   // railways
   for (const r of D.rails || []) { g.strokeStyle = '#222'; g.lineWidth = mm(0.5); path(r); g.stroke(); g.strokeStyle = '#fff'; g.lineWidth = mm(0.3); g.setLineDash([mm(1.2), mm(1.2)]); path(r); g.stroke(); g.setLineDash([]); }
   // buildings
-  g.fillStyle = '#3a3a3a'; for (const b of D.buildings || []) { path(b.ring, true); g.fill(); }
+  for (const b of D.buildings || []) { let A = 0; const r = b.ring; for (let q = 0; q < r.length; q++) { const p = r[q], n2 = r[(q + 1) % r.length]; A += p[0] * n2[1] - n2[0] * p[1]; } A = Math.abs(A) / 2;
+    path(r, true); if (A > 600) { g.fillStyle = '#9a9a9a'; g.fill(); g.strokeStyle = '#333'; g.lineWidth = mm(0.15); g.stroke(); } else { g.fillStyle = '#3a3a3a'; g.fill(); } }
   g.fillStyle = '#5a5a5a'; for (const b of world.housesList || []) { path(b.ring, true); g.fill(); }
   g.fillStyle = '#7a2a8a'; for (const f of ed.filter(f => f.type === 'building')) { path(f.coords.map(cc => [F.x(cc[0]), F.z(cc[1])]), true); g.fill(); }
   g.fillStyle = '#a9cdea'; for (const f of ed.filter(f => f.type === 'pond')) { path(f.coords.map(cc => [F.x(cc[0]), F.z(cc[1])]), true); g.fill(); g.strokeStyle = '#3f7fbf'; g.stroke(); }
@@ -156,7 +170,8 @@ export async function makeTopoMap(world, o, say = () => {}) {
   // place names and landmarks from OpenStreetMap
   if (o.names) {
     say('Place names (OpenStreetMap)…');
-    const el = await overpassNames(aoi);
+    const el = await localNames(aoi), RANKP = { city: 0, town: 1, village: 2, suburb: 3, hamlet: 4, neighbourhood: 5, locality: 6 }, boxes = [];
+    el.sort((a, b) => (RANKP[a.tags.place] ?? 9) - (RANKP[b.tags.place] ?? 9));
     for (const e of el) {
       const lat = e.lat ?? e.center?.lat, lon = e.lon ?? e.center?.lon; if (lat == null) continue; const x = F.x(lon), z = F.z(lat);
       if (x < cxm || z < czm || x > cxm + FW * S / 1000 || z > czm + FH * S / 1000) continue;
@@ -176,7 +191,8 @@ export async function makeTopoMap(world, o, say = () => {}) {
         const isRiver = t.waterway === 'river'; font(placeSz || 1.8, placeSz ? 600 : 400); g.textAlign = placeSz ? 'center' : 'left'; g.textBaseline = 'middle';
         g.lineWidth = mm(0.6); g.strokeStyle = 'rgba(255,255,255,.9)'; const tx = placeSz ? px : px + mm(1.4), ty = placeSz ? py : py - mm(0.3);
         g.fillStyle = isRiver ? '#1f5fa8' : placeSz ? '#222' : '#333'; if (isRiver) g.font = `italic 500 ${mm(2.6)}px ${FONT}`;
-        g.strokeText(name, tx, ty); g.fillText(name, tx, ty);
+        const tw = g.measureText(name).width, th = mm(placeSz || 1.8), bx0 = placeSz ? tx - tw / 2 : tx, box = [bx0 - mm(0.5), ty - th / 2 - mm(0.5), bx0 + tw + mm(0.5), ty + th / 2 + mm(0.5)];
+        if (!boxes.some(b => b[0] < box[2] && b[2] > box[0] && b[1] < box[3] && b[3] > box[1])) { boxes.push(box); g.strokeText(name, tx, ty); g.fillText(name, tx, ty); }
       }
       g.restore();
     }
@@ -223,11 +239,11 @@ export async function makeTopoMap(world, o, say = () => {}) {
   // ===== title =====
   const place = o.title || '', titleKm = o.titleKm || place, titleEn = place;
   g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#1f3f8f'; font(5.2, 700);
-  g.fillText(lang === 'en' ? `${titleEn.toUpperCase()}` : lang === 'km' ? titleKm : `${titleKm}${titleEn && titleKm !== titleEn ? ' - ' + titleEn.toUpperCase() : ''}`, mm(M + (W - 2 * M - side) / 2), mm(M + 5));
-  font(2.3); g.fillStyle = '#333'; g.textAlign = 'left'; g.fillText(T(`Scale 1:${S.toLocaleString('en')}`, `មាត្រដ្ឋាន ១:${KD(S)}`), mm(M), mm(M + 5));
-  g.textAlign = 'right'; g.fillText(T(`Topographic map · UTM ${zone}N`, `ផែនទីសណ្ឋានដី · UTM ${KD(zone)}N`), mm(M + (land ? W - 2 * M - side : W - 2 * M)), mm(M + 5));
+  g.fillText(lang === 'en' ? `${titleEn.toUpperCase()}` : lang === 'km' ? titleKm : `${titleKm}${titleEn && titleKm !== titleEn ? ' - ' + titleEn.toUpperCase() : ''}`, mm(fx + FW / 2), mm(M + 5));
+  font(2.3); g.fillStyle = '#333'; g.textAlign = 'left'; g.fillText(T(`Scale 1:${S.toLocaleString('en')}`, `មាត្រដ្ឋាន ១:${KD(S)}`), mm(fx), mm(M + 5));
+  g.textAlign = 'right'; g.fillText(T(`Topographic map · UTM ${zone}N`, `ផែនទីសណ្ឋានដី · UTM ${KD(zone)}N`), mm(fx + FW), mm(M + 5));
   // ===== margin: legend, scale, north, location, credits =====
-  const lx = land ? W - M - side : M, ly = land ? M + head : M + head + fh + 8, lw = land ? side : W - 2 * M;
+  const lx = land ? fx + FW + 8 : M, ly = land ? M + head : fy + FH + 9, lw = land ? side : W - 2 * M;
   const cols = land ? 2 : 4, colW = lw / cols, legBottom = land ? H - M - 96 : H - M - 2; let col = 0, cy = ly;
   const heading = (txt) => { font(2.4, 700); g.fillStyle = '#1f3f8f'; g.textAlign = 'left'; g.fillText(txt, mm(lx + col * colW), mm(cy + 1.5)); cy += 5; };
   const item = (draw, txt) => { const two = lang === 'both' && txt.includes(' · '), hgt = two ? 5.4 : 4.1; if (cy + hgt > legBottom) { col++; cy = ly + 5; } const x0 = lx + col * colW; draw(mm(x0), mm(cy), mm(8), mm(3)); g.fillStyle = '#222'; g.textAlign = 'left'; g.textBaseline = 'middle';
