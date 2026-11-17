@@ -148,17 +148,18 @@ export class Globe {
       const j = await (await fetch('https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=TC')).json(), now = Date.now();
       const act = (j.features || []).filter(f => now - Date.parse(f.properties.todate + 'Z') < 3 * 864e5);
       if (this.storms) { this.scene.remove(this.storms); this.storms.traverse(o => { if (o.geometry) o.geometry.dispose(); }); } const G0 = this.storms = new THREE.Group(); this.scene.add(G0);
-      const line = (co, col, dash, r = 1.009) => { const pts = co.map(([lo, la]) => xyz(la, lo, r)); const g = new THREE.BufferGeometry().setFromPoints(pts), l = new THREE.Line(g, dash ? new THREE.LineDashedMaterial({ color: col, dashSize: 0.006, gapSize: 0.004, transparent: true, opacity: 0.95 }) : new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: 0.95 })); if (dash) l.computeLineDistances(); G0.add(l); };
+      const line = (co, col, dash, r = 1.009, op = 0.95) => { const pts = co.map(([lo, la]) => xyz(la, lo, r)); const g = new THREE.BufferGeometry().setFromPoints(pts), l = new THREE.Line(g, dash ? new THREE.LineDashedMaterial({ color: col, dashSize: 0.006, gapSize: 0.004, transparent: true, opacity: op }) : new THREE.LineBasicMaterial({ color: col, transparent: true, opacity: op })); if (dash) l.computeLineDistances(); G0.add(l); };
       const names = [];
       for (const f of act) {
         const P = f.properties, geo = await (await fetch(P.url.geometry)).json(), C = { Green: 0x3fbf5f, Orange: 0xff9b2f, Red: 0xff3b30 };
         for (const q of geo.features) { const cl = q.properties.Class || ''; if (q.geometry.type === 'LineString') line(q.geometry.coordinates, q.properties.forecast ? 0xffd23f : 0xff5a3c, !!q.properties.forecast);
-          else if (/^Poly_(Green|Orange|Red)/.test(cl)) for (const ring of q.geometry.coordinates) line(ring, C[cl.slice(5)], false, 1.0085); }
+          else if (/^Poly_(Green|Orange|Red)/.test(cl)) for (const ring of q.geometry.coordinates) line(ring, C[cl.slice(5)], false, 1.0085, 0.35); }
         const [lo, la] = f.geometry.coordinates, sev = P.severitydata || {}, c = document.createElement('canvas'); c.width = 512; c.height = 112; const x = c.getContext('2d'); x.font = '700 40px system-ui'; x.fillStyle = '#ffd23f'; x.strokeStyle = '#000'; x.lineWidth = 6;
         const n1 = `🌀 ${P.eventname.replace(/-\d+$/, '')}`, n2 = (sev.severitytext || '').replace('(maximum wind speed of ', '· ').replace(')', ''); x.strokeText(n1, 8, 44); x.fillText(n1, 8, 44); x.font = '600 30px system-ui'; x.strokeText(n2, 8, 92); x.fillText(n2, 8, 92);
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), sizeAttenuation: false, depthTest: true, transparent: true })); sp.center.set(-0.04, 0.5); sp.scale.set(0.16, 0.035, 1); sp.position.copy(xyz(la, lo, 1.012)); sp.renderOrder = 32; G0.add(sp);
         const dot = new THREE.Mesh(new THREE.RingGeometry(0.004, 0.007, 24), new THREE.MeshBasicMaterial({ color: C[P.alertlevel] || 0xff9b2f, side: THREE.DoubleSide })); dot.position.copy(xyz(la, lo, 1.01)); dot.lookAt(0, 0, 0); G0.add(dot); names.push(`${P.eventname.replace(/-\d+$/, '')} (${sev.severity ? Math.round(sev.severity) + ' km/h' : P.alertlevel})`);
       }
+      if (!act.length) this.stormAt = Date.now() - 27 * 60e3; // try again in a few minutes
       this.status.storms = act.length ? `Tropical cyclones (GDACS): ${names.join(', ')} – red track = past, yellow dashed = forecast` : 'No active tropical cyclones (GDACS)';
     } catch (e) { this.status.storms = 'Storm data (GDACS) not reachable'; this.stormAt = 0; } this.onInfo && this.onInfo();
   }
