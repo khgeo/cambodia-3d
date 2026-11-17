@@ -827,9 +827,9 @@ export class World {
       for (let v = 0; v < f; v++) for (let u = 0; u < f; u++) { const x = Math.round(sx0 + i * f + u), y = Math.round(sy0 + j * f + v); if (x < 0 || y < 0 || x >= IW || y >= img.height) continue; const o = (y * IW + x) * 4; r += wb(px[o], 0, g); gg += wb(px[o + 1], 1, g); b += wb(px[o + 2], 2, g); n++; }
       if (!n) continue; r /= n; gg /= n; b /= n; const q = j * gw + i, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), v = (r + gg + b) / 3, sat = mx ? (mx - mn) / mx : 0;
       V[q] = v; Sat[q] = sat; R[q] = r; Gc[q] = gg; B[q] = b;
-      if (r > gg + 28 && r > b + 38 && r > 105 && sat > 0.28) cls[q] = 1;                 // red / orange tiles
-      else if (b > r + 22 && b > gg + 4 && v > 85 && sat > 0.2) cls[q] = 2;               // blue sheet roof
-      else if (v > 196 && sat < 0.16) cls[q] = 3;                                         // zinc / concrete
+      if (r > gg + 18 && r > b + 26 && r > 92 && sat > 0.2) cls[q] = 1;                 // red / orange tiles
+      else if (b > r + 16 && b > gg && v > 80 && sat > 0.16) cls[q] = 2;               // blue sheet roof
+      else if (v > 178 && sat < 0.2) cls[q] = 3;                                         // zinc / concrete
     }
     const lab = new Int32Array(gw * gh).fill(-1), taken = new Map(), key = (x, z) => Math.floor(x / 10) + ',' + Math.floor(z / 10);
     const xAt = i => X0 + ((i + 0.5) * f) * mpp, zAt = j => Z0 + ((j + 0.5) * f) * (D.H / (sy1 - sy0));
@@ -841,10 +841,10 @@ export class World {
       while (st.length) { const q = st.pop(); mem.push(q); if (mem.length > 4000) break; const i = q % gw, j = (q / gw) | 0;
         for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ii = i + a, jj = j + b; if (ii < 0 || jj < 0 || ii >= gw || jj >= gh) continue; const n2 = jj * gw + ii; if (lab[n2] < 0 && cls[n2] === c) { lab[n2] = comp; st.push(n2); } } }
       comp++;
-      const area = mem.length * cell * cell; if (area < 14 || area > 650) continue;
+      const area = mem.length * cell * cell; if (area < 9 || area > 700) continue;
       const pts = mem.map(q => [xAt(q % gw), zAt((q / gw) | 0)]), ob = G.obb(pts); if (!ob) continue;
       const a = ob.a + cell / 2, b = ob.b + cell / 2, fill = area / (4 * a * b);
-      if (fill < 0.5 || b < 1.3 || a / b > 4.5) continue;
+      if (fill < 0.42 || b < 1.1 || a / b > 5) continue;
       // contrast with a ring around the roof
       let iv = 0, is = 0, rv = 0, rs = 0, rn = 0, mr = 0, mg = 0, mb = 0;
       for (const q of mem) { iv += V[q]; is += Sat[q]; mr += R[q]; mg += Gc[q]; mb += B[q]; }
@@ -852,8 +852,8 @@ export class World {
       const i0 = Math.min(...mem.map(q => q % gw)), i1 = Math.max(...mem.map(q => q % gw)), j0 = Math.min(...mem.map(q => (q / gw) | 0)), j1 = Math.max(...mem.map(q => (q / gw) | 0)), pad = 3;
       for (let j = j0 - pad; j <= j1 + pad; j++) for (let i = i0 - pad; i <= i1 + pad; i++) { if (i < 0 || j < 0 || i >= gw || j >= gh) continue; if (i >= i0 && i <= i1 && j >= j0 && j <= j1) continue; const q = j * gw + i; rv += V[q]; rs += Sat[q]; rn++; }
       if (!rn) continue; rv /= rn; rs /= rn;
-      if (c === 3 && iv - rv < 32) continue;           // bright roofs must be clearly brighter than the ground around
-      if (c !== 3 && is - rs < 0.12) continue;         // coloured roofs must be clearly more colourful
+      if (c === 3 && iv - rv < 20) continue;           // bright roofs must be clearly brighter than the ground around
+      if (c !== 3 && is - rs < 0.07) continue;         // coloured roofs must be clearly more colourful
       const cx = ob.cx, cz = ob.cz;
       if (mAt(exclude, cx, cz) || mAt(D.rmask, cx, cz) || mAt(D.wmask, cx, cz)) continue;
       let near = false; for (let u = -1; u <= 1 && !near; u++) for (let v = -1; v <= 1; v++) for (const p of taken.get((Math.floor(cx / 10) + u) + ',' + (Math.floor(cz / 10) + v)) || []) if (Math.hypot(p[0] - cx, p[1] - cz) < 3) { near = true; break; }
