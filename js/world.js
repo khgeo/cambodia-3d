@@ -5,23 +5,23 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=28';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=28';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=28';
-import { buildTrees, GrassField } from './vegetation.js?v=28';
-import { RoadNet, Driver, Walker } from './modes.js?v=28';
-import { vehicleKit } from './vehicles.js?v=28';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=28';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=28';
-import { LayerStack } from './layers.js?v=28';
-import { Survey } from './survey.js?v=28';
-import { Editor } from './editor.js?v=28';
-import { Atmos } from './atmos.js?v=28';
-import { NightLights } from './lights.js?v=28';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=28';
-import { Tactical, loadCatalog } from './tactical.js?v=28';
-import { SEASON } from './vegetation.js?v=28';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=28';
+import * as G from './geo.js?v=29';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=29';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=29';
+import { buildTrees, GrassField } from './vegetation.js?v=29';
+import { RoadNet, Driver, Walker } from './modes.js?v=29';
+import { vehicleKit } from './vehicles.js?v=29';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=29';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=29';
+import { LayerStack } from './layers.js?v=29';
+import { Survey } from './survey.js?v=29';
+import { Editor } from './editor.js?v=29';
+import { Atmos } from './atmos.js?v=29';
+import { NightLights } from './lights.js?v=29';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=29';
+import { Tactical, loadCatalog } from './tactical.js?v=29';
+import { SEASON } from './vegetation.js?v=29';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=29';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -841,10 +841,10 @@ export class World {
       while (st.length) { const q = st.pop(); mem.push(q); if (mem.length > 4000) break; const i = q % gw, j = (q / gw) | 0;
         for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ii = i + a, jj = j + b; if (ii < 0 || jj < 0 || ii >= gw || jj >= gh) continue; const n2 = jj * gw + ii; if (lab[n2] < 0 && cls[n2] === c) { lab[n2] = comp; st.push(n2); } } }
       comp++;
-      const area = mem.length * cell * cell; if (area < 9 || area > 700) continue;
+      const area = mem.length * cell * cell; if (area < 9 || area > 450) continue;
       const pts = mem.map(q => [xAt(q % gw), zAt((q / gw) | 0)]), ob = G.obb(pts); if (!ob) continue;
       const a = ob.a + cell / 2, b = ob.b + cell / 2, fill = area / (4 * a * b);
-      if (fill < 0.42 || b < 1.1 || a / b > 5) continue;
+      if (fill < (c === 3 ? 0.55 : 0.42) || b < 1.1 || a / b > 5) continue;
       // contrast with a ring around the roof
       let iv = 0, is = 0, rv = 0, rs = 0, rn = 0, mr = 0, mg = 0, mb = 0;
       for (const q of mem) { iv += V[q]; is += Sat[q]; mr += R[q]; mg += Gc[q]; mb += B[q]; }
@@ -859,7 +859,7 @@ export class World {
       let near = false; for (let u = -1; u <= 1 && !near; u++) for (let v = -1; v <= 1; v++) for (const p of taken.get((Math.floor(cx / 10) + u) + ',' + (Math.floor(cz / 10) + v)) || []) if (Math.hypot(p[0] - cx, p[1] - cz) < 3) { near = true; break; }
       if (near) continue;
       const A2 = a + 0.25, B2 = b + 0.25, ring = [[-A2, -B2], [A2, -B2], [A2, B2], [-A2, B2]].map(([u, v]) => [cx + ob.ux * u + ob.vx * v, cz + ob.uz * u + ob.vz * v]);
-      const n = mem.length, roofC = (Math.round(mr / n * 0.85) << 16) | (Math.round(mg / n * 0.85) << 8) | Math.round(mb / n * 0.85);
+      const n = mem.length, cl = v => Math.min(255, Math.round(v)), roofC = (cl(mr / n) << 16) | (cl(mg / n) << 8) | cl(mb / n);
       out.push({ t: 1, hdm: 0, lv: area > 220 ? 2 : 0, ring, stilt: area < 120 && rnd() < 0.5 ? 1.8 + rnd() * 0.6 : 0, roof: area > 400 ? 'flat' : a / b > 1.6 ? 'gable' : 'hip', roofC, wall: [0xa07a55, 0xd9cdb5, 0xe6dccb, 0xbfa27c, 0xc8d3d6, 0xefe2c9][(rnd() * 6) | 0], src: 'image roof' });
       (taken.get(key(cx, cz)) || taken.set(key(cx, cz), []).get(key(cx, cz))).push([cx, cz]);
       for (let u = -a; u <= a; u += MR) for (let v = -b; v <= b; v += MR) { const x = cx + ob.ux * u + ob.vx * v, z = cz + ob.uz * u + ob.vz * v, i = Math.min(mw - 1, Math.max(0, ((x - X0) / MR) | 0)), j = Math.min(mh - 1, Math.max(0, ((z - Z0) / MR) | 0)); exclude[j * mw + i] = 1; this.bmask[j * mw + i] = 1; }
