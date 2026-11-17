@@ -69,6 +69,62 @@ More in the Layers panel:
 - **Flood level:** a water sheet set by a chosen elevation (a simple bathtub model, no flow). It reports the share of the area under water and the mean depth, and it works with the layers apart or together.
 - **Cross-section through the stack:** a section line drawn while the layers are apart is shown on every slab, joined by a light curtain.
 
+## Interface and language
+A narrow icon rail on the left holds everything:
+- **Panels:** 🎥 views, 🖼 display, 🌤 environment, 📊 land cover and statistics.
+- **Tools:** 🗂 layers, 📐 survey, ✏️ digitize, ✂️ cross-section, 🎯 tactical, 🗺 topographic map.
+
+Hover an icon for its name. On phones the rail moves to the bottom. **ខ្មែរ / EN** switches the whole interface between Khmer and English, and the choice is remembered. Strings are in `js/i18n.js`.
+
+## Land cover: 13 classes
+Each 2.5 m cell is classified from the satellite image (water, canopy, green, bare, built). The class is then refined using:
+- canopy density
+- nearness to houses and water
+- slope
+- OpenStreetMap roads, buildings, water and land use
+- the Esri | Impact Observatory 10 m Sentinel-2 land cover of the latest year
+
+The classes are:
+
+| # | Class |
+|---|---|
+| 1 | Open water |
+| 2 | Flooded / wet vegetation |
+| 3 | Dense forest |
+| 4 | Open forest / woodland |
+| 5 | Shrubland / scattered trees |
+| 6 | Orchard / village trees |
+| 7 | Paddy rice field |
+| 8 | Other cropland |
+| 9 | Grassland / pasture |
+| 10 | Bare soil / fallow |
+| 11 | Sand / riverbank |
+| 12 | Built-up |
+| 13 | Roads |
+
+These classes are used by the *Land cover* ground style, the statistics panel, the topographic map and the mobility analysis.
+
+## Topographic map (🗺)
+Builds an A4, A3 or A2 sheet (landscape or portrait) at an automatic or chosen scale, in Khmer, English or both. It contains:
+- **Land cover:** topographic tints with map symbols (forest circles, rice tufts, grass, orchard, marsh).
+- **Relief:** hillshade, and contours (interval chosen from the relief) with labelled index contours.
+- **Mapped features:** spot heights, water, and roads by class with casings and dashed tracks. Also railways, OSM buildings and houses from the image.
+- **Names:** place names and landmarks (pagodas, schools, health centres, markets, peaks, rivers) from a bundled OpenStreetMap extract (`data/places`, made by `tools/places.py`).
+- **Optional overlays:** your digitized features, survey points and parcels, and the tactical overlay.
+- **Grid:** a UTM 48N grid with labels in the topographic style and DMS corner coordinates.
+- **Margin:** a bilingual legend, scale bar, contour interval, true north and grid north with the convergence angle, a location map, sources, and the RUPP Geoinformatics and Research Lab credit.
+
+Download as PNG (150–300 dpi) or PDF.
+
+## Tactical (🎯)
+Adapted from the author's **Terrain Ops** and **TacMap KH** QGIS plugins (`tac/` holds the symbol SVGs, the catalogue and `mobility.json`).
+- **Symbols:** own, enemy or neutral, with NATO or Khmer/Soviet colours. Point symbols stand on poles in 3D with labels. Line symbols are draped on the ground: axis, front line with semicircles, trenches with ticks, wire, mine line, anti-tank ditch, phase line, boundaries and dimension arrows. Areas include defended area, objective, assembly area, minefield, obstacle and impassable (hatched). Fire sectors and range rings are also available.
+- **Line of sight:** between two points or between the nearest own and enemy symbols. Trees and buildings block sight, but those at the observer's and target's own positions do not. Results: profile chart, distance, height change, bearing in degrees and mils, and the share of ground seen.
+- **Viewshed:** visible and hidden ground from an observation point within a chosen radius.
+- **Mobility:** GO / SLOW-GO / NO-GO from slope, land cover, water, roads, vehicle type (wheeled, tracked, foot) and dry or wet season.
+
+Export as GeoJSON. For planning and training from open data. Confirm by reconnaissance.
+
 ## Digitize: your own roads, buildings, trees and ponds
 **✏️ Digitize** opens the editor.
 - **Road:** tap along a route and choose the type (national, provincial, district, village street, laterite track or footpath). The road is draped on a smoothed long profile with shoulders and textured (asphalt with markings, concrete, laterite or dirt). Every new road joins the **Drive** network.
