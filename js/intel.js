@@ -128,7 +128,9 @@ export function findSimilar(canvas0, px0, py0, tol = 28, minF = 0.4, maxF = 2.5,
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(canvas0, 0, 0, W, H); const d = g.getImageData(0, 0, W, H).data, N = W * H;
   const px = Math.min(W - 1, Math.max(0, Math.round(px0 * k))), py = Math.min(H - 1, Math.max(0, Math.round(py0 * k)));
   const L0 = new Float32Array(N), A0 = new Float32Array(N), B0 = new Float32Array(N); for (let i = 0, q = 0; i < N; i++, q += 4) { const r = d[q], gg = d[q + 1], b = d[q + 2]; L0[i] = 0.299 * r + 0.587 * gg + 0.114 * b; A0[i] = r - gg; B0[i] = (r + gg) / 2 - b; }
-  let ref = [0, 0, 0]; if (given) ref = given.ref; else { let n = 0; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const x = Math.min(W - 1, Math.max(0, px + i)), y = Math.min(H - 1, Math.max(0, py + j)), q = y * W + x; ref[0] += L0[q]; ref[1] += A0[q]; ref[2] += B0[q]; n++; } ref = ref.map(v => v / n); }
+  // colour statistics of this image, so an example from one date can be matched in another date's image
+  const stat = A => { let m = 0, q = 0; for (let i = 0; i < N; i += 7) { m += A[i]; q += A[i] * A[i]; } const n = Math.ceil(N / 7); m /= n; return [m, Math.sqrt(Math.max(1, q / n - m * m))]; }, S = [stat(L0), stat(A0), stat(B0)];
+  let ref = [0, 0, 0]; if (given) { ref = given.ref.map((v, k) => given.stats ? (v - given.stats[k][0]) / given.stats[k][1] * S[k][1] + S[k][0] : v); if (given.stats) tol *= (S[0][1] / given.stats[0][1] + S[1][1] / given.stats[1][1] + S[2][1] / given.stats[2][1]) / 3; } else { let n = 0; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const x = Math.min(W - 1, Math.max(0, px + i)), y = Math.min(H - 1, Math.max(0, py + j)), q = y * W + x; ref[0] += L0[q]; ref[1] += A0[q]; ref[2] += B0[q]; n++; } ref = ref.map(v => v / n); }
   const mask = new Uint8Array(N), t2 = tol * tol; for (let i = 0; i < N; i++) { const a = (L0[i] - ref[0]) * 0.8, b = A0[i] - ref[1], c = B0[i] - ref[2]; if (a * a + b * b + c * c < t2) mask[i] = 1; }
   const lbl = new Int32Array(N), blobs = [null]; let id = 0; const st = new Int32Array(N); let sp = 0;
   for (let s0 = 0; s0 < N; s0++) { if (!mask[s0] || lbl[s0]) continue; id++; let n = 0, sx = 0, sy = 0, x0 = W, x1 = 0, y0 = H, y1 = 0; st[sp++] = s0; lbl[s0] = id;
@@ -140,7 +142,7 @@ export function findSimilar(canvas0, px0, py0, tol = 28, minF = 0.4, maxF = 2.5,
   if (!given && ex.n > N * 0.05) return { count: 0, items: [], example: null, tooBig: true }; // tapped on a large surface (field, water), not an object
   const exAR = Math.max(ex.w, ex.h) / Math.max(1, Math.min(ex.w, ex.h)), items = [];
   for (let i = 1; i < blobs.length; i++) { const b = blobs[i]; if (b.n < ex.n * minF || b.n > ex.n * maxF || b.fill < Math.min(0.35, ex.fill * 0.6)) continue; if (Math.max(b.w, b.h) / Math.max(1, Math.min(b.w, b.h)) > Math.max(4, exAR * 1.8)) continue; items.push(b); }
-  return { count: items.length, items, example: { ...ex, n: ex.n / (k * k) }, ref, exK: ex };
+  return { count: items.length, items, example: { ...ex, n: ex.n / (k * k) }, ref, exK: ex, stats: S };
 }
 
 /* ================= share link: area, view, notes, tactical symbols and your drawings in the URL ================= */
