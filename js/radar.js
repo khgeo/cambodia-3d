@@ -58,7 +58,7 @@ export class Radar {
       for (let k = 0; k < NE; k++) { const A = 1 + k, B = 1 + NE + 1 + k; idx.push(0, A, A + 1, 0, B, B + 1, A, B, A + 1, A + 1, B, B + 1); }
       const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gg.setIndex(idx); gg.computeVertexNormals();
       const m = new THREE.Mesh(gg, new THREE.MeshBasicMaterial({ color: 0x33ff66, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending })); m.renderOrder = 8; return m; };
-    sw.add(fan(3, 0.32)); for (let k = 1; k <= 6; k++) { const f = fan(4, 0.13 * (1 - k / 7)); f.rotation.y = k * 4 * Math.PI / 180; sw.add(f); } // afterglow
+    sw.add(fan(3, 0.2)); for (let k = 1; k <= 6; k++) { const f = fan(4, 0.13 * (1 - k / 7)); f.rotation.y = k * 4 * Math.PI / 180; sw.add(f); } // afterglow
     this.sweep = sw; g.add(sw);
     // coverage: the radar sees from the horizon up to EL_MAX; above that is the cone of silence
     const dome = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 12, 0, Math.PI * 2, Math.PI / 2 - EL_MAX * Math.PI / 180, EL_MAX * Math.PI / 180), new THREE.MeshBasicMaterial({ color: 0x33ff66, transparent: true, opacity: 0.05, depthWrite: false, side: THREE.DoubleSide }));
