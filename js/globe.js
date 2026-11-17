@@ -121,7 +121,7 @@ export class Globe {
     const P = this.P, pos = this.windLines.geometry.attributes.position.array, col = this.windLines.geometry.attributes.color.array, K = 2.2e4 * dt; // time lapse
     for (let i = 0; i < this.nP; i++) {
       let la = P[i * 3], lo = P[i * 3 + 1]; const [u, v] = this.windAt_(la, lo), s = Math.hypot(u, v), la1 = la + v * K / 111000, lo1 = lo + u * K / (111000 * Math.max(0.2, Math.cos(la * D2R)));
-      P[i * 3 + 2] += dt; const Tt = 22000, a = xyz(la - v * Tt / 111000, lo - u * Tt / (111000 * Math.max(0.2, Math.cos(la * D2R))), 1.008), b = xyz(la1, lo1, 1.008); // short streak behind each particle pos.set([a.x, a.y, a.z, b.x, b.y, b.z], i * 6);
+      P[i * 3 + 2] += dt; const Tt = 22000, a = xyz(la - v * Tt / 111000, lo - u * Tt / (111000 * Math.max(0.2, Math.cos(la * D2R))), 1.008), b = xyz(la1, lo1, 1.008); pos.set([a.x, a.y, a.z, b.x, b.y, b.z], i * 6); // short streak behind each particle
       const t = Math.min(1, s / 18), fade = Math.min(1, P[i * 3 + 2] / 2) * Math.min(1, (90 - P[i * 3 + 2]) / 5); const r = 0.55 + t * 0.45, gg = 0.85 - t * 0.45, bb = 1 - t * 0.85; col.set([r, gg, bb, 0, r, gg, bb, 0.95 * fade], i * 8);
       P[i * 3] = la1; P[i * 3 + 1] = ((lo1 + 540) % 360) - 180; if (P[i * 3 + 2] > 90 || Math.abs(la1) > 82 || s < 0.3 && Math.random() < 0.02) this.respawn(i);
     }
