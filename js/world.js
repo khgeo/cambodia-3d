@@ -5,25 +5,26 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=37';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=37';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=37';
-import { buildTrees, GrassField } from './vegetation.js?v=37';
-import { RoadNet, Driver, Walker } from './modes.js?v=37';
-import { vehicleKit } from './vehicles.js?v=37';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=37';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=37';
-import { LayerStack } from './layers.js?v=37';
-import { Survey } from './survey.js?v=37';
-import { Editor } from './editor.js?v=37';
-import { Atmos } from './atmos.js?v=37';
-import { NightLights } from './lights.js?v=37';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=37';
-import { Tactical, loadCatalog } from './tactical.js?v=37';
-import { LcTrainer } from './lctrain.js?v=37';
-import { Radar } from './radar.js?v=37';
-import { SEASON } from './vegetation.js?v=37';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=37';
+import * as G from './geo.js?v=38';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=38';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=38';
+import { buildTrees, GrassField } from './vegetation.js?v=38';
+import { RoadNet, Driver, Walker } from './modes.js?v=38';
+import { vehicleKit } from './vehicles.js?v=38';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=38';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=38';
+import { LayerStack } from './layers.js?v=38';
+import { Survey } from './survey.js?v=38';
+import { Editor } from './editor.js?v=38';
+import { Atmos } from './atmos.js?v=38';
+import { NightLights } from './lights.js?v=38';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=38';
+import { Tactical, loadCatalog } from './tactical.js?v=38';
+import { LcTrainer } from './lctrain.js?v=38';
+import { Radar } from './radar.js?v=38';
+import { Globe } from './globe.js?v=38';
+import { SEASON } from './vegetation.js?v=38';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=38';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -143,10 +144,13 @@ export class World {
     let painting = false, lastPaint = 0;
     const paintAt = e => { const r = el.getBoundingClientRect(), rc = this._rc || (this._rc = new THREE.Raycaster()); rc.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera);
       const hit = rc.intersectObject(this.terrainMesh, false)[0]; if (!hit) return null; if (this.brush) { this.brush.position.set(hit.point.x, hit.point.y + 0.5, hit.point.z); this.brush.visible = true; } return hit.point; };
+    // zooming out past the farthest view keeps going: out to the whole Earth
+    el.addEventListener('wheel', e => { if (this.mode !== 'orbit' || (this.globe && this.globe.on) || !this.D || (this.layers && this.layers.t > 0.01)) return;
+      const d = this.camera.position.distanceTo(this.controls.target); if (e.deltaY > 0 && d >= this.controls.maxDistance * 0.97) { this._oz = (this._oz || 0) + 1; if (this._oz >= 4) { this._oz = 0; this.openGlobe(); } } else this._oz = 0; }, { passive: true });
     let spaceDown = false;
     addEventListener('keydown', e => { if (e.code === 'Space' && this.lcPaint && !/INPUT|TEXTAREA|SELECT/.test((e.target.tagName || ''))) { spaceDown = true; el.style.cursor = 'grab'; e.preventDefault(); } });
     addEventListener('keyup', e => { if (e.code === 'Space') { spaceDown = false; el.style.cursor = ''; } });
-    el.addEventListener('pointerdown', e => { if (!this.lcPaint || this.mode !== 'orbit' || e.button !== 0 || spaceDown || e.altKey || !this.terrainMesh) return; painting = true; this.controls.enabled = false; const p = paintAt(e); if (p) this.onPaint && this.onPaint(p.x, p.z); }, true);
+    el.addEventListener('pointerdown', e => { if (!this.lcPaint || (this.globe && this.globe.on) || this.mode !== 'orbit' || e.button !== 0 || spaceDown || e.altKey || !this.terrainMesh) return; painting = true; this.controls.enabled = false; const p = paintAt(e); if (p) this.onPaint && this.onPaint(p.x, p.z); }, true);
     el.addEventListener('pointermove', e => { if (!this.lcPaint || !this.terrainMesh) return; const now = performance.now(); if (now - lastPaint < 30) return; lastPaint = now; const p = paintAt(e); if (painting && p) this.onPaint && this.onPaint(p.x, p.z); });
     addEventListener('pointerup', () => { if (!painting) return; painting = false; this.controls.enabled = this.mode === 'orbit'; this.onPaintEnd && this.onPaintEnd(); });
     // digitizing: live snap marker + rubber band under the cursor
@@ -1179,6 +1183,7 @@ export class World {
     this.ensureUnderground(say).then(() => { this.layers.buildUnder(); this.onLayersReady && this.onLayersReady(); }).catch(e => console.warn(e));
     return this.layers;
   }
+  openGlobe() { if (!this.globe) { this.globe = new Globe(this); this.globe.onToggle = v => this.onGlobe && this.onGlobe(v); } this.globe.enter(); return this.globe; }
   openRadar() { if (!this.radar) this.radar = new Radar(this); return this.radar; }
   async openTactical() { await loadCatalog(); if (!this.tactical) this.tactical = new Tactical(this); this.tactical.active = true; await this.tactical.rebuild(); return this.tactical; }
   openEditor() { if (!this.editor) { this.editor = new Editor(this); this.editor.rebuild(); } this.editor.active = true; return this.editor; }
@@ -1226,7 +1231,7 @@ export class World {
     if (this.brush) this.brush.visible = on;
   }
   getTrainer() { if (!this.trainer) this.trainer = new LcTrainer(this); this.trainer.prepare(); return this.trainer; }
-  refreshLC() { if (this.texStyl) { this.texStyl.dispose(); this.texStyl = null; } if (this.groundStyle === 'lulc') this.setGround('lulc'); }
+  refreshLC() { if (this.texStyl) { this.texStyl.dispose(); this.texStyl = null; } if (this.groundStyle === 'lulc') this.setGround('lulc'); if (this.layers && this.layers.refreshLulc) this.layers.refreshLulc(); }
   // quick feedback while painting: draw the class colour straight into the land-cover texture
   paintPreview(x, z, r, hex) {
     const D = this.D, t = this.texStyl; if (!t || this.groundStyle !== 'lulc') return; const c = t.image.getContext('2d'), px = D.pxX(this.F.lon(x)), py = D.pxY(this.F.lat(z)), pr = (D.pxX(this.F.lon(x + r)) - px);
@@ -1281,6 +1286,7 @@ export class World {
   groundAt(x, z) { return this.hAt ? this.hAt(x, z) : 0; }
   pxToMetres(p, px) { const d = this.camera.position.distanceTo(p); return Math.max(0.3, d * 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) / this.renderer.domElement.clientHeight * px); }
   onTap(e) {
+    if (this.globe && this.globe.on) return;
     if (this.radarPick && this.terrainMesh && this.mode === 'orbit') { const r = this.renderer.domElement.getBoundingClientRect(), rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera);
       const h = rc.intersectObject(this.terrainMesh, false)[0]; if (h) { this.radarPick = false; this.radar.place(h.point.x, h.point.z); } return; }
     const tacPick = this.tactical && this.tactical.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
@@ -1328,6 +1334,7 @@ export class World {
 
   frame() {
     if (this.paused) { this.clock.getDelta(); return; }
+    if (this.globe && this.globe.on) { this.globe.frame(Math.min(this.clock.getDelta(), 0.1)); return; }
     const dt = Math.min(this.clock.getDelta(), 0.05); this.uTime.value += dt;
     if (this.trafficOn !== false) this.updateTraffic(dt);
     this.waterNormal.offset.x += dt * 0.012; this.waterNormal.offset.y += dt * 0.007;

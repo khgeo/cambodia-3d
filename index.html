@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=37">
+<link rel="stylesheet" href="css/app.css?v=38">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -70,6 +70,7 @@
     <button id="editBtn" data-tip="Digitize: roads, buildings, trees">✏️</button>
     <button id="sectionBtn" data-tip="Cross-section: soil &amp; geology">✂️</button>
     <button id="lcBtn" data-tip="Train land cover: paint what you see, the model learns">🖌️</button>
+    <button id="globeBtn" data-tip="Whole Earth: where this area is, live clouds, wind, satellites, flights">🌍</button>
     <button id="radarBtn" data-tip="Radar: aircraft in the sky (simulated or live)">📡</button>
     <button id="tacBtn" data-tip="Tactical: symbols, line of sight, mobility">🎯</button>
     <button id="topoBtn" data-tip="Export: topographic map &amp; GeoPackage">🗺️</button>
@@ -262,6 +263,28 @@
       <div id="lcInfo" class="svhelp"></div>
     </div>
   </div>
+  <div id="globePanel" class="rpanel" hidden>
+    <div class="row lphead"><b>🌍 Whole Earth</b><span id="globeHint" class="hint"></span><button id="globeMin" title="Hide / show">▴</button></div>
+    <div id="globeContent">
+      <div class="row"><button id="globeBack" class="primary" style="margin:0">⤵ Back to my 3D area</button></div>
+      <div class="svhelp">Drag to turn the Earth, wheel to zoom. Zoom right down onto your area to go back into it.</div>
+      <div class="gchk">
+        <label><input type="checkbox" data-g="night" checked> 🌗 Day &amp; night (real sun now)</label>
+        <label><input type="checkbox" data-g="clouds" checked> ☁️ Clouds (live, satellites)</label>
+        <label><input type="checkbox" data-g="wind" checked> 🌬️ Wind (live)</label>
+        <label><input type="checkbox" data-g="flights" checked> ✈️ Aircraft</label>
+      </div>
+      <div class="lbl" style="margin-top:6px">🛰️ Satellites (live orbits)</div>
+      <div class="gchk">
+        <label><input type="checkbox" data-s="stations" checked> Space stations (ISS, Tiangong)</label>
+        <label><input type="checkbox" data-s="visual" checked> Brightest satellites</label>
+        <label><input type="checkbox" data-s="gps-ops"> GPS</label>
+        <label><input type="checkbox" data-s="weather"> Weather satellites</label>
+        <label><input type="checkbox" data-s="starlink"> Starlink (thousands)</label>
+      </div>
+      <div id="globeInfo" class="svhelp"></div>
+    </div>
+  </div>
   <div id="radarPanel" class="rpanel" hidden>
     <div class="row lphead"><b>📡 Radar</b><span id="radarHint" class="hint"></span><button id="radarMin" title="Hide / show">▴</button><button id="radarClose" title="Close">✕</button></div>
     <div id="radarContent">
@@ -317,6 +340,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=37"></script>
+<script type="module" src="js/app.js?v=38"></script>
 </body>
 </html>

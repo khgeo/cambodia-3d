@@ -110,6 +110,10 @@ export const KM = {
   'Detected': 'រកឃើញ', 'tracked': 'កំពុងតាមដាន', 'Flight': 'ជើងហោះហើរ', 'Type': 'ប្រភេទ', 'Track': 'ទិស', 'Bearing': 'ទិសពីរ៉ាដា', 'Place the radar on the ground first.': 'សូមដាក់រ៉ាដាលើដីជាមុនសិន។', 'Tap the ground to place the radar': 'ចុចលើដីដើម្បីដាក់រ៉ាដា', 'Saved': 'បានរក្សាទុក',
   'Live weather & time here': 'អាកាសធាតុ និងម៉ោងផ្ទាល់នៅទីនេះ', 'Thunderstorm': 'ព្យុះផ្គររន្ទះ', 'Rain': 'ភ្លៀង', 'Fog': 'អ័ព្ទ', 'Overcast': 'មេឃស្រទំ', 'Partly cloudy': 'មានពពកខ្លះ', 'Clear': 'មេឃស្រឡះ', 'feels': 'មានអារម្មណ៍', 'from': 'ពី', 'today': 'ថ្ងៃនេះ', 'Local time': 'ម៉ោងក្នុងស្រុក', 'updated every 15 min': 'ធ្វើបច្ចុប្បន្នភាពរៀងរាល់ ១៥ នាទី', 'Live weather is not reachable right now.': 'មិនអាចភ្ជាប់អាកាសធាតុផ្ទាល់បានទេឥឡូវនេះ។',
   'Satellite image on top (I)': 'រូបភាពផ្កាយរណបពីលើ (I)', 'Image opacity': 'ភាពស្រអាប់រូបភាព',
+  'Whole Earth: where this area is, live clouds, wind, satellites, flights': 'ផែនដីទាំងមូល៖ ទីតាំងតំបន់នេះ ពពក ខ្យល់ ផ្កាយរណប ជើងហោះហើរផ្ទាល់', 'Whole Earth': 'ផែនដីទាំងមូល', 'Back to my 3D area': 'ត្រឡប់ទៅតំបន់ 3D របស់ខ្ញុំ',
+  'Drag to turn the Earth, wheel to zoom. Zoom right down onto your area to go back into it.': 'អូសដើម្បីបង្វិលផែនដី កង់ដើម្បីពង្រីក។ ពង្រីកចុះលើតំបន់របស់អ្នកដើម្បីចូលវិញ។',
+  'Day & night (real sun now)': 'ថ្ងៃ និងយប់ (ព្រះអាទិត្យពិតឥឡូវ)', 'Clouds (live, satellites)': 'ពពក (ផ្ទាល់ ពីផ្កាយរណប)', 'Wind (live)': 'ខ្យល់ (ផ្ទាល់)', 'Aircraft': 'យន្តហោះ', 'Satellites (live orbits)': 'ផ្កាយរណប (គន្លងផ្ទាល់)',
+  'Space stations (ISS, Tiangong)': 'ស្ថានីយអវកាស (ISS, Tiangong)', 'Brightest satellites': 'ផ្កាយរណបភ្លឺបំផុត', 'Weather satellites': 'ផ្កាយរណបឧតុនិយម', 'Starlink (thousands)': 'Starlink (រាប់ពាន់)',
   'Contours': 'ខ្សែកម្ពស់', 'Grid': 'ក្រឡាចត្រង្គ', 'Your features': 'វត្ថុរបស់អ្នក', 'Survey points & parcels': 'ចំណុចវាស់ និងក្បាលដី', 'Tactical overlay': 'ស្រទាប់យុទ្ធសាស្ត្រ',
 };
 export let lang = 'en';

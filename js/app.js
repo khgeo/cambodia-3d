@@ -1,6 +1,6 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=37';
-import { t, lang, setLang, initLang, onLang } from './i18n.js?v=37';
+import * as G from './geo.js?v=38';
+import { t, lang, setLang, initLang, onLang } from './i18n.js?v=38';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -99,7 +99,7 @@ document.querySelectorAll('#rail [data-fly]').forEach(b => b.onclick = () => {
 function syncRail() {
   const open = !$('scenePanel').classList.contains('hidden');
   document.querySelectorAll('#rail [data-fly]').forEach(b => b.classList.toggle('on', open && b.dataset.fly === flySec));
-  const P = { layersBtn: 'layerPanel', surveyBtn: 'surveyPanel', editBtn: 'editPanel', sectionBtn: 'sectionPanel', tacBtn: 'tacPanel', topoBtn: 'topoPanel', lcBtn: 'lcPanel', radarBtn: 'radarPanel' };
+  const P = { layersBtn: 'layerPanel', surveyBtn: 'surveyPanel', editBtn: 'editPanel', sectionBtn: 'sectionPanel', tacBtn: 'tacPanel', topoBtn: 'topoPanel', lcBtn: 'lcPanel', radarBtn: 'radarPanel', globeBtn: 'globePanel' };
   for (const [b, p] of Object.entries(P)) if ($(b) && $(p)) $(b).classList.toggle('act', !$(p).hidden);
 }
 setInterval(syncRail, 500);
@@ -218,7 +218,7 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=37'); world = new World($('scene')); window.__world = world;
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=38'); world = new World($('scene')); window.__world = world; world.onGlobe = v => globeUI(v);
     world.onModeChange = m => {
       $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk'; if (SV && !$('surveyPanel').hidden) svRender();
       if (m === 'drive' || m === 'walk') { setOn('views', m); showPanel('scenePanel', false); }
@@ -227,13 +227,13 @@ $('build').onclick = async () => {
     world.onVehicle = k => { $('vehicle').value = k; };
     world.onSectionHint = t => { $('secHint').textContent = t; };
     world.onSection = async S => {
-      const { drawProfile, legendHTML } = await import('./section.js?v=37');
+      const { drawProfile, legendHTML } = await import('./section.js?v=38');
       $('sectionPanel').classList.remove('picking', 'min'); $('secMin').textContent = '▾';
       const cv = $('secCanvas'); cv.width = Math.min(1600, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio))); cv.height = Math.round(cv.width * 0.36);
       drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – ↺ for a new line, ▾ to minimise';
     };
-    const { joystick } = await import('./modes.js?v=37'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=37'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=38'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=38'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -243,7 +243,7 @@ $('build').onclick = async () => {
   catch (e) { console.error(e); progress('Failed: ' + e.message); setTimeout(() => progress(''), 6000); return; }
   await rebuild();
   $('hud').hidden = false;
-  if (world.radar) { world.radar.remove(); world.radarPick = false; } if ($('liveWx').checked) liveWeather();
+  if (world.globe && world.globe.on) world.globe.finishLeave(); if (world.radar) { world.radar.remove(); world.radarPick = false; } if ($('liveWx').checked) liveWeather();
 };
 function openScene() { $('mapView').hidden = true; $('sceneView').hidden = false; if (world) world.paused = false; }
 $('return3d').onclick = () => openScene();
@@ -283,7 +283,7 @@ document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.
 if (innerWidth < 640) showPanel('mapPanel', false);
 /* right-hand column: keep the layer panel under the inset map, never on top of it */
 const placeRight = () => {
-  const lp = ['surveyPanel', 'editPanel', 'tacPanel', 'topoPanel', 'lcPanel', 'radarPanel', 'layerPanel'].map($).find(e => !e.hidden) || $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
+  const lp = ['surveyPanel', 'editPanel', 'tacPanel', 'topoPanel', 'lcPanel', 'radarPanel', 'globePanel', 'layerPanel'].map($).find(e => !e.hidden) || $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
   document.body.classList.add('lp-open');
   if (innerWidth < 640) { lp.style.top = ''; lp.style.maxHeight = ''; return; }
   const top = hud.hidden ? 12 : hud.getBoundingClientRect().bottom + 8;
@@ -328,8 +328,9 @@ $('layersBtn').onclick = async () => {
   closeOthers('layerPanel');
   $('layerPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
   if (world.mode !== 'orbit') world.setMode('orbit');
+  if (world.groundStyle && world.groundStyle !== 'sat') { world.setGround('sat'); setOn('ground', 'sat'); } // the satellite surface stays the original image
   $('lpHint').textContent = 'Preparing layers…';
-  const mod = await import('./layers.js?v=37'); LAYERS_DEF = mod.LAYERS;
+  const mod = await import('./layers.js?v=38'); LAYERS_DEF = mod.LAYERS;
   LS = await world.openLayers(t => { $('lpHint').textContent = t; });
   LS.onT = t => { $('lpExplode').value = Math.round(t * 100); };
   LS.onFocus = () => lpRender();
@@ -434,7 +435,7 @@ const svProfile = m => {
 const svOpen = async () => {
   if (!world || !world.D) return;
   closeOthers('surveyPanel');
-  SVM = await import('./survey.js?v=37'); SV = world.openSurvey(); SV.onChange = svRender;
+  SVM = await import('./survey.js?v=38'); SV = world.openSurvey(); SV.onChange = svRender;
   SV.onArrive = () => { svSay('Arrived at the target'); if (SV.tool === 'points') $('svMark').classList.add('pulse'); setTimeout(() => $('svMark').classList.remove('pulse'), 2500); svRender(); };
   if (!$('svCode').options.length) $('svCode').innerHTML = SVM.CODES.map(c => `<option>${c}</option>`).join('');
   $('surveyPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); svRender();
@@ -517,7 +518,7 @@ $('editBtn').onclick = async () => {
   if (!world || !world.D) return;
   closeOthers('editPanel');
   if (world.mode !== 'orbit') world.setMode('orbit');
-  EDM = await import('./editor.js?v=37'); ED = world.openEditor(); ED.onChange = edRender;
+  EDM = await import('./editor.js?v=38'); ED = world.openEditor(); ED.onChange = edRender;
   ED.onHover = p => { $('edSnapKind').textContent = p && p.kind ? '→ ' + p.kind : ''; };
   if (!$('edRoad').options.length) { fillSel('#edRoad'.slice(1), EDM.ROAD_TYPES, ED.opts.road); fillSel('edRoof', EDM.ROOFS, ED.opts.roof); fillSel('edWall', EDM.WALLS, ED.opts.wall); fillSel('edRoofC', EDM.ROOF_COLS, ED.opts.roofC); fillSel('edTree', EDM.TREES, ED.opts.tree); }
   $('editPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); edRender();
@@ -558,7 +559,7 @@ const tacTab = k => { document.querySelectorAll('.tactabs button').forEach(b => 
 document.querySelectorAll('.tactabs button').forEach(b => b.onclick = () => { tacTab(b.dataset.tt); if (TC && b.dataset.tt !== 'ana' && /los|viewshed|ring|measure/.test(TC.mode)) { TC.mode = 'place'; tacRender(); } });
 $('tacBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('tacPanel'); if (world.mode !== 'orbit') world.setMode('orbit');
-  TCM = await import('./tactical.js?v=37'); TCAT = (await TCM.loadCatalog()).CAT;
+  TCM = await import('./tactical.js?v=38'); TCAT = (await TCM.loadCatalog()).CAT;
   TC = await world.openTactical(); TC.onChange = () => {}; TC.onMsg = m => $('tacHint').textContent = t(m); TC.onResult = tacResult; TC.lang = lang; TC.labels = $('tacLabels').value;
   TC.onSelect = f => { if (!f) { $('tacHint').textContent = t('Tap a symbol first'); return; } $('tacHint').textContent = t('Editing') + ': ' + nm(TCAT.catalog[f.code]); $('tacLabel').value = f.label || ''; TC.label = f.label || ''; tacDirSet(f.dir ?? null, false); };
   $('tacPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); tacRender();
@@ -621,7 +622,7 @@ $('topoBtn').onclick = async () => {
 $('topoClose').onclick = () => { $('topoPanel').hidden = true; placeRight(); };
 $('topoMin').onclick = () => { const c = $('topoPanel').classList.toggle('collapsed'); $('topoMin').textContent = c ? '▾' : '▴'; };
 $('topoMake').onclick = async () => {
-  if (!world || !world.D) return; const M = await import('./topomap.js?v=37'); $('topoMake').disabled = true;
+  if (!world || !world.D) return; const M = await import('./topomap.js?v=38'); $('topoMake').disabled = true;
   try {
     TOPO = await M.makeTopoMap(world, { paper: $('topoPaper').value, scale: $('topoScale').value, ci: $('topoCI').value, lang: $('topoLang').value, dpi: +$('topoDPI').value, title: $('topoTitle').value.trim(), titleKm: $('topoTitleKm').value.trim(),
       names: $('topoNames').checked, hill: $('topoHill').checked, image: $('topoImg').checked, mine: $('topoMine').checked, survey: $('topoSurvey').checked, tac: $('topoTac').checked, legend: $('topoLeg').value }, m => $('topoHint').textContent = t(m));
@@ -633,11 +634,11 @@ $('topoMake').onclick = async () => {
 };
 const topoName = ext => `topo-${($('topoTitle').value || 'map').replace(/[^A-Za-z0-9]+/g, '_')}-1_${TOPO.scale}.${ext}`;
 $('topoPNG').onclick = () => TOPO && TOPO.canvas.toBlob(b => download(topoName('png'), b));
-$('topoPDF').onclick = async () => { if (!TOPO) return; $('topoHint').textContent = t('Making PDF…'); const M = await import('./topomap.js?v=37'); await M.toPDF(TOPO, topoName('pdf')); $('topoHint').textContent = ''; };
+$('topoPDF').onclick = async () => { if (!TOPO) return; $('topoHint').textContent = t('Making PDF…'); const M = await import('./topomap.js?v=38'); await M.toPDF(TOPO, topoName('pdf')); $('topoHint').textContent = ''; };
 
 $('gpkgBtn').onclick = async () => {
   if (!world || !world.D) return; $('gpkgBtn').disabled = true;
-  try { const M = await import('./gpkg.js?v=37'), r = await M.exportGeoPackage(world, m => $('topoHint').textContent = t(m));
+  try { const M = await import('./gpkg.js?v=38'), r = await M.exportGeoPackage(world, m => $('topoHint').textContent = t(m));
     const nm = `cambodia3d-${($('topoTitle').value || 'area').replace(/[^A-Za-z0-9]+/g, '_')}-${new Date().toISOString().slice(0, 10)}.gpkg`; download(nm, r.blob);
     $('topoHint').textContent = `${nm} · ${(r.blob.size / 1e6).toFixed(1)} MB · ${Object.values(r.counts).filter(Boolean).length} ${t('vector layers')} + 2 ${t('rasters')}`;
   } catch (e) { console.error(e); $('topoHint').textContent = 'Error: ' + e.message; }
@@ -645,7 +646,7 @@ $('gpkgBtn').onclick = async () => {
 };
 
 /* land-cover training */
-let LT = null;
+let LT = null, LT_prevGround = null;
 const lcInfo = (msg) => { if (!LT) return; const here = LT.hereSamples().length; $('lcInfo').innerHTML = `${msg ? msg + '<br>' : ''}${t('Samples here')}: <b>${here}</b> · ${t('in all areas')}: <b>${LT.samples.length}</b>`; };
 const lcRenderClasses = () => { const LCm = world.LC; $('lcClasses').innerHTML = Object.keys(LCm).map(Number).filter(k => k > 0).map(k => `<button data-c="${k}" class="${LT.cls === k ? 'on' : ''}"><i style="background:${LCm[k].c}"></i>${lang === 'km' ? LCm[k].km : LCm[k].en}</button>`).join('');
   $('lcClasses').querySelectorAll('button').forEach(b => b.onclick = () => { LT.cls = +b.dataset.c; lcRenderClasses(); }); };
@@ -653,13 +654,13 @@ const lcLearn = () => { if (!LT) return; $('lcHint').textContent = t('Learning�
 $('lcBtn').onclick = () => {
   if (!world || !world.D) return; closeOthers('lcPanel'); if (world.mode !== 'orbit') world.setMode('orbit');
   LT = world.getTrainer(); $('lcPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
-  setOn('ground', 'lulc'); world.setGround('lulc');
+  if (world.groundStyle !== 'lulc') LT_prevGround = world.groundStyle || 'sat'; setOn('ground', 'lulc'); world.setGround('lulc');
   import('three').then(T => { if (!world.brushReal) { const m = new T.Mesh(new T.RingGeometry(0.92, 1, 48).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffe14a, depthTest: false, transparent: true, opacity: 0.9 })); m.renderOrder = 30; world.scene.add(m); world.brush = m; world.brushReal = true; } world.brush.scale.setScalar(LT.radius); world.brush.visible = true; });
   lcSetMode(true); world.setImageOverlay($('lcImg').checked ? $('lcImgA').value / 100 : 0); lcRenderClasses(); lcInfo();
   world.onPaint = (x, z) => { const n = LT.paint(x, z); if (n) world.paintPreview(x, z, LT.radius, world.LC[LT.cls].c); };
   world.onPaintEnd = () => { LT.save(); if ($('lcAuto').checked) lcLearn(); else { world.refreshLC(); renderStats(); lcInfo(); } };
 };
-$('lcClose').onclick = () => { $('lcPanel').hidden = true; if (world) { world.setPaintMode(false); world.setImageOverlay(0); } placeRight(); };
+$('lcClose').onclick = () => { $('lcPanel').hidden = true; if (world) { world.setPaintMode(false); world.setImageOverlay(0); if (LT_prevGround) { world.setGround(LT_prevGround); setOn('ground', LT_prevGround); LT_prevGround = null; } } placeRight(); };
 $('lcMin').onclick = () => { const c = $('lcPanel').classList.toggle('collapsed'); $('lcMin').textContent = c ? '▾' : '▴'; };
 $('lcRad').oninput = e => { if (!LT) return; LT.radius = +e.target.value; $('lcRadV').textContent = e.target.value + ' m'; if (world.brush) world.brush.scale.setScalar(LT.radius); };
 $('lcTau').oninput = e => { if (LT) LT.tau = e.target.value / 100; $('lcTauV').textContent = e.target.value + '%'; };
@@ -699,6 +700,23 @@ $('radarFit').onchange = e => { if (RD) RD.setFit(e.target.checked); };
 $('radarAll').onchange = e => { if (RD) RD.showAll = e.target.checked; };
 $('radarProxySave').onclick = () => { if (!RD) return; RD.setProxy($('radarProxy').value); RD.lastFetch = 0; $('radarHint').textContent = t('Saved'); };
 
+/* whole Earth */
+let GL = null, globeTimer = 0;
+const globeInfo = () => { GL = GL || (world && world.globe); if (!GL) return; const i = GL.info(); $('globeInfo').innerHTML = [`UTC ${i.utc}`, i.clouds, i.wind, i.sats && '🛰️ ' + i.sats, i.flights, i.base].filter(Boolean).map(x => t(x)).join('<br>') + `<br><span style="opacity:.7">NASA GIBS · Open-Meteo · CelesTrak${GL.flightsLive ? ' · OpenSky' : ''}</span>`; };
+const globeUI = on => {
+  $('globePanel').hidden = !on; $('hud').hidden = on || !(world && world.D);
+  if (on) { closeOthers('globePanel'); $('globePanel').hidden = false; placeRight(); clearInterval(globeTimer); globeTimer = setInterval(globeInfo, 2000); globeInfo(); }
+  else { clearInterval(globeTimer); placeRight(); }
+  const G = world.globe; document.querySelectorAll('#globePanel [data-g]').forEach(c => c.checked = !!G.opt[c.dataset.g]);
+  document.querySelectorAll('#globePanel [data-s]').forEach(c => c.checked = !!G.opt.sats[c.dataset.s]);
+};
+const globeOpen = () => { if (!world || !world.D) return; if (world.mode !== 'orbit') world.setMode('orbit'); world.onGlobe = globeUI; GL = world.openGlobe(); GL.onInfo = globeInfo; };
+$('globeBtn').onclick = () => { if (world && world.globe && world.globe.on) world.globe.leave(); else globeOpen(); };
+$('globeBack').onclick = () => { if (GL) GL.leave(); };
+$('globeMin').onclick = () => { const c = $('globePanel').classList.toggle('collapsed'); $('globeMin').textContent = c ? '▾' : '▴'; };
+document.querySelectorAll('#globePanel [data-g]').forEach(c => c.onchange = () => { if (!GL) return; GL.opt[c.dataset.g] = c.checked; if (c.checked) GL.refresh(); });
+document.querySelectorAll('#globePanel [data-s]').forEach(c => c.onchange = () => { if (!GL) return; GL.opt.sats[c.dataset.s] = c.checked; GL.loadSats(); });
+
 /* live weather (Open-Meteo) */
 let wxTimer = 0;
 const WMO = c => c >= 95 ? ['storm', '⛈️', 'Thunderstorm'] : (c >= 51 && c <= 67) || (c >= 80 && c <= 82) ? ['rain', '🌧️', 'Rain'] : c === 45 || c === 48 ? ['haze', '🌫️', 'Fog'] : c === 3 ? ['haze', '☁️', 'Overcast'] : c === 2 ? ['clear', '⛅', 'Partly cloudy'] : ['clear', '☀️', 'Clear'];
@@ -735,7 +753,7 @@ $('secClose').onclick = () => { $('sectionPanel').hidden = true; if (world) { wo
 $('secWall').onchange = e => { if (!world) return; world.sectionWallOn = e.target.checked; if (world.sectionWall) world.sectionWall.visible = e.target.checked; };
 const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 $('secPng').onclick = () => $('secCanvas').toBlob(b => download('cross-section.png', b));
-$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=37'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
+$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=38'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
 
 /* language */
 document.querySelectorAll('.langBtn').forEach(b => b.onclick = () => setLang(lang === 'km' ? 'en' : 'km'));

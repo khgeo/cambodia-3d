@@ -2,7 +2,8 @@
 // Above-ground layers (water, roads, plants, buildings, traffic) rise; derived map layers (land cover,
 // elevation, soil, geology) sink below the imagery surface. A level bar picks / isolates a layer.
 import * as THREE from 'three';
-import { UNITS, SOIL_CLASSES, geologyAt, soilAt } from './section.js?v=37';
+import { UNITS, SOIL_CLASSES, geologyAt, soilAt } from './section.js?v=38';
+import { LC } from './landcover.js?v=38';
 
 export const LAYERS = [
   { id: 'traffic', short: 'Traffic & people', name: 'Traffic & people', c: '#ff8a3d', side: 1, on: true },
@@ -11,7 +12,7 @@ export const LAYERS = [
   { id: 'roads', short: 'Roads & rail', name: 'Roads, rail & bridges', c: '#f2c14e', side: 1, on: true },
   { id: 'water', short: 'Water (OSM)', name: 'Water', c: '#3d8fd1', side: 1, on: true },
   { id: 'surface', short: 'Satellite surface', name: 'Satellite surface', c: '#9fb7a0', side: 0, on: true },
-  { id: 'lulc', short: 'Land cover (image)', name: 'Land cover (classified)', c: '#7fb85a', side: -1, on: true },
+  { id: 'lulc', short: 'Land cover (13 classes)', name: 'Land cover (13 classes, editable with 🖌️)', c: '#7fb85a', side: -1, on: true },
   { id: 'lctime', short: 'Land cover 2017–25', name: 'Land cover 2017–2025', c: '#e49635', side: -1, on: true, under: true },
   { id: 'elev', short: 'Elevation', name: 'Elevation & contours', c: '#d9b36a', side: -1, on: true },
   { id: 'topsoil', short: 'Topsoil 15–30 cm', name: 'Topsoil 15–30 cm', c: '#a8835a', side: -1, on: true, under: true },
@@ -54,9 +55,13 @@ export class LayerStack {
   }
   dispose() { if (this.extra) { this.w.root.remove(this.extra); this.extra = null; } for (const t of Object.values(this.tex)) if (t.dispose) t.dispose(); this.tex = {}; this.ioTex = null; this.slab = {}; }
   /* ---- textures (planar over the AOI: u = x, v = z) ---- */
+  lulcLegend() { const D = this.w.D; if (!D.lc) return [...new Set(D.cls)].sort().map(k => [LULC_NAMES[k], `rgb(${LULC_PAL[k]})`]); return Object.keys(D.lcPct || {}).map(Number).filter(k => k > 0 && D.lcPct[k] > 0.001).sort((a, b) => a - b).map(k => [LC[k].en, LC[k].c]); }
+  // after land-cover training: redraw the land-cover slab from the edited classes
+  refreshLulc() { const t = this.tex && this.tex.lulc; if (!t) return; const c = this.texLulc(); t.image = c; t.needsUpdate = true; if (this.legend) this.legend.lulc = this.lulcLegend(); }
   texLulc() {
     const D = this.w.D, c = document.createElement('canvas'); c.width = D.gw; c.height = D.gh; const g = c.getContext('2d'), im = g.createImageData(D.gw, D.gh);
-    for (let i = 0; i < D.cls.length; i++) { const p = LULC_PAL[D.cls[i]] || LULC_PAL[0]; im.data.set([p[0], p[1], p[2], 255], i * 4); }
+    const src = D.lc || D.cls, rgb = {}; for (const k in LC) { const h = LC[k].c; rgb[k] = [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
+    for (let i = 0; i < src.length; i++) { const p = D.lc ? (rgb[src[i]] || [200, 200, 205]) : (LULC_PAL[src[i]] || LULC_PAL[0]); im.data.set([p[0], p[1], p[2], 255], i * 4); }
     g.putImageData(im, 0, 0); return c;
   }
   texElev() {
@@ -102,7 +107,7 @@ export class LayerStack {
       m.receiveShadow = true; m.visible = false; grp.add(m); return m;
     };
     this.objs = {};
-    this.legend = { lulc: [...new Set(D.cls)].sort().map(k => [LULC_NAMES[k], `rgb(${LULC_PAL[k]})`]) };
+    this.legend = { lulc: this.lulcLegend() };
     this.slab = { lulc: mk('lulc', this.texLulc()), elev: mk('elev', this.texElev()) };
     this.mkSlab = mk; this.buildDeep(); this.buildFlood();
 

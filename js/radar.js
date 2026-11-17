@@ -3,7 +3,7 @@
 // A target is "detected" when the sweep passes over it, it is inside the range and above the radar horizon.
 import * as THREE from 'three';
 
-const KT = 0.514444, FT = 0.3048, R_E = 6371000, PROXY_KEY = 'cambodia3d.flightProxy';
+const EL_MAX = 40, KT = 0.514444, FT = 0.3048, R_E = 6371000, PROXY_KEY = 'cambodia3d.flightProxy';
 const AIRPORTS = [['PNH', 11.5466, 104.8441], ['KTI', 11.3594, 104.9264], ['SAI', 13.3700, 104.2240], ['KOS', 10.5797, 103.6370], ['BKK', 13.6900, 100.7501], ['SGN', 10.8188, 106.6519]];
 const TYPES = {
   airliner: { label: 'Airliner', alt: [9000, 12000], spd: [210, 250], icon: 'jet', t: ['A320', 'A321', 'B738', 'A20N', 'B77W', 'A333'] },
@@ -51,8 +51,20 @@ export class Radar {
     g.add(base, hut, tower, deck, head, beacon); g.traverse(o => { if (o.isMesh) o.castShadow = true; });
     // sweep and range rings on the ground (scaled to the scene when "fit" is on)
     const R = this.sceneR(); this.R3 = R;
-    const sw = new THREE.Mesh(new THREE.CircleGeometry(R, 48, Math.PI / 2 - 0.5, 0.5).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x33ff66, transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide }));
-    sw.position.y = 3; sw.renderOrder = 8; this.sweep = sw; g.add(sw);
+    // the beam is a vertical fan: it covers from the horizon up to EL_MAX at once while it turns
+    const sw = new THREE.Group(); sw.position.y = this.mast + 2;
+    const fan = (wid, op) => { const pos = [], idx = [], NE = 12, a0 = -wid * Math.PI / 180, a1 = 0; pos.push(0, 0, 0);
+      for (const a of [a0, a1]) for (let k = 0; k <= NE; k++) { const e = k / NE * EL_MAX * Math.PI / 180; pos.push(R * Math.cos(e) * Math.sin(a), R * Math.sin(e), -R * Math.cos(e) * Math.cos(a)); }
+      for (let k = 0; k < NE; k++) { const A = 1 + k, B = 1 + NE + 1 + k; idx.push(0, A, A + 1, 0, B, B + 1, A, B, A + 1, A + 1, B, B + 1); }
+      const gg = new THREE.BufferGeometry(); gg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); gg.setIndex(idx); gg.computeVertexNormals();
+      const m = new THREE.Mesh(gg, new THREE.MeshBasicMaterial({ color: 0x33ff66, transparent: true, opacity: op, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending })); m.renderOrder = 8; return m; };
+    sw.add(fan(3, 0.32)); for (let k = 1; k <= 6; k++) { const f = fan(4, 0.13 * (1 - k / 7)); f.rotation.y = k * 4 * Math.PI / 180; sw.add(f); } // afterglow
+    this.sweep = sw; g.add(sw);
+    // coverage: the radar sees from the horizon up to EL_MAX; above that is the cone of silence
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 12, 0, Math.PI * 2, Math.PI / 2 - EL_MAX * Math.PI / 180, EL_MAX * Math.PI / 180), new THREE.MeshBasicMaterial({ color: 0x33ff66, transparent: true, opacity: 0.05, depthWrite: false, side: THREE.DoubleSide }));
+    dome.position.y = this.mast + 2; dome.renderOrder = 7; g.add(dome);
+    const domeW = new THREE.LineSegments(new THREE.WireframeGeometry(new THREE.SphereGeometry(R, 24, 4, 0, Math.PI * 2, Math.PI / 2 - EL_MAX * Math.PI / 180, EL_MAX * Math.PI / 180)), new THREE.LineBasicMaterial({ color: 0x33ff66, transparent: true, opacity: 0.12, depthWrite: false }));
+    domeW.position.y = this.mast + 2; g.add(domeW);
     for (let k = 1; k <= 4; k++) { const rr = R * k / 4, ring = new THREE.Mesh(new THREE.RingGeometry(rr - R * 0.003 - 0.4, rr + R * 0.003 + 0.4, 128).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x33ff66, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.DoubleSide })); ring.position.y = 2.5; ring.renderOrder = 8; g.add(ring); }
     this.ringR = R; this.seedSim(); this.onChange && this.onChange();
   }
@@ -116,7 +128,7 @@ export class Radar {
       if (t.src === 'sim' && t.kind === 'drone' && dist > 9000) t.trk = (Math.atan2(-e, -n) * 180 / Math.PI + 360) % 360;
       // painted by the sweep this frame?
       const crossed = prev <= this.az ? brg > prev && brg <= this.az : brg > prev || brg <= this.az;
-      if (crossed) { const vis = dist <= R && dist <= this.horizon(t.alt) && !t.ground; t.det = vis; if (vis) { t.hit = now; (t.trail = t.trail || []).push([e, n]); if (t.trail.length > 8) t.trail.shift(); } }
+      if (crossed) { const el = Math.atan2(t.alt - this.elev - this.mast, dist) * 180 / Math.PI, vis = dist <= R && dist <= this.horizon(t.alt) && el <= EL_MAX && !t.ground; t.el = el; t.det = vis; if (vis) { t.hit = now; (t.trail = t.trail || []).push([e, n]); if (t.trail.length > 8) t.trail.shift(); } }
       // 3D
       const show = this.showAll || (t.hit && now - t.hit < 60000 / this.rpm * 1.5);
       if (!show || dist > R * 1.05) { if (t.obj) t.obj.visible = false; continue; }
