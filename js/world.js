@@ -5,23 +5,23 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=26';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=26';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=26';
-import { buildTrees, GrassField } from './vegetation.js?v=26';
-import { RoadNet, Driver, Walker } from './modes.js?v=26';
-import { vehicleKit } from './vehicles.js?v=26';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=26';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=26';
-import { LayerStack } from './layers.js?v=26';
-import { Survey } from './survey.js?v=26';
-import { Editor } from './editor.js?v=26';
-import { Atmos } from './atmos.js?v=26';
-import { NightLights } from './lights.js?v=26';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=26';
-import { Tactical, loadCatalog } from './tactical.js?v=26';
-import { SEASON } from './vegetation.js?v=26';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=26';
+import * as G from './geo.js?v=27';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=27';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=27';
+import { buildTrees, GrassField } from './vegetation.js?v=27';
+import { RoadNet, Driver, Walker } from './modes.js?v=27';
+import { vehicleKit } from './vehicles.js?v=27';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=27';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=27';
+import { LayerStack } from './layers.js?v=27';
+import { Survey } from './survey.js?v=27';
+import { Editor } from './editor.js?v=27';
+import { Atmos } from './atmos.js?v=27';
+import { NightLights } from './lights.js?v=27';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=27';
+import { Tactical, loadCatalog } from './tactical.js?v=27';
+import { SEASON } from './vegetation.js?v=27';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=27';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -811,33 +811,58 @@ export class World {
     g.computeVertexNormals(); return g;
   }
 
-  // Khmer village houses: rectangles on built-up pixels within ~45 m of a road, facing it; skipped where OSM has buildings
+  // Houses found in the satellite image: compact roof-coloured blobs (red / orange tile, blue sheet, bright zinc or
+  // concrete) that stand out from their surroundings. Each roof gives the house its real position, size,
+  // orientation and roof colour. Skipped where OSM already has buildings, on roads and on water.
   inferHousesList(rnd) {
-    const D = this.D, { gw, gh, C, X0, Z0, cls, mw, mh, MR, exclude } = D, out = [], taken = new Map(), cap = this.mobile ? 350 : 900;
-    if (!this.net) return out;
-    const cellAt = (m, x, z) => m[Math.min(mh - 1, Math.max(0, ((z - Z0) / MR) | 0)) * mw + Math.min(mw - 1, Math.max(0, ((x - X0) / MR) | 0))];
-    const builtFrac = (x, z, r) => { const ci = ((x - X0) / C) | 0, cj = ((z - Z0) / C) | 0, n = Math.round(r / C); let a = 0, t = 0;
-      for (let j = cj - n; j <= cj + n; j++) for (let i = ci - n; i <= ci + n; i++) { if (i < 0 || j < 0 || i >= gw || j >= gh) continue; t++; if (cls[j * gw + i] === 5) a++; } return t ? a / t : 0; };
-    const osmNear = (x, z) => { for (let a = 0; a < 8; a++) { const ang = a * 0.785; for (const r of [6, 14]) if (this.bmask && cellAt(this.bmask, x + Math.cos(ang) * r, z + Math.sin(ang) * r) && !cellAt(D.wmask, x + Math.cos(ang) * r, z + Math.sin(ang) * r)) return true; } return false; };
-    const key = (x, z) => Math.floor(x / 12) + ',' + Math.floor(z / 12);
-    const clash = (x, z) => { for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const p of taken.get((Math.floor(x / 12) + i) + ',' + (Math.floor(z / 12) + j)) || []) if (Math.hypot(p[0] - x, p[1] - z) < 13) return true; return false; };
-    const step = 7;
-    for (let z = Z0 + 6; z < Z0 + D.H - 6 && out.length < cap; z += step) for (let x = X0 + 6; x < X0 + D.W - 6 && out.length < cap; x += step) {
-      const jx = x + (rnd() - .5) * 4, jz = z + (rnd() - .5) * 4;
-      if (builtFrac(jx, jz, 5) < 0.42 || cellAt(exclude, jx, jz)) continue;
-      const nr = this.net.near(jx, jz, 48)[0]; if (!nr) continue;
-      const road = this.net.roads[nr[0]], p = road.pts[nr[1]], q = road.pts[Math.min(road.pts.length - 1, nr[1] + 1)], pp = road.pts[Math.max(0, nr[1] - 1)];
-      if (nr[2] < road.hw + 6) continue;
-      if (clash(jx, jz) || osmNear(jx, jz)) continue;
-      let tx = q.x - pp.x, tz = q.z - pp.z; const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
-      const wd = 4.5 + rnd() * 3, dp = 6.5 + rnd() * 5, hw = wd / 2, hd = dp / 2; // long side along the road
-      const ring = [[-hd, -hw], [hd, -hw], [hd, hw], [-hd, hw]].map(([u, v]) => [jx + tx * u - tz * v, jz + tz * u + tx * v]);
-      if (ring.some(([rx, rz]) => cellAt(exclude, rx, rz) || rx < X0 + 1 || rz < Z0 + 1 || rx > X0 + D.W - 1 || rz > Z0 + D.H - 1)) continue;
-      const stilt = rnd() < 0.55 ? 1.8 + rnd() * 0.7 : 0;
-      out.push({ t: 1, hdm: 0, lv: 0, ring, stilt, roof: rnd() < 0.6 ? 'gable' : 'hip', roofC: [0x9b4a32, 0xa8452f, 0x8a8f94, 0x6f7377, 0x7c8a96, 0xb05a3c, 0x5f6b72][(rnd() * 7) | 0], wall: [0xa07a55, 0x8f6c4a, 0xd9cdb5, 0xe6dccb, 0xbfa27c, 0xc8d3d6][(rnd() * 6) | 0] });
-      (taken.get(key(jx, jz)) || taken.set(key(jx, jz), []).get(key(jx, jz))).push([jx, jz]);
-      // block the footprint for trees and for walking
-      for (let u = -hd; u <= hd; u += MR) for (let v = -hw; v <= hw; v += MR) { const cx = jx + tx * u - tz * v, cz = jz + tz * u + tx * v, i = Math.min(mw - 1, Math.max(0, ((cx - X0) / MR) | 0)), j = Math.min(mh - 1, Math.max(0, ((cz - Z0) / MR) | 0)); exclude[j * mw + i] = 1; if (this.bmask) this.bmask[j * mw + i] = 1; }
+    const D = this.D, F = this.F, { mw, mh, MR, exclude, X0, Z0 } = D, out = [], cap = this.mobile ? 700 : 1600;
+    if (!D.px || !this.bmask) return out;
+    const img = D.img, IW = img.width, px = D.px, g = D.gains;
+    const sx0 = D.pxX(F.lon(X0)), sx1 = D.pxX(F.lon(X0 + D.W)), sy0 = D.pxY(F.lat(Z0)), sy1 = D.pxY(F.lat(Z0 + D.H)), mpp = D.W / (sx1 - sx0);
+    if (mpp > 1.25) return out; // image too coarse to see single roofs
+    const f = Math.max(1, Math.round(0.6 / mpp)), cell = mpp * f, gw = Math.floor((sx1 - sx0) / f), gh = Math.floor((sy1 - sy0) / f);
+    const cls = new Uint8Array(gw * gh), V = new Float32Array(gw * gh), Sat = new Float32Array(gw * gh), R = new Float32Array(gw * gh), Gc = new Float32Array(gw * gh), B = new Float32Array(gw * gh);
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      let r = 0, gg = 0, b = 0, n = 0;
+      for (let v = 0; v < f; v++) for (let u = 0; u < f; u++) { const x = Math.round(sx0 + i * f + u), y = Math.round(sy0 + j * f + v); if (x < 0 || y < 0 || x >= IW || y >= img.height) continue; const o = (y * IW + x) * 4; r += wb(px[o], 0, g); gg += wb(px[o + 1], 1, g); b += wb(px[o + 2], 2, g); n++; }
+      if (!n) continue; r /= n; gg /= n; b /= n; const q = j * gw + i, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), v = (r + gg + b) / 3, sat = mx ? (mx - mn) / mx : 0;
+      V[q] = v; Sat[q] = sat; R[q] = r; Gc[q] = gg; B[q] = b;
+      if (r > gg + 28 && r > b + 38 && r > 105 && sat > 0.28) cls[q] = 1;                 // red / orange tiles
+      else if (b > r + 22 && b > gg + 4 && v > 85 && sat > 0.2) cls[q] = 2;               // blue sheet roof
+      else if (v > 196 && sat < 0.16) cls[q] = 3;                                         // zinc / concrete
+    }
+    const lab = new Int32Array(gw * gh).fill(-1), taken = new Map(), key = (x, z) => Math.floor(x / 10) + ',' + Math.floor(z / 10);
+    const xAt = i => X0 + ((i + 0.5) * f) * mpp, zAt = j => Z0 + ((j + 0.5) * f) * (D.H / (sy1 - sy0));
+    const mAt = (m, x, z) => m[Math.min(mh - 1, Math.max(0, ((z - Z0) / MR) | 0)) * mw + Math.min(mw - 1, Math.max(0, ((x - X0) / MR) | 0))];
+    let comp = 0;
+    for (let s0 = 0; s0 < gw * gh && out.length < cap; s0++) {
+      const c = cls[s0]; if (!c || lab[s0] >= 0) continue;
+      const st = [s0], mem = []; lab[s0] = comp;
+      while (st.length) { const q = st.pop(); mem.push(q); if (mem.length > 4000) break; const i = q % gw, j = (q / gw) | 0;
+        for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ii = i + a, jj = j + b; if (ii < 0 || jj < 0 || ii >= gw || jj >= gh) continue; const n2 = jj * gw + ii; if (lab[n2] < 0 && cls[n2] === c) { lab[n2] = comp; st.push(n2); } } }
+      comp++;
+      const area = mem.length * cell * cell; if (area < 14 || area > 650) continue;
+      const pts = mem.map(q => [xAt(q % gw), zAt((q / gw) | 0)]), ob = G.obb(pts); if (!ob) continue;
+      const a = ob.a + cell / 2, b = ob.b + cell / 2, fill = area / (4 * a * b);
+      if (fill < 0.5 || b < 1.3 || a / b > 4.5) continue;
+      // contrast with a ring around the roof
+      let iv = 0, is = 0, rv = 0, rs = 0, rn = 0, mr = 0, mg = 0, mb = 0;
+      for (const q of mem) { iv += V[q]; is += Sat[q]; mr += R[q]; mg += Gc[q]; mb += B[q]; }
+      iv /= mem.length; is /= mem.length;
+      const i0 = Math.min(...mem.map(q => q % gw)), i1 = Math.max(...mem.map(q => q % gw)), j0 = Math.min(...mem.map(q => (q / gw) | 0)), j1 = Math.max(...mem.map(q => (q / gw) | 0)), pad = 3;
+      for (let j = j0 - pad; j <= j1 + pad; j++) for (let i = i0 - pad; i <= i1 + pad; i++) { if (i < 0 || j < 0 || i >= gw || j >= gh) continue; if (i >= i0 && i <= i1 && j >= j0 && j <= j1) continue; const q = j * gw + i; rv += V[q]; rs += Sat[q]; rn++; }
+      if (!rn) continue; rv /= rn; rs /= rn;
+      if (c === 3 && iv - rv < 32) continue;           // bright roofs must be clearly brighter than the ground around
+      if (c !== 3 && is - rs < 0.12) continue;         // coloured roofs must be clearly more colourful
+      const cx = ob.cx, cz = ob.cz;
+      if (mAt(exclude, cx, cz) || mAt(D.rmask, cx, cz) || mAt(D.wmask, cx, cz)) continue;
+      let near = false; for (let u = -1; u <= 1 && !near; u++) for (let v = -1; v <= 1; v++) for (const p of taken.get((Math.floor(cx / 10) + u) + ',' + (Math.floor(cz / 10) + v)) || []) if (Math.hypot(p[0] - cx, p[1] - cz) < 3) { near = true; break; }
+      if (near) continue;
+      const A2 = a + 0.25, B2 = b + 0.25, ring = [[-A2, -B2], [A2, -B2], [A2, B2], [-A2, B2]].map(([u, v]) => [cx + ob.ux * u + ob.vx * v, cz + ob.uz * u + ob.vz * v]);
+      const n = mem.length, roofC = (Math.round(mr / n * 0.85) << 16) | (Math.round(mg / n * 0.85) << 8) | Math.round(mb / n * 0.85);
+      out.push({ t: 1, hdm: 0, lv: area > 220 ? 2 : 0, ring, stilt: area < 120 && rnd() < 0.5 ? 1.8 + rnd() * 0.6 : 0, roof: area > 400 ? 'flat' : a / b > 1.6 ? 'gable' : 'hip', roofC, wall: [0xa07a55, 0xd9cdb5, 0xe6dccb, 0xbfa27c, 0xc8d3d6, 0xefe2c9][(rnd() * 6) | 0], src: 'image roof' });
+      (taken.get(key(cx, cz)) || taken.set(key(cx, cz), []).get(key(cx, cz))).push([cx, cz]);
+      for (let u = -a; u <= a; u += MR) for (let v = -b; v <= b; v += MR) { const x = cx + ob.ux * u + ob.vx * v, z = cz + ob.uz * u + ob.vz * v, i = Math.min(mw - 1, Math.max(0, ((x - X0) / MR) | 0)), j = Math.min(mh - 1, Math.max(0, ((z - Z0) / MR) | 0)); exclude[j * mw + i] = 1; this.bmask[j * mw + i] = 1; }
     }
     return out;
   }

@@ -1,7 +1,7 @@
 // Animated people (walkers, farmers with conical hats) and cattle. Limbs swing in the vertex shader:
 // each vertex carries aAnim = (pivotY, pivotZ, phase sign, 0); rotation is about the X axis through the pivot.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=26';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=27';
 
 function part(g, hex, anim = [0, 0, 0]) {
   g = g.index ? g.toNonIndexed() : g; const n = g.attributes.position.count, c = new THREE.Color(hex), col = new Float32Array(n * 3), an = new Float32Array(n * 4);
