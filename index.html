@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=51">
+<link rel="stylesheet" href="css/app.css?v=52">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -342,6 +342,7 @@
       <div id="chDate" class="chdate" hidden></div>
       <div class="row seg" id="chMode"><button data-v="swipe" class="on">Swipe</button><button data-v="before">Before</button><button data-v="after">After</button><button data-v="changes">Changes</button></div>
       <div class="row"><span>Swipe (west ← → east)</span><input type="range" id="chSwipe" min="0" max="100" value="50" style="flex:1"></div>
+      <div class="row"><span>Sensitivity</span><input type="range" id="chSens" min="0" max="100" value="50" style="flex:1"></div>
       <div id="chStats" class="svhelp"></div>
       <div class="svhelp" style="opacity:.75">Changes: <b style="color:#ff5a3c">■</b> new roofs, roads or clearing · <b style="color:#3fdc5f">■</b> vegetation gain · <b style="color:#3f9bff">■</b> water · <b style="color:#ffd23f">■</b> other. The dates are when the image was published in the archive; the photo can be older.</div>
     </div>
@@ -402,6 +403,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=51"></script>
+<script type="module" src="js/app.js?v=52"></script>
 </body>
 </html>

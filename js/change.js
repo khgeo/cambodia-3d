@@ -25,13 +25,13 @@ export async function mosaic(D, rel, say = () => { }) {
   return c;
 }
 // change map: both images normalised (so a brighter or hazier date is not "change"), smoothed, then compared
-export function changeMap(before, after) {
+export function changeMap(before, after, thr = 2.2) {
   const W = before.width, H = before.height, s = 2, w = Math.floor(W / s), h = Math.floor(H / s), sm = (cv) => { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.filter = 'blur(1.5px)'; g.drawImage(cv, 0, 0, w, h); return g.getImageData(0, 0, w, h).data; };
   const A = sm(before), B = sm(after), N = w * h, st = (P) => { const m = [0, 0, 0], q = [0, 0, 0]; for (let i = 0; i < N; i++) for (let k = 0; k < 3; k++) { const v = P[i * 4 + k]; m[k] += v; q[k] += v * v; } return m.map((v, k) => [v / N, Math.sqrt(Math.max(1, q[k] / N - (v / N) ** 2))]); };
   const sa = st(A), sb = st(B), out = document.createElement('canvas'); out.width = w; out.height = h; const og = out.getContext('2d'), im = og.createImageData(w, h); const cnt = { built: 0, veg: 0, water: 0, other: 0 };
   for (let i = 0; i < N; i++) {
     const a = [0, 1, 2].map(k => (A[i * 4 + k] - sa[k][0]) / sa[k][1]), b = [0, 1, 2].map(k => (B[i * 4 + k] - sb[k][0]) / sb[k][1]), d = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
-    if (d < 1.6) continue; // unchanged
+    if (d < thr) continue; // unchanged
     const ga = 2 * a[1] - a[0] - a[2], gb = 2 * b[1] - b[0] - b[2], la = a[0] + a[1] + a[2], lb = b[0] + b[1] + b[2];
     let col, k; if (gb - ga > 1.2) { col = [40, 220, 90]; k = 'veg'; } else if (lb - la < -2.2 && b[2] >= b[0]) { col = [40, 140, 255]; k = 'water'; } else if (lb - la > 1.2 || ga - gb > 1.2) { col = [255, 60, 40]; k = 'built'; } else { col = [255, 210, 60]; k = 'other'; }
     cnt[k]++; im.data.set([...col, Math.min(230, 90 + d * 40)], i * 4);
