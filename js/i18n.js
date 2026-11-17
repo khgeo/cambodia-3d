@@ -114,6 +114,8 @@ export const KM = {
   'Drag to turn the Earth, wheel to zoom. Zoom right down onto your area to go back into it.': 'អូសដើម្បីបង្វិលផែនដី កង់ដើម្បីពង្រីក។ ពង្រីកចុះលើតំបន់របស់អ្នកដើម្បីចូលវិញ។',
   'Day & night (real sun now)': 'ថ្ងៃ និងយប់ (ព្រះអាទិត្យពិតឥឡូវ)', 'Clouds (live, satellites)': 'ពពក (ផ្ទាល់ ពីផ្កាយរណប)', 'Wind (live)': 'ខ្យល់ (ផ្ទាល់)', 'Aircraft': 'យន្តហោះ', 'Satellites (live orbits)': 'ផ្កាយរណប (គន្លងផ្ទាល់)',
   'Space stations (ISS, Tiangong)': 'ស្ថានីយអវកាស (ISS, Tiangong)', 'Brightest satellites': 'ផ្កាយរណបភ្លឺបំផុត', 'Weather satellites': 'ផ្កាយរណបឧតុនិយម', 'Starlink (thousands)': 'Starlink (រាប់ពាន់)',
+  'Temperature (live)': 'សីតុណ្ហភាព (ផ្ទាល់)', 'Rain (NASA IMERG)': 'ភ្លៀង (NASA IMERG)', 'Tropical storms: track & forecast': 'ព្យុះត្រូពិច៖ គន្លង និងការព្យាករ', 'Aircraft & routes': 'យន្តហោះ និងផ្លូវហោះហើរ', 'My radar (range, sweep, targets)': 'រ៉ាដារបស់ខ្ញុំ (ចម្ងាយ ការស្កេន គោលដៅ)',
+  'Earth observation (Landsat, Sentinel …)': 'ផ្កាយរណបសង្កេតផែនដី (Landsat, Sentinel …)', 'Show / hide the data credits': 'បង្ហាញ / លាក់ប្រភពទិន្នន័យ',
   'Contours': 'ខ្សែកម្ពស់', 'Grid': 'ក្រឡាចត្រង្គ', 'Your features': 'វត្ថុរបស់អ្នក', 'Survey points & parcels': 'ចំណុចវាស់ និងក្បាលដី', 'Tactical overlay': 'ស្រទាប់យុទ្ធសាស្ត្រ',
 };
 export let lang = 'en';

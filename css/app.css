@@ -425,3 +425,8 @@ body.km .lbl{text-transform:none;letter-spacing:0;font-size:12px}
 
 #globePanel .gchk{display:flex;flex-direction:column;gap:3px;margin:4px 0}#globePanel .gchk label{font-size:12px;display:flex;gap:6px;align-items:center}
 @media (max-width:640px){#globePanel{top:auto;bottom:62px;right:6px;left:6px;width:auto;max-height:50%}}
+
+#creditBtn{position:absolute;right:8px;bottom:6px;z-index:5;width:22px;height:22px;padding:0;border-radius:50%;font-size:13px;line-height:20px;background:rgba(255,255,255,.75);color:#22313f;border:0;cursor:pointer}
+#credit{right:34px}
+body.nocredit #credit{display:none}
+.globe-on #credit{background:rgba(10,16,28,.6);color:#c8d4e2}.globe-on #credit a{color:#9fd0ff}

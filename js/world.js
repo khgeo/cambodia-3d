@@ -5,26 +5,26 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=43';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=43';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=43';
-import { buildTrees, GrassField } from './vegetation.js?v=43';
-import { RoadNet, Driver, Walker } from './modes.js?v=43';
-import { vehicleKit } from './vehicles.js?v=43';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=43';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=43';
-import { LayerStack } from './layers.js?v=43';
-import { Survey } from './survey.js?v=43';
-import { Editor } from './editor.js?v=43';
-import { Atmos } from './atmos.js?v=43';
-import { NightLights } from './lights.js?v=43';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=43';
-import { Tactical, loadCatalog } from './tactical.js?v=43';
-import { LcTrainer } from './lctrain.js?v=43';
-import { Radar } from './radar.js?v=43';
-import { Globe } from './globe.js?v=43';
-import { SEASON } from './vegetation.js?v=43';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=43';
+import * as G from './geo.js?v=44';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=44';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=44';
+import { buildTrees, GrassField } from './vegetation.js?v=44';
+import { RoadNet, Driver, Walker } from './modes.js?v=44';
+import { vehicleKit } from './vehicles.js?v=44';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=44';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=44';
+import { LayerStack } from './layers.js?v=44';
+import { Survey } from './survey.js?v=44';
+import { Editor } from './editor.js?v=44';
+import { Atmos } from './atmos.js?v=44';
+import { NightLights } from './lights.js?v=44';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=44';
+import { Tactical, loadCatalog } from './tactical.js?v=44';
+import { LcTrainer } from './lctrain.js?v=44';
+import { Radar } from './radar.js?v=44';
+import { Globe } from './globe.js?v=44';
+import { SEASON } from './vegetation.js?v=44';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=44';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -1334,7 +1334,7 @@ export class World {
 
   frame() {
     if (this.paused) { this.clock.getDelta(); return; }
-    if (this.globe && this.globe.on) { this.globe.frame(Math.min(this.clock.getDelta(), 0.1)); return; }
+    if (this.globe && this.globe.on) { const gdt = Math.min(this.clock.getDelta(), 0.1); if (this.radar) this.radar.step(gdt); this.globe.frame(gdt); return; }
     const dt = Math.min(this.clock.getDelta(), 0.05); this.uTime.value += dt;
     if (this.trafficOn !== false) this.updateTraffic(dt);
     this.waterNormal.offset.x += dt * 0.012; this.waterNormal.offset.y += dt * 0.007;
