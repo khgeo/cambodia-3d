@@ -35,7 +35,9 @@ export class Globe {
       fragmentShader: `uniform sampler2D day; uniform sampler2D night; uniform vec3 sun; uniform float nightOn; varying vec2 vUv; varying vec3 vN;
         void main(){ float d = dot(normalize(vN), normalize(sun)); float k = mix(1.0, smoothstep(-0.12, 0.12, d), nightOn);
           vec3 dc = texture2D(day, vUv).rgb * (0.35 + 0.75 * max(d, 0.0) * nightOn + (1.0 - nightOn) * 0.65); vec3 nc = texture2D(night, vUv).rgb * 1.6 + vec3(0.01, 0.015, 0.03);
-          gl_FragColor = vec4(mix(nc, dc, k), 1.0); #include <colorspace_fragment> }` }));
+          gl_FragColor = vec4(mix(nc, dc, k), 1.0);
+          #include <colorspace_fragment>
+        }` }));
     sc.add(this.earth);
     // clouds
     this.cloudTex = blank('rgba(0,0,0,0)'); this.clouds = new THREE.Mesh(new THREE.SphereGeometry(1.006, 128, 64), new THREE.MeshLambertMaterial({ map: this.cloudTex, transparent: true, depthWrite: false })); sc.add(this.clouds);
@@ -54,20 +56,20 @@ export class Globe {
     const g = new THREE.Group(), real = Math.max(D.W, D.H) / 1000 / R_KM, S = Math.max(real, 0.006);
     const top = new THREE.MeshBasicMaterial({ map: w.texSat }), side = new THREE.MeshBasicMaterial({ color: 0x8a7a5c });
     const box = new THREE.Mesh(new THREE.BoxGeometry(S, S * 0.12, S), [side, side, top, side, side, side]); box.position.y = S * 0.06; g.add(box);
-    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.0006, 0.0006, 0.05, 6).translate(0, 0.025, 0), new THREE.MeshBasicMaterial({ color: 0xffb547 })); g.add(pin);
+    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.0004, 0.0004, 0.025, 6).translate(0, 0.0125, 0), new THREE.MeshBasicMaterial({ color: 0xffb547 })); g.add(pin);
     const c = document.createElement('canvas'); c.width = 512; c.height = 96; const x = c.getContext('2d'); x.font = '700 40px system-ui, "Noto Sans Khmer", sans-serif'; x.fillStyle = '#ffb547'; x.strokeStyle = '#000'; x.lineWidth = 6;
     const txt = `Your 3D area · ${lat.toFixed(3)}°N ${lon.toFixed(3)}°E`; x.strokeText(txt, 8, 60); x.fillText(txt, 8, 60);
-    const lab = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), sizeAttenuation: false, depthTest: false, transparent: true })); lab.center.set(0, 0); lab.scale.set(0.2, 0.0375, 1); lab.position.y = 0.05; lab.renderOrder = 30; g.add(lab);
+    const lab = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), sizeAttenuation: false, depthTest: false, transparent: true })); lab.center.set(0, 0); lab.scale.set(0.16, 0.03, 1); lab.renderOrder = 30; this.plateLab = lab;
     const p = xyz(lat, lon, 1.0005); g.position.copy(p); g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), p.clone().normalize());
     // keep the image "north up" on the plate
     const north = xyz(lat + 0.01, lon, 1.0005).sub(p).normalize(), loc = north.clone().applyQuaternion(g.quaternion.clone().invert()); g.rotateY(Math.atan2(-loc.x, -loc.z));
-    this.plate = g; this.scene.add(g); this.plateS = S;
+    this.plate = g; this.scene.add(g); this.plateS = S; if (this.plateLabOld) this.scene.remove(this.plateLabOld); lab.position.copy(xyz(lat, lon, 1.03)); this.scene.add(lab); this.plateLabOld = lab;
   }
   /* ---------- enter / leave ---------- */
   async enter() {
     if (this.on) return; const w = this.w; this.on = true; w.controls.enabled = false; this.ctl.enabled = true; this.placePlate();
     const p = xyz(this.lat, this.lon, 1); this.cam.position.copy(p.clone().multiplyScalar(1.03)); this.ctl.target.set(0, 0, 0); this.ctl.update();
-    this.anim = { t: 0, from: 1.03, to: 2.8, dir: p.clone().normalize() }; this.onToggle && this.onToggle(true);
+    this.anim = { t: 0, from: 1.03, to: 3.4, dir: p.clone().normalize() }; this.onToggle && this.onToggle(true);
     if (!this.loaded) { this.loaded = true; this.loadBase(); }
     this.refresh(); clearInterval(this.timer); this.timer = setInterval(() => this.refresh(), 60000);
   }
