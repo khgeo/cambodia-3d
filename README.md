@@ -104,6 +104,9 @@ The classes are:
 
 These classes are used by the *Land cover* ground style, the statistics panel, the topographic map and the mobility analysis.
 
+### Train the land cover (🖌️)
+Correct the classification yourself (supervised classification). Pick the class you see in the image, then paint over it on the ground. A Gaussian naive-Bayes model learns from your strokes (image colour, greenness, saturation, texture, tree density, slope, nearness to water and villages) together with samples of the automatic map, and re-classifies the whole area live. Only cells it is confident about change (set the confidence); your painted cells always keep your class; OpenStreetMap water, roads and buildings stay as mapped. Your samples are kept in this browser and can be used in every area you open, so the model keeps learning. The edited land cover goes into the topographic map and the GeoPackage (land_cover raster + land_cover_training points).
+
 ## Topographic map (🗺)
 Builds an A4, A3 or A2 sheet (landscape or portrait) at an automatic or chosen scale, in Khmer, English or both. It contains:
 - **Land cover:** topographic tints with map symbols (forest circles, rice tufts, grass, orchard, marsh).
@@ -115,6 +118,8 @@ Builds an A4, A3 or A2 sheet (landscape or portrait) at an automatic or chosen s
 - **Margin:** a bilingual legend, scale bar, contour interval, true north and grid north with the convergence angle, a location map, sources, and the RUPP Geoinformatics and Research Lab credit.
 
 Download as PNG (150–300 dpi) or PDF.
+
+Legend styles (after TopoStyler): **Illustrated** (roads converging on a village with callout lines, hand-drawn land-cover parcels), **Map sheet** (description ..... symbol, dot leaders) or **Simple list**.
 
 ## Tactical (🎯)
 Adapted from the author's **Terrain Ops** and **TacMap KH** QGIS plugins (`tac/` holds the symbol SVGs, the catalogue and `mobility.json`).
@@ -135,7 +140,10 @@ Export as GeoJSON. For planning and training from open data. Confirm by reconnai
 
 Edits are saved in the browser and can be exported or imported as **GeoJSON** (works with QGIS).
 
+New roads clear their way: trees, image houses and OpenStreetMap buildings under a road you draw are removed (and come back if you delete the road). The GeoPackage only holds what is still standing.
+
 ## Houses from the image
+Houses face the nearest road (when two roads are near, the closer one wins).
 OpenStreetMap has few buildings in rural Cambodia. When OSM has none nearby, village houses are placed on built-up pixels within about 45 m of a road. They are oriented to the road, with gable or hip roofs, wood or plaster walls, and many on stilts. They can be switched off with *Houses from image*. These are inferred, not mapped.
 
 ## Time of day, weather, cinematic flight

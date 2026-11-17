@@ -95,6 +95,13 @@ export const KM = {
   'Export GeoPackage (QGIS)': 'នាំចេញ GeoPackage (QGIS)', 'Export: topographic map & GeoPackage': 'នាំចេញ៖ ផែនទីសណ្ឋានដី និង GeoPackage',
   'GeoPackage for QGIS': 'GeoPackage សម្រាប់ QGIS', 'vector layers': 'ស្រទាប់វ៉ិចទ័រ', 'rasters': 'រ៉ាស្ទ័រ', 'Loading SQLite…': 'កំពុងផ្ទុក SQLite…', 'Vector layers…': 'ស្រទាប់វ៉ិចទ័រ…', 'Raster tiles…': 'ក្បឿងរ៉ាស្ទ័រ…', 'Writing file…': 'កំពុងសរសេរឯកសារ…',
   'All layers of this area (roads, water, buildings, houses, contours, spot heights, place names, land cover, image, your survey, digitized and tactical layers) with their map styles.': 'ស្រទាប់ទាំងអស់នៃតំបន់នេះ (ផ្លូវ ទឹក អគារ ផ្ទះ ខ្សែកម្ពស់ ចំណុចកម្ពស់ ឈ្មោះទីកន្លែង គម្របដី រូបភាព ការវាស់វែង ឌីជីថលកម្ម និងយុទ្ធសាស្ត្រ) រួមទាំងរចនាប័ទ្មផែនទី។',
+  'Train land cover': 'បង្ហាត់គម្របដី', 'Train land cover: paint what you see, the model learns': 'បង្ហាត់គម្របដី៖ គូរអ្វីដែលអ្នកឃើញ ម៉ូដែលរៀនពីវា', 'Brush': 'ជក់', 'Paint (off = move the view)': 'គូរ (បិទ = ផ្លាស់ទីទិដ្ឋភាព)',
+  'Learn after each stroke': 'រៀនក្រោយគូររាល់លើក', 'Use samples from all my areas': 'ប្រើគំរូពីតំបន់ទាំងអស់របស់ខ្ញុំ', 'Confidence': 'ទំនុកចិត្ត', 'Learn now': 'រៀនឥឡូវ', 'Automatic map': 'ផែនទីស្វ័យប្រវត្តិ', 'Forget samples here': 'លុបគំរូនៅទីនេះ',
+  'Choose the class you see in the image, then paint over it on the ground (drag). The model learns from your strokes and re-classifies the whole area.': 'ជ្រើសថ្នាក់ដែលអ្នកឃើញក្នុងរូបភាព រួចគូរលើដី (អូស)។ ម៉ូដែលរៀនពីការគូររបស់អ្នក ហើយចាត់ថ្នាក់តំបន់ទាំងមូលឡើងវិញ។',
+  'Samples here': 'គំរូនៅទីនេះ', 'in all areas': 'ក្នុងតំបន់ទាំងអស់', 'Learning…': 'កំពុងរៀន…', 'Model': 'ម៉ូដែល', 'classes': 'ថ្នាក់', 'cells changed': 'ក្រឡាបានប្ដូរ',
+  'Back to the automatic map (your samples are kept).': 'ត្រឡប់ទៅផែនទីស្វ័យប្រវត្តិ (គំរូរបស់អ្នកនៅរក្សាទុក)។', 'Delete your training samples in this area?': 'លុបគំរូបង្ហាត់របស់អ្នកក្នុងតំបន់នេះ?',
+  'cleared for new roads': 'បានឈូសឆាយសម្រាប់ផ្លូវថ្មី', 'trees': 'ដើមឈើ', 'houses': 'ផ្ទះ',
+  'Illustrated': 'មានរូបគំនូរ', 'Map sheet (dot leaders)': 'សន្លឹកផែនទី (ចំណុចនាំ)', 'Simple list': 'បញ្ជីសាមញ្ញ',
   'Contours': 'ខ្សែកម្ពស់', 'Grid': 'ក្រឡាចត្រង្គ', 'Your features': 'វត្ថុរបស់អ្នក', 'Survey points & parcels': 'ចំណុចវាស់ និងក្បាលដី', 'Tactical overlay': 'ស្រទាប់យុទ្ធសាស្ត្រ',
 };
 export let lang = 'en';

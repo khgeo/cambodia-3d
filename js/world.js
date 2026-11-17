@@ -5,23 +5,24 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=29';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=29';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=29';
-import { buildTrees, GrassField } from './vegetation.js?v=29';
-import { RoadNet, Driver, Walker } from './modes.js?v=29';
-import { vehicleKit } from './vehicles.js?v=29';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=29';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=29';
-import { LayerStack } from './layers.js?v=29';
-import { Survey } from './survey.js?v=29';
-import { Editor } from './editor.js?v=29';
-import { Atmos } from './atmos.js?v=29';
-import { NightLights } from './lights.js?v=29';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=29';
-import { Tactical, loadCatalog } from './tactical.js?v=29';
-import { SEASON } from './vegetation.js?v=29';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=29';
+import * as G from './geo.js?v=30';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=30';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=30';
+import { buildTrees, GrassField } from './vegetation.js?v=30';
+import { RoadNet, Driver, Walker } from './modes.js?v=30';
+import { vehicleKit } from './vehicles.js?v=30';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=30';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=30';
+import { LayerStack } from './layers.js?v=30';
+import { Survey } from './survey.js?v=30';
+import { Editor } from './editor.js?v=30';
+import { Atmos } from './atmos.js?v=30';
+import { NightLights } from './lights.js?v=30';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=30';
+import { Tactical, loadCatalog } from './tactical.js?v=30';
+import { LcTrainer } from './lctrain.js?v=30';
+import { SEASON } from './vegetation.js?v=30';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=30';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -137,6 +138,13 @@ export class World {
     // taps (short press without drag) for picking roads / teleporting
     const el = r.domElement; let down = null;
     el.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY, performance.now()]; });
+    // land-cover training: paint with the left button while painting is on
+    let painting = false, lastPaint = 0;
+    const paintAt = e => { const r = el.getBoundingClientRect(), rc = this._rc || (this._rc = new THREE.Raycaster()); rc.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera);
+      const hit = rc.intersectObject(this.terrainMesh, false)[0]; if (!hit) return null; if (this.brush) { this.brush.position.set(hit.point.x, hit.point.y + 0.5, hit.point.z); this.brush.visible = true; } return hit.point; };
+    el.addEventListener('pointerdown', e => { if (!this.lcPaint || this.mode !== 'orbit' || e.button !== 0 || !this.terrainMesh) return; painting = true; this.controls.enabled = false; const p = paintAt(e); if (p) this.onPaint && this.onPaint(p.x, p.z); }, true);
+    el.addEventListener('pointermove', e => { if (!this.lcPaint || !this.terrainMesh) return; const now = performance.now(); if (now - lastPaint < 30) return; lastPaint = now; const p = paintAt(e); if (painting && p) this.onPaint && this.onPaint(p.x, p.z); });
+    addEventListener('pointerup', () => { if (!painting) return; painting = false; this.controls.enabled = this.mode === 'orbit'; this.onPaintEnd && this.onPaintEnd(); });
     // digitizing: live snap marker + rubber band under the cursor
     let lastHover = 0;
     el.addEventListener('pointermove', e => {
@@ -678,6 +686,7 @@ export class World {
     const palmOK = (x, z) => forestFrac(x, z) < 0.4 && slopeAt(x, z) < 0.07 && this.rawElevation(x, z) < 150;
     const vctx = { ...D, mask: D.exclude, pxAt: D.pxAt, hAt, rnd, mobile: this.mobile, palmOK };
     const t = buildTrees(vctx); this.treeMeshes = t.meshes; t.meshes.forEach(m => this.root.add(m));
+    this._treeMat0 = this.treeMeshes.map(m => m.instanceMatrix.array.slice()); this.housesList0 = this.housesList || []; D.buildings0 = D.buildings0 || D.buildings; this._cleared = null;
     D.stats.trees = t.counts;
     this.grass = new GrassField(vctx, this.uTime, this.mobile); this.root.add(this.grass.group);
 
@@ -858,6 +867,11 @@ export class World {
       if (mAt(exclude, cx, cz) || mAt(D.rmask, cx, cz) || mAt(D.wmask, cx, cz)) continue;
       let near = false; for (let u = -1; u <= 1 && !near; u++) for (let v = -1; v <= 1; v++) for (const p of taken.get((Math.floor(cx / 10) + u) + ',' + (Math.floor(cz / 10) + v)) || []) if (Math.hypot(p[0] - cx, p[1] - cz) < 3) { near = true; break; }
       if (near) continue;
+      // face the nearest road (if two roads are close, the nearer one wins): turn the roof's axes to the road direction
+      if (this.net) { const nr = this.net.near(cx, cz, 45)[0]; if (nr) { const P = this.net.roads[nr[0]].pts, p0 = P[Math.max(0, nr[1] - 2)], p1 = P[Math.min(P.length - 1, nr[1] + 2)];
+        let tx = p1.x - p0.x, tz = p1.z - p0.z; const tl = Math.hypot(tx, tz); if (tl > 0.1) { tx /= tl; tz /= tl;
+          // long side along the road unless the roof is clearly turned the other way (then the gable end faces the road)
+          const along = Math.abs(ob.ux * tx + ob.uz * tz) >= Math.SQRT1_2; if (along) { ob.ux = tx; ob.uz = tz; ob.vx = -tz; ob.vz = tx; } else { ob.ux = -tz; ob.uz = tx; ob.vx = -tx; ob.vz = -tz; } } } }
       const A2 = a + 0.25, B2 = b + 0.25, ring = [[-A2, -B2], [A2, -B2], [A2, B2], [-A2, B2]].map(([u, v]) => [cx + ob.ux * u + ob.vx * v, cz + ob.uz * u + ob.vz * v]);
       const n = mem.length, cl = v => Math.min(255, Math.round(v)), roofC = (cl(mr / n) << 16) | (cl(mg / n) << 8) | cl(mb / n);
       out.push({ t: 1, hdm: 0, lv: area > 220 ? 2 : 0, ring, stilt: area < 120 && rnd() < 0.5 ? 1.8 + rnd() * 0.6 : 0, roof: area > 400 ? 'flat' : a / b > 1.6 ? 'gable' : 'hip', roofC, wall: [0xa07a55, 0xd9cdb5, 0xe6dccb, 0xbfa27c, 0xc8d3d6, 0xefe2c9][(rnd() * 6) | 0], src: 'image roof' });
@@ -1059,7 +1073,7 @@ export class World {
 
   /* ---------- ground looks ---------- */
   setGround(style) {
-    const D = this.D; if (!D) return;
+    const D = this.D; if (!D) return; this.groundStyle = style;
     let tex = this.texSat;
     if (style === 'enhanced' && D.px) { if (!this.texEnh) this.texEnh = this.mkTex(enhanceCanvas(D.img, D.px, D.gains)); tex = this.texEnh; }
     if (style === 'lulc' && D.px) {
@@ -1168,6 +1182,38 @@ export class World {
     if (this.grass) this.grass.center.set(1e9, 0, 1e9);
   }
   get LC() { return LC; }
+  // clear trees, image houses and OSM buildings under new roads (corridor = half width + margin)
+  applyCorridors(roads) {
+    const D = this.D; if (!D || !this.treeMeshes || !this._treeMat0) return;
+    const segs = []; for (const r of roads) for (let i = 0; i < r.pts.length - 1; i++) segs.push([r.pts[i], r.pts[i + 1], r.hw]);
+    const cell = 25, grid = new Map(); segs.forEach((sg, k) => { const [a, b, hw] = sg; for (let x = Math.floor((Math.min(a.x, b.x) - hw - 6) / cell); x <= Math.floor((Math.max(a.x, b.x) + hw + 6) / cell); x++) for (let z = Math.floor((Math.min(a.z, b.z) - hw - 6) / cell); z <= Math.floor((Math.max(a.z, b.z) + hw + 6) / cell); z++) { const key = x + ',' + z; (grid.get(key) || grid.set(key, []).get(key)).push(k); } });
+    const dist = (x, z) => { let best = Infinity; for (const k of grid.get(Math.floor(x / cell) + ',' + Math.floor(z / cell)) || []) { const [a, b, hw] = segs[k], vx = b.x - a.x, vz = b.z - a.z, L = vx * vx + vz * vz || 1, t = Math.max(0, Math.min(1, ((x - a.x) * vx + (z - a.z) * vz) / L)); best = Math.min(best, Math.hypot(a.x + vx * t - x, a.z + vz * t - z) - hw); } return best; };
+    // trees: restore, then hide the ones within 2.5 m of a new road edge
+    let trees = 0;
+    this.treeMeshes.forEach((m, i) => { const arr = m.instanceMatrix.array; arr.set(this._treeMat0[i]); if (segs.length) for (let q = 0; q < m.count; q++) { const o = q * 16; if (dist(arr[o + 12], arr[o + 14]) < 2.5) { for (let e = 0; e < 16; e++) arr[o + e] = 0; trees++; } } m.instanceMatrix.needsUpdate = true; });
+    const hit = ring => { if (!segs.length) return false; let cx = 0, cz = 0; for (const [x, z] of ring) { if (dist(x, z) < 0.8) return true; cx += x / ring.length; cz += z / ring.length; } return dist(cx, cz) < 0.8; };
+    const houses = this.housesList0.filter(b => !hit(b.ring)), bld = D.buildings0.filter(b => !hit(b.ring));
+    const changed = houses.length !== (this.housesList || []).length || bld.length !== D.buildings.length;
+    this.housesList = houses; D.buildings = bld; D.stats.houses = houses.length;
+    if (changed) {
+      const rnd = G.mulberry32(Math.round(D.aoi.w * 1e4 + D.aoi.s * 1e3) + 7);
+      for (const [key, list] of [['housesMesh', houses], ['buildingsMesh', bld]]) {
+        const old = this[key]; if (old) { this.root.remove(old); old.geometry.dispose(); }
+        const g = list.length ? this.buildBuildings(list, rnd, { noStats: true }) : null;
+        if (g) { const m = new THREE.Mesh(g, old ? old.material : makeBuildingMaterial()); m.castShadow = m.receiveShadow = true; m.visible = old ? old.visible : true; this.root.add(m); this[key] = m; } else this[key] = null;
+      }
+      if (this.layers) this.layers.collect && this.layers.collect();
+    }
+    this._cleared = { trees, houses: this.housesList0.length - houses.length, buildings: D.buildings0.length - bld.length };
+    return this._cleared;
+  }
+  getTrainer() { if (!this.trainer) this.trainer = new LcTrainer(this); this.trainer.prepare(); return this.trainer; }
+  refreshLC() { if (this.texStyl) { this.texStyl.dispose(); this.texStyl = null; } if (this.groundStyle === 'lulc') this.setGround('lulc'); }
+  // quick feedback while painting: draw the class colour straight into the land-cover texture
+  paintPreview(x, z, r, hex) {
+    const D = this.D, t = this.texStyl; if (!t || this.groundStyle !== 'lulc') return; const c = t.image.getContext('2d'), px = D.pxX(this.F.lon(x)), py = D.pxY(this.F.lat(z)), pr = (D.pxX(this.F.lon(x + r)) - px);
+    c.fillStyle = hex; c.globalAlpha = 0.9; c.beginPath(); c.arc(px, py, Math.max(1, pr), 0, 7); c.fill(); c.globalAlpha = 1; t.needsUpdate = true;
+  }
   getAtmos() { if (!this.atmos) this.atmos = new Atmos(this); return this.atmos; }
   openSurvey() { if (!this.survey) this.survey = new Survey(this); this.survey.active = true; this.survey.redraw(); return this.survey; }
   startSection() { this.sectionPick = 'A'; this.clearSection(); this.onSectionHint && this.onSectionHint('Tap point A on the ground or on the inset map'); }

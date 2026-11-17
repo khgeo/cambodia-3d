@@ -2,9 +2,9 @@
 // spot heights, water, roads by class, railways, buildings, place names and landmarks (OpenStreetMap), your own
 // features, survey points, parcels and the tactical overlay; UTM grid with edge labels, bilingual legend,
 // scale bar, north arrows with grid convergence, location map and credits. PNG or PDF.
-import { LC } from './landcover.js?v=29';
-import { utm } from './hud.js?v=29';
-import { utmInv } from './survey.js?v=29';
+import { LC } from './landcover.js?v=30';
+import { utm } from './hud.js?v=30';
+import { utmInv } from './survey.js?v=30';
 
 const PAPER = { A4: [210, 297], A3: [297, 420], A2: [420, 594] };
 const SCALES = [1000, 2000, 2500, 5000, 7500, 10000, 15000, 20000, 25000, 50000, 100000];
@@ -213,7 +213,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
     for (const p of sv.points) { g.fillStyle = '#e04020'; g.beginPath(); g.moveTo(X(p.x), Y(p.z) - mm(0.9)); g.lineTo(X(p.x) + mm(0.8), Y(p.z) + mm(0.5)); g.lineTo(X(p.x) - mm(0.8), Y(p.z) + mm(0.5)); g.closePath(); g.fill(); g.fillStyle = '#111'; g.fillText(p.id, X(p.x) + mm(1), Y(p.z)); }
   }
   if (o.tac && world.tactical) {
-    const tc = world.tactical, { symbolURL } = await import('./tactical.js?v=29');
+    const tc = world.tactical, { symbolURL } = await import('./tactical.js?v=30');
     for (const f of tc.features.filter(f => tc.inAOI(f))) {
       const col = tc.color(f.side, f.code), P = f.coords.map(c => [F.x(c[0]), F.z(c[1])]); g.strokeStyle = g.fillStyle = col; g.lineWidth = mm(0.5);
       if (f.geom === 'point') { try { const im = await loadImg(await symbolURL(f.code, col)); const sz = mm(6); g.drawImage(im, X(P[0][0]) - sz / 2, Y(P[0][1]) - sz, sz, sz); if (f.label) { font(1.8, 700); g.textAlign = 'center'; g.fillText(f.label, X(P[0][0]), Y(P[0][1]) + mm(1.5)); } } catch (e) { } }
@@ -252,13 +252,40 @@ export async function makeTopoMap(world, o, say = () => {}) {
   g.textAlign = 'right'; g.fillText(T(`Topographic map · UTM ${zone}N`, `ផែនទីសណ្ឋានដី · UTM ${KD(zone)}N`), mm(fx + FW), mm(M + 5));
   // ===== margin: legend, scale, north, location, credits =====
   const lx = land ? fx + FW + 9 : M, ly = land ? M + head : fy + FH + 9, lw = land ? side : W - 2 * M;
-  const cols = land ? 2 : 4, colW = lw / cols, legBottom = land ? H - M - 96 : H - M - 2; let col = 0, cy = ly;
-  const heading = (txt) => { font(2.4, 700); g.fillStyle = '#1f3f8f'; g.textAlign = 'left'; g.fillText(txt, mm(lx + col * colW), mm(cy + 1.5)); cy += 5; };
-  const item = (draw, txt) => { const two = lang === 'both' && txt.includes(' · '), hgt = two ? 5.4 : 4.1; if (cy + hgt > legBottom) { col++; cy = ly + 5; } const x0 = lx + col * colW; draw(mm(x0), mm(cy), mm(8), mm(3)); g.fillStyle = '#222'; g.textAlign = 'left'; g.textBaseline = 'middle';
+  const cols = land ? 2 : 4, colW = lw / cols, legBottom = land ? H - M - 96 : H - M - 2; let col = 0, cy = ly, colTop = () => ly + 5;
+  const LS = o.legend || 'illus', caps = v => lang === 'km' ? v : v.toUpperCase();
+  // three legend styles (after TopoStyler): illustrated, sheet with dot leaders, simple list
+  const heading = (txt) => { if (cy + 9 > legBottom) { col++; cy = colTop(); } const x0 = lx + col * colW; g.textAlign = 'left'; g.textBaseline = 'middle';
+    if (LS === 'simple') { font(2.4, 700); g.fillStyle = '#1f3f8f'; g.fillText(txt, mm(x0), mm(cy + 1.5)); cy += 5; return; }
+    font(2.1, 700); g.fillStyle = '#222'; g.fillText(caps(txt), mm(x0), mm(cy + 1.4)); g.strokeStyle = '#222'; g.lineWidth = mm(LS === 'sheet' ? 0.25 : 0.12); g.beginPath(); g.moveTo(mm(x0), mm(cy + 3.3)); g.lineTo(mm(x0 + colW - 3), mm(cy + 3.3)); g.stroke(); cy += 5.6; };
+  const item = (draw, txt) => { const two = lang === 'both' && txt.includes(' · '), hgt = two ? 5.4 : 4.1; if (cy + hgt > legBottom) { col++; cy = colTop(); } const x0 = lx + col * colW; g.textAlign = 'left'; g.textBaseline = 'middle';
+    if (LS === 'sheet') { // "Description ........ [symbol]"
+      const sx = x0 + colW - 12, a = two ? txt.slice(0, txt.indexOf(' · ')) : txt, b = two ? txt.slice(txt.indexOf(' · ') + 3) : '';
+      draw(mm(sx), mm(cy), mm(8), mm(3)); font(1.8); g.fillStyle = '#222'; g.fillText(a, mm(x0), mm(cy + (two ? 0.6 : 1.5))); const tw = g.measureText(a).width;
+      g.fillStyle = '#777'; const dot = mm(0.9); for (let x = mm(x0) + tw + mm(1); x < mm(sx - 1); x += dot) g.fillRect(x, mm(cy + (two ? 0.6 : 1.5)) + mm(0.4), mm(0.18), mm(0.18));
+      if (b) { font(1.5); g.fillStyle = '#555'; g.fillText(b, mm(x0), mm(cy + 2.9)); } cy += hgt; return; }
+    draw(mm(x0), mm(cy), mm(8), mm(3)); g.fillStyle = '#222';
     if (two) { const i = txt.indexOf(' · '); font(1.8); g.fillText(txt.slice(0, i), mm(x0 + 9.5), mm(cy + 0.6)); font(1.5); g.fillStyle = '#555'; g.fillText(txt.slice(i + 3), mm(x0 + 9.5), mm(cy + 2.9)); } else { font(1.8); g.fillText(txt, mm(x0 + 9.5), mm(cy + 1.5)); } cy += hgt; };
-  heading(T('Legend', 'សញ្ញាផែនទី'));
+  // hand-drawn parcel for land cover (wobbly rounded shape)
+  const wobbly = (x, y, w, h, seed) => { const P = []; const n = 10; for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, j = 1 + 0.12 * Math.sin(seed * 7.3 + k * 2.1); P.push([x + w / 2 + Math.cos(a) * w / 2 * j * 0.98, y + h / 2 + Math.sin(a) * h / 2 * j * 0.95]); }
+    g.beginPath(); for (let k = 0; k <= n; k++) { const p0 = P[k % n], p1 = P[(k + 1) % n], m = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2]; if (!k) g.moveTo(m[0], m[1]); else g.quadraticCurveTo(p0[0], p0[1], m[0], m[1]); } g.closePath(); };
+  if (LS !== 'simple') { font(3.4, 700); g.fillStyle = '#111'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(lang === 'km' ? 'សញ្ញាផែនទី' : lang === 'both' ? 'LEGEND · សញ្ញាផែនទី' : 'LEGEND', mm(lx), mm(cy + 2)); cy += 7; }
+  heading(T(LS === 'simple' ? 'Legend' : 'Roads and settlements', LS === 'simple' ? 'សញ្ញាផែនទី' : 'ផ្លូវ និងទីលំនៅ'));
   const usedR = new Map(); for (const r of D.roads || []) { const st = RS(r.cls); usedR.set(st.k, st); }
-  for (const st of usedR.values()) item((x, y, w, h) => { g.setLineDash([]); if (st.o) { g.strokeStyle = st.o; g.lineWidth = mm(st.w + 0.3); g.beginPath(); g.moveTo(x, y + h / 2); g.lineTo(x + w, y + h / 2); g.stroke(); } g.setLineDash(st.d ? st.d.map(mm) : []); g.strokeStyle = st.f; g.lineWidth = mm(st.w); g.beginPath(); g.moveTo(x, y + h / 2); g.lineTo(x + w, y + h / 2); g.stroke(); g.setLineDash([]); }, T(st.k, st.km));
+  const roadLine = (st, path) => { g.setLineDash([]); g.lineCap = 'round'; if (st.o) { g.strokeStyle = st.o; g.lineWidth = mm(st.w + 0.3); path(); g.stroke(); } g.setLineDash(st.d ? st.d.map(mm) : []); g.strokeStyle = st.f; g.lineWidth = mm(st.w); path(); g.stroke(); g.setLineDash([]); g.lineCap = 'butt'; };
+  if (LS === 'illus' && usedR.size) { // roads converging on a village, labelled with hairline callouts
+    const R = [...usedR.values()].slice(0, 7), sw = land ? lw - 3 : colW * 2 - 4, sh = 4 + R.length * 4.6, x0 = lx, y0 = cy, vx = x0 + sw * 0.86, vy = y0 + sh / 2;
+    g.fillStyle = '#f4f1e8'; wobbly(mm(x0 + sw * 0.5), mm(y0 + 0.5), mm(sw * 0.5), mm(sh - 1), 3); g.fill();
+    R.forEach((st, k) => { const yy = y0 + 3 + k * 4.6, sx = x0 + sw * 0.5, mxp = x0 + sw * 0.7;
+      roadLine(st, () => { g.beginPath(); g.moveTo(mm(sx), mm(yy)); g.bezierCurveTo(mm(mxp), mm(yy), mm(vx - 6), mm(vy + (yy - vy) * 0.3), mm(vx), mm(vy)); });
+      const two = lang === 'both', en = st.k, kmn = st.km; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillStyle = '#222'; font(1.7); const lab = lang === 'km' ? kmn : en; g.fillText(lab, mm(x0), mm(yy - (two ? 0.8 : 0))); let tw = g.measureText(lab).width;
+      if (two) { font(1.4); g.fillStyle = '#555'; g.fillText(kmn, mm(x0), mm(yy + 1.3)); tw = Math.max(tw, g.measureText(kmn).width); }
+      g.strokeStyle = '#555'; g.lineWidth = mm(0.08); g.beginPath(); g.moveTo(mm(x0) + tw + mm(0.8), mm(yy)); g.lineTo(mm(sx - 0.6), mm(yy)); g.stroke(); g.fillStyle = '#555'; g.beginPath(); g.arc(mm(sx - 0.6), mm(yy), mm(0.25), 0, 7); g.fill(); });
+    g.fillStyle = '#3a3a3a'; for (const [dx, dy, bw_, bh] of [[-2.4, -2, 1.4, 1.1], [-0.6, -2.6, 1.2, 1.2], [1, -1.4, 1.5, 1.1], [-1.8, 0.4, 1.2, 1.3], [0.2, 0.6, 1.4, 1], [1.8, 0.9, 1.1, 1.2], [-0.5, 2.2, 1.3, 1]]) g.fillRect(mm(vx + dx), mm(vy + dy), mm(bw_), mm(bh));
+    font(1.6, 700); g.fillStyle = '#111'; g.textAlign = 'center'; g.fillText(T('Village', 'ភូមិ'), mm(vx), mm(vy + 4.6));
+    cy = y0 + sh + 2; if (!land) { const sb = cy; colTop = () => (col < 2 ? sb : ly + 5); }
+  } else for (const st of usedR.values()) item((x, y, w, h) => { g.setLineDash([]); if (st.o) { g.strokeStyle = st.o; g.lineWidth = mm(st.w + 0.3); g.beginPath(); g.moveTo(x, y + h / 2); g.lineTo(x + w, y + h / 2); g.stroke(); } g.setLineDash(st.d ? st.d.map(mm) : []); g.strokeStyle = st.f; g.lineWidth = mm(st.w); g.beginPath(); g.moveTo(x, y + h / 2); g.lineTo(x + w, y + h / 2); g.stroke(); g.setLineDash([]); }, T(st.k, st.km));
+  if (LS !== 'simple') { cy += 1.5; heading(T('Water, buildings and relief', 'ទឹក អគារ និងទម្រង់ដី')); }
   if ((D.rails || []).length) item((x, y, w, h) => { g.strokeStyle = '#222'; g.lineWidth = mm(0.5); g.beginPath(); g.moveTo(x, y + h / 2); g.lineTo(x + w, y + h / 2); g.stroke(); g.strokeStyle = '#fff'; g.lineWidth = mm(0.3); g.setLineDash([mm(1.2), mm(1.2)]); g.stroke(); g.setLineDash([]); }, T('Railway', 'ផ្លូវដែក'));
   item((x, y, w, h) => { g.strokeStyle = '#3f7fbf'; g.lineWidth = mm(0.4); g.beginPath(); g.moveTo(x, y + h * 0.7); g.bezierCurveTo(x + w * 0.3, y, x + w * 0.6, y + h, x + w, y + h * 0.3); g.stroke(); }, T('River / stream / canal', 'ទន្លេ / អូរ / ប្រឡាយ'));
   item((x, y, w, h) => { g.fillStyle = '#a9cdea'; g.strokeStyle = '#3f7fbf'; g.lineWidth = mm(0.15); g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h); }, T('Lake / pond / reservoir', 'បឹង / ស្រះ / អាងទឹក'));
@@ -266,12 +293,12 @@ export async function makeTopoMap(world, o, say = () => {}) {
   if ((world.housesList || []).length) item((x, y, w, h) => { g.fillStyle = '#5a5a5a'; for (const a of [0.1, 0.45, 0.75]) g.fillRect(x + w * a, y + h * 0.3, w * 0.18, h * 0.45); }, T('House (from the image)', 'ផ្ទះ (ពីរូបភាព)'));
   item((x, y, w, h) => { g.strokeStyle = '#a8662e'; g.lineWidth = mm(0.14); g.beginPath(); g.moveTo(x, y + h * 0.3); g.lineTo(x + w, y + h * 0.3); g.stroke(); g.lineWidth = mm(0.32); g.beginPath(); g.moveTo(x, y + h * 0.75); g.lineTo(x + w, y + h * 0.75); g.stroke(); }, T(`Contour ${CI} m · index ${CI * IDX} m`, `ខ្សែកម្ពស់ ${KD(CI)} ម · ខ្សែមេ ${KD(CI * IDX)} ម`));
   item((x, y, w, h) => { g.fillStyle = '#222'; g.beginPath(); g.arc(x + w * 0.3, y + h / 2, mm(0.45), 0, 7); g.fill(); font(1.8, 600); g.fillText(N(124), x + w * 0.42, y + h / 2); }, T('Spot height (m)', 'ចំណុចកម្ពស់ (ម)'));
-  if (o.names) { item((x, y, w, h) => { g.fillStyle = '#b0302a'; g.beginPath(); g.moveTo(x + w / 2, y); g.lineTo(x + w / 2 + mm(1.1), y + h * 0.8); g.lineTo(x + w / 2 - mm(1.1), y + h * 0.8); g.closePath(); g.fill(); }, T('Pagoda / temple', 'វត្ត / ទីសក្ការៈ'));
+  if (o.names) { if (LS !== 'simple') { cy += 1.5; heading(T('Places and landmarks', 'ទីកន្លែង និងទីសម្គាល់')); } item((x, y, w, h) => { g.fillStyle = '#b0302a'; g.beginPath(); g.moveTo(x + w / 2, y); g.lineTo(x + w / 2 + mm(1.1), y + h * 0.8); g.lineTo(x + w / 2 - mm(1.1), y + h * 0.8); g.closePath(); g.fill(); }, T('Pagoda / temple', 'វត្ត / ទីសក្ការៈ'));
     item((x, y, w, h) => { g.fillStyle = '#111'; g.fillRect(x + w / 2 - mm(0.12), y, mm(0.24), h); g.fillStyle = '#2f5fbf'; g.fillRect(x + w / 2, y, mm(1.1), mm(0.7)); }, T('School', 'សាលារៀន'));
     item((x, y, w, h) => { g.fillStyle = '#d02020'; g.fillRect(x + w / 2 - mm(0.9), y + h / 2 - mm(0.3), mm(1.8), mm(0.6)); g.fillRect(x + w / 2 - mm(0.3), y + h / 2 - mm(0.9), mm(0.6), mm(1.8)); }, T('Hospital / health centre', 'មន្ទីរពេទ្យ / មណ្ឌលសុខភាព')); }
   cy += 2; heading(T('Land cover', 'គម្របដី'));
   const present = Object.keys(D.lcPct || {}).map(Number).filter(v => v > 0 && v !== 13 && D.lcPct[v] > 0.002).sort((a, b) => a - b);
-  for (const c of present) item((x, y, w, h) => { g.fillStyle = LC[c].topo; g.fillRect(x, y, w, h); if (LC_SYM[c]) { g.fillStyle = g.createPattern(patCache[LC_SYM[c]] || (patCache[LC_SYM[c]] = pat(LC_SYM[c])), 'repeat'); g.fillRect(x, y, w, h); } g.strokeStyle = '#999'; g.lineWidth = mm(0.1); g.strokeRect(x, y, w, h); }, T(LC[c].en, LC[c].km));
+  for (const c of present) item(LS === 'illus' ? (x, y, w, h) => { g.save(); wobbly(x, y - mm(0.3), w, h + mm(0.6), c); g.clip(); g.fillStyle = LC[c].topo; g.fillRect(x - 2, y - 4, w + 4, h + 8); if (LC_SYM[c]) { g.fillStyle = g.createPattern(patCache[LC_SYM[c]] || (patCache[LC_SYM[c]] = pat(LC_SYM[c])), 'repeat'); g.fillRect(x - 2, y - 4, w + 4, h + 8); } g.restore(); g.strokeStyle = '#777'; g.lineWidth = mm(0.1); wobbly(x, y - mm(0.3), w, h + mm(0.6), c); g.stroke(); } : (x, y, w, h) => { g.fillStyle = LC[c].topo; g.fillRect(x, y, w, h); if (LC_SYM[c]) { g.fillStyle = g.createPattern(patCache[LC_SYM[c]] || (patCache[LC_SYM[c]] = pat(LC_SYM[c])), 'repeat'); g.fillRect(x, y, w, h); } g.strokeStyle = '#999'; g.lineWidth = mm(0.1); g.strokeRect(x, y, w, h); }, T(LC[c].en, LC[c].km));
   // scale bar, north arrows, location map, credits in the lower part of the margin
   const bx = land ? lx : lx + 3 * colW + 2, byTop = land ? H - M - 92 : ly - 2; let by = byTop; const bw = land ? lw : colW - 2;
   font(2.6, 700); g.fillStyle = '#111'; g.textAlign = 'center'; g.fillText(T(`Scale 1:${S.toLocaleString('en')}`, `មាត្រដ្ឋាន ១:${KD(S)}`), mm(bx + bw / 2), mm(by + 2)); by += 5;

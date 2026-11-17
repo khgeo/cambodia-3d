@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=29">
+<link rel="stylesheet" href="css/app.css?v=30">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -69,6 +69,7 @@
     <button id="surveyBtn" data-tip="Survey: measure, mark &amp; go to">📐</button>
     <button id="editBtn" data-tip="Digitize: roads, buildings, trees">✏️</button>
     <button id="sectionBtn" data-tip="Cross-section: soil &amp; geology">✂️</button>
+    <button id="lcBtn" data-tip="Train land cover: paint what you see, the model learns">🖌️</button>
     <button id="tacBtn" data-tip="Tactical: symbols, line of sight, mobility">🎯</button>
     <button id="topoBtn" data-tip="Export: topographic map &amp; GeoPackage">🗺️</button>
     <span class="grow"></span>
@@ -238,6 +239,21 @@
       <div class="svhelp">For planning and training from open data (terrain model, image land cover, OSM). Trees and buildings block sight; movement uses bare ground. Confirm by reconnaissance.</div>
     </div>
   </div>
+  <div id="lcPanel" class="rpanel" hidden>
+    <div class="row lphead"><b>🖌️ Train land cover</b><span id="lcHint" class="hint"></span><button id="lcMin" title="Hide / show">▴</button><button id="lcClose" title="Close">✕</button></div>
+    <div id="lcContent">
+      <div class="svhelp">Choose the class you see in the image, then paint over it on the ground (drag). The model learns from your strokes and re-classifies the whole area.</div>
+      <div id="lcClasses" class="lcgrid"></div>
+      <div class="row"><span>Brush</span><input type="range" id="lcRad" min="2" max="40" value="6"><b id="lcRadV">6 m</b></div>
+      <div class="row"><label><input type="checkbox" id="lcPaintOn" checked> 🖌 Paint (off = move the view)</label></div>
+      <div class="row"><label><input type="checkbox" id="lcAuto" checked> Learn after each stroke</label></div>
+      <div class="row"><label><input type="checkbox" id="lcAll" checked> Use samples from all my areas</label></div>
+      <div class="row"><span>Confidence</span><input type="range" id="lcTau" min="40" max="95" value="60"><b id="lcTauV">60%</b></div>
+      <div class="row"><button id="lcLearn" class="primary" style="margin:0">🧠 Learn now</button></div>
+      <div class="row"><button id="lcReset">↺ Automatic map</button><button id="lcForget">🗑 Forget samples here</button></div>
+      <div id="lcInfo" class="svhelp"></div>
+    </div>
+  </div>
   <div id="topoPanel" class="rpanel" hidden>
     <div class="row lphead"><b>🗺️ Topographic map</b><span id="topoHint" class="hint"></span><button id="topoMin" title="Hide / show">▴</button><button id="topoClose" title="Close">✕</button></div>
     <div id="topoContent">
@@ -246,6 +262,7 @@
       <div class="row"><span>Paper</span><select id="topoPaper"><option value="A3L">A3 landscape</option><option value="A3P">A3 portrait</option><option value="A4L">A4 landscape</option><option value="A4P">A4 portrait</option><option value="A2L">A2 landscape</option></select></div>
       <div class="row"><span>Scale</span><select id="topoScale"><option value="auto">Auto</option><option>2500</option><option>5000</option><option>10000</option><option>15000</option><option>20000</option><option>25000</option><option>50000</option></select><span>Contour interval</span><select id="topoCI"><option value="auto">Auto</option><option>0.5</option><option>1</option><option>2</option><option>5</option><option>10</option><option>20</option></select></div>
       <div class="row"><span>Language</span><select id="topoLang"><option value="both">Bilingual</option><option value="km">ខ្មែរ</option><option value="en">English</option></select><span>DPI</span><select id="topoDPI"><option>150</option><option selected>200</option><option>300</option></select></div>
+      <div class="row"><span>Legend</span><select id="topoLeg"><option value="illus">Illustrated</option><option value="sheet">Map sheet (dot leaders)</option><option value="simple">Simple list</option></select></div>
       <div class="chips">
         <label><input type="checkbox" id="topoNames" checked><span>Place names from OpenStreetMap</span></label>
         <label><input type="checkbox" id="topoHill" checked><span>Hillshade</span></label>
@@ -276,6 +293,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=29"></script>
+<script type="module" src="js/app.js?v=30"></script>
 </body>
 </html>

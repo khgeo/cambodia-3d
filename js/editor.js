@@ -2,9 +2,9 @@
 // Features are kept in lon/lat in this browser (localStorage), rebuilt whenever the scene is rebuilt,
 // drivable (new roads join the Drive network) and exportable / importable as GeoJSON.
 import * as THREE from 'three';
-import { RoadNet } from './modes.js?v=29';
-import { instTrees } from './vegetation.js?v=29';
-import { makeBuildingMaterial } from './shaders.js?v=29';
+import { RoadNet } from './modes.js?v=30';
+import { instTrees } from './vegetation.js?v=30';
+import { makeBuildingMaterial } from './shaders.js?v=30';
 
 const KEY = 'cambodia3d.edits.v1';
 export const ROAD_TYPES = {
@@ -153,6 +153,7 @@ export class Editor {
       netRoads.push({ pts: pts.map(p => ({ x: p.x, y: p.y, z: p.z, s: p.s })), hw: T.w / 2, oneway: false, cls: 11, user: true });
     }
     if (w.net) { const base = w.net.roads.filter(r => !r.user); w.net = new RoadNet([...base, ...netRoads]); if (w.driver) w.driver.net = w.net; }
+    if (w.applyCorridors) this.cleared = w.applyCorridors(netRoads.map(r => ({ pts: r.pts, hw: r.hw + 0.6 })));
     // buildings: same builder as the OSM buildings (walls with windows, gable / hip / flat roofs, stilts)
     if (blds.length) {
       const list = blds.map(f => ({ t: f.props.floors > 3 ? 3 : 1, hdm: 0, lv: f.props.floors, ring: f.coords.map(c => { const p = this.xz(c); return [p.x, p.z]; }), roof: f.props.roof, wall: new THREE.Color(f.props.wall).getHex(), roofC: new THREE.Color(f.props.roofC).getHex(), stilt: f.props.stilt ? 2.2 : 0 }));

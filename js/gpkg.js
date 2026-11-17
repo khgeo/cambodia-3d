@@ -2,8 +2,8 @@
 // image houses, contours, spot heights, place names, survey points and parcels, your digitized features, the
 // tactical overlay) in EPSG:4326, the satellite image and the 13-class land cover as raster tiles (EPSG:3857),
 // and a QGIS style for each layer saved as its default (layer_styles), so the layers open styled.
-import { LC } from './landcover.js?v=29';
-import { terrainData } from './topomap.js?v=29';
+import { LC } from './landcover.js?v=30';
+import { terrainData } from './topomap.js?v=30';
 
 let SQL = null;
 async function sqljs() {
@@ -127,7 +127,7 @@ export async function exportGeoPackage(world, say = () => {}) {
   // tactical overlay: TacMap symbols (SVG with param() colours) coloured by side
   const tc = world.tactical;
   if (tc && tc.features.length) {
-    const { CAT } = await (await import('./tactical.js?v=29')).loadCatalog(), feats = tc.features.filter(q => tc.inAOI(q)), base = q => ({ code: q.code, side: q.side, label: q.label || '', name_en: CAT.catalog[q.code].en, name_km: CAT.catalog[q.code].km, color: tc.color(q.side, q.code) });
+    const { CAT } = await (await import('./tactical.js?v=30')).loadCatalog(), feats = tc.features.filter(q => tc.inAOI(q)), base = q => ({ code: q.code, side: q.side, label: q.label || '', name_en: CAT.catalog[q.code].en, name_km: CAT.catalog[q.code].km, color: tc.color(q.side, q.code) });
     const svgs = {}; for (const q of feats.filter(q => q.geom === 'point')) if (!svgs[q.code]) { try { svgs[q.code] = btoa(unescape(encodeURIComponent(await (await fetch('tac/svg/' + CAT.catalog[q.code].svg)).text()))); } catch (e) { } }
     const svgSym = c => `<layer class="SvgMarker" enabled="1" pass="0" locked="0">${opt({ name: 'base64:' + svgs[c], size: 7, size_unit: 'MM', color: '255,255,255,255', outline_color: '232,23,61,255', outline_width: 0.6, outline_width_unit: 'MM', vertical_anchor_point: '2' })}${ddColor('outlineColor', 'color')}</layer>`;
     cnt.tacP = layer('tactical_points', 'Tactical symbols', 1, [['code', 'TEXT'], ['side', 'TEXT'], ['label', 'TEXT'], ['name_en', 'TEXT'], ['name_km', 'TEXT'], ['color', 'TEXT'], ['rings_m', 'TEXT']],
@@ -138,6 +138,13 @@ export async function exportGeoPackage(world, say = () => {}) {
     cnt.tacA = layer('tactical_areas', 'Tactical areas', 3, [['code', 'TEXT'], ['side', 'TEXT'], ['label', 'TEXT'], ['name_en', 'TEXT'], ['name_km', 'TEXT'], ['color', 'TEXT']],
       feats.filter(q => q.geom === 'polygon' || q.geom === 'sector').map(q => ({ g: [[...q.coords, q.coords[0]]], ...base(q) })),
       qml(single('fill', `<layer class="SimpleFill" enabled="1" pass="0" locked="0">${opt({ color: '232,23,61,40', outline_color: '232,23,61,255', outline_width: 0.6, outline_width_unit: 'MM', style: 'solid' })}<data_defined_properties><Option type="Map"><Option type="QString" name="name" value=""/><Option type="Map" name="properties"><Option type="Map" name="outlineColor"><Option type="bool" name="active" value="true"/><Option type="QString" name="field" value="color"/><Option type="int" name="type" value="2"/></Option><Option type="Map" name="fillColor"><Option type="bool" name="active" value="true"/><Option type="QString" name="expression" value="set_color_part(&quot;color&quot;,'alpha',40)"/><Option type="int" name="type" value="3"/></Option></Option><Option type="QString" name="type" value="collection"/></Option></data_defined_properties></layer>`), labels('label', 8, '#111111', 1)));
+  }
+  // your land-cover training samples in this area
+  if (world.trainer) {
+    const hs = world.trainer.hereSamples();
+    cnt.train = layer('land_cover_training', 'Land cover training samples', 1, [['class_id', 'INTEGER'], ['class_en', 'TEXT'], ['class_km', 'TEXT'], ['color', 'TEXT']],
+      hs.map(q => ({ g: [q.lon, q.lat], class_id: q.c, class_en: LC[q.c].en, class_km: LC[q.c].km, color: LC[q.c].c })),
+      qml(single('marker', marker('circle', '#ffffff', 1.2, '#111111', ddColor('fillColor', 'color')))));
   }
   // land-cover classes as a lookup table
   db.run(`CREATE TABLE land_cover_classes (id INTEGER PRIMARY KEY, class_en TEXT, class_km TEXT, color TEXT, percent REAL)`);
