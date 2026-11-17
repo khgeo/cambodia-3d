@@ -365,3 +365,36 @@ body.km .lbl{text-transform:none;letter-spacing:0;font-size:12px}
 .lcgrid button i{flex:0 0 14px;height:14px;border-radius:3px}
 .lcgrid button.on{outline:2px solid #ffb547;background:#3a4656}
 @media (max-width:640px){#lcPanel{top:auto;bottom:62px;right:6px;left:6px;width:auto;max-height:55%}}
+
+#lcPanel .seg{gap:0}#lcPanel .seg button{flex:1;margin:0;border-radius:0}#lcPanel .seg button:first-child{border-radius:6px 0 0 6px}#lcPanel .seg button:last-child{border-radius:0 6px 6px 0}#lcPanel .seg button.on{background:#ffb547;color:#1a1a1a;font-weight:600}
+
+#radarPanel{position:absolute;right:12px;top:200px;width:260px;overflow:auto;overscroll-behavior:contain;z-index:7;background:rgba(17,23,31,.88);color:#e8eef4;border-radius:12px;padding:10px;box-sizing:border-box;font-size:12px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 28px rgba(0,0,0,.35)}
+#radarPanel[hidden]{display:none}
+#radarPanel .row{display:flex;gap:6px;align-items:center;margin:0 0 7px}
+#radarPanel .row button{flex:1;padding:6px 4px;font-size:11.5px}
+#radarPanel .lphead{position:sticky;top:-10px;z-index:2;background:rgba(17,23,31,.97);margin:-10px -10px 8px;padding:10px 10px 8px;border-radius:12px 12px 0 0}
+#radarPanel .lphead b{font-size:14px}#radarPanel .lphead .hint{flex:1;color:#ffd88a;font-size:11px}
+#radarPanel .lphead button{flex:0;padding:4px 9px}
+#radarPanel.collapsed #radarContent{display:none}
+#radarPanel.collapsed .lphead{margin-bottom:-10px;border-radius:12px}
+.svtabs button.on{background:#2d7a55;color:#fff}
+.svhelp{color:#9fb0c0;font-size:11px;line-height:1.45;margin:0 0 7px}
+#svCodeRow span{color:#9fb0c0;width:34px}#svCodeRow select{flex:1}
+#svResult{line-height:1.55;margin:2px 0 6px}
+#svResult table{width:100%;border-collapse:collapse}#svResult td{padding:1px 0}#svResult td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+#svProfile{width:100%;height:auto;border-radius:8px;background:#f7f4ee;margin-bottom:6px}
+.svsec{border-top:1px solid rgba(255,255,255,.12);padding-top:8px;margin-top:6px}
+.svsec input{width:100%;box-sizing:border-box;margin:6px 0;padding:7px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff}
+#svList{max-height:150px;overflow:auto;margin:6px 0;font-size:11px;font-variant-numeric:tabular-nums}
+#svList div{display:grid;grid-template-columns:30px 1fr 46px 16px;gap:4px;padding:3px 2px;border-bottom:1px solid rgba(255,255,255,.07)}
+#svList div span:nth-child(2){color:#c9d3dc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#svList button{padding:0;background:none;color:#ff8a7a;font-size:12px}
+
+
+#radarPanel [hidden]{display:none!important}#radarPanel .row span{color:#9fb0c0;font-size:11px}#radarPanel label{font-size:11px;display:flex;gap:5px;align-items:center}
+#radarPanel .seg{gap:0}#radarPanel .seg button{flex:1;margin:0;border-radius:0}#radarPanel .seg button:first-child{border-radius:6px 0 0 6px}#radarPanel .seg button:last-child{border-radius:0 6px 6px 0}#radarPanel .seg button.on{background:#2fbf6a;color:#06140b;font-weight:600}
+#radarScope{display:block;width:100%;max-width:300px;aspect-ratio:1;margin:6px auto;border-radius:50%;background:#000e06}
+.radarlist{max-height:150px;overflow:auto;font:11px/1.35 ui-monospace,monospace}.radarlist table{width:100%;border-collapse:collapse}.radarlist td,.radarlist th{padding:1px 3px;text-align:right;white-space:nowrap}.radarlist td:first-child,.radarlist th:first-child{text-align:left}.radarlist th{color:#9fb0c0;font-weight:600}
+#radarHelp summary{cursor:pointer;font-size:11.5px;color:#9fd0ff;margin-top:4px}#radarHelp a{color:#9fd0ff}
+@media (max-width:640px){#radarPanel{top:auto;bottom:62px;right:6px;left:6px;width:auto;max-height:55%}}

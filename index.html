@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=35">
+<link rel="stylesheet" href="css/app.css?v=36">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -70,6 +70,7 @@
     <button id="editBtn" data-tip="Digitize: roads, buildings, trees">✏️</button>
     <button id="sectionBtn" data-tip="Cross-section: soil &amp; geology">✂️</button>
     <button id="lcBtn" data-tip="Train land cover: paint what you see, the model learns">🖌️</button>
+    <button id="radarBtn" data-tip="Radar: aircraft in the sky (simulated or live)">📡</button>
     <button id="tacBtn" data-tip="Tactical: symbols, line of sight, mobility">🎯</button>
     <button id="topoBtn" data-tip="Export: topographic map &amp; GeoPackage">🗺️</button>
     <span class="grow"></span>
@@ -108,6 +109,8 @@
       <input type="range" id="hour" min="5" max="23.5" step="0.25" value="9.5" class="wide">
       <label class="lbl">Weather</label>
       <div class="row wxrow"><button data-wx="clear" class="on" title="Clear sky">☀️</button><button data-wx="haze" title="Hazy / burning season">🌫️</button><button data-wx="rain" title="Monsoon rain">🌧️</button><button data-wx="storm" title="Thunderstorm">⛈️</button></div>
+      <div class="row"><label><input type="checkbox" id="liveWx"> 📡 Live weather &amp; time here</label></div>
+      <div id="liveWxInfo" class="info" hidden></div>
       <label class="lbl">Rice season</label>
       <select id="season" class="wide"><option value="image">As in the image</option><option value="planting">Jun–Jul · planting (flooded)</option><option value="growing">Aug–Oct · growing (green)</option><option value="ripening">Nov–Dec · ripening (golden)</option><option value="harvested">Jan–May · harvested (stubble)</option></select>
     </section>
@@ -235,6 +238,8 @@
         <div class="row"><button id="tacClearA">Clear analysis</button></div>
       </div>
       <div class="row"><input id="tacLabel" placeholder="Label / unit name (optional)" style="flex:1"></div>
+      <div class="row"><span>Direction</span><input type="range" id="tacDirR" min="0" max="359" value="0" style="flex:1" disabled><input type="number" id="tacDir" min="0" max="359" placeholder="—" style="width:52px"><span>°</span><button id="tacDirX" title="No direction">✕</button></div>
+      <div class="row"><span>Labels</span><select id="tacLabels"><option value="mine">Your labels</option><option value="all">Labels + symbol names</option><option value="none">Hide labels</option></select><button data-am="edit">✎ Edit</button></div>
       <div class="row"><button data-am="move">✥ Move</button><button data-am="delete">🗑 Delete</button><button id="tacExport">⬇ GeoJSON</button><button id="tacClearAll">Clear all</button></div>
       <div class="svhelp">For planning and training from open data (terrain model, image land cover, OSM). Trees and buildings block sight; movement uses bare ground. Confirm by reconnaissance.</div>
     </div>
@@ -245,13 +250,31 @@
       <div class="svhelp">Choose the class you see in the image, then paint over it on the ground (drag). The model learns from your strokes and re-classifies the whole area.</div>
       <div id="lcClasses" class="lcgrid"></div>
       <div class="row"><span>Brush</span><input type="range" id="lcRad" min="2" max="40" value="6"><b id="lcRadV">6 m</b></div>
-      <div class="row"><label><input type="checkbox" id="lcPaintOn" checked> 🖌 Paint (off = move the view)</label></div>
+      <div class="row seg"><button id="lcModePaint" class="on">🖌 Paint</button><button id="lcModeMove">✋ Move / rotate</button></div>
+      <div class="svhelp" id="lcNav">Right-drag: rotate · Shift + right-drag: pan · wheel: zoom · hold Space and drag: move</div>
+      <div class="row"><label><input type="checkbox" id="lcImg"> 🛰 Satellite image on top</label><input type="range" id="lcImgA" min="10" max="100" value="60"><b id="lcImgAV">60%</b></div>
       <div class="row"><label><input type="checkbox" id="lcAuto" checked> Learn after each stroke</label></div>
       <div class="row"><label><input type="checkbox" id="lcAll" checked> Use samples from all my areas</label></div>
       <div class="row"><span>Confidence</span><input type="range" id="lcTau" min="40" max="95" value="60"><b id="lcTauV">60%</b></div>
       <div class="row"><button id="lcLearn" class="primary" style="margin:0">🧠 Learn now</button></div>
       <div class="row"><button id="lcReset">↺ Automatic map</button><button id="lcForget">🗑 Forget samples here</button></div>
       <div id="lcInfo" class="svhelp"></div>
+    </div>
+  </div>
+  <div id="radarPanel" class="rpanel" hidden>
+    <div class="row lphead"><b>📡 Radar</b><span id="radarHint" class="hint"></span><button id="radarMin" title="Hide / show">▴</button><button id="radarClose" title="Close">✕</button></div>
+    <div id="radarContent">
+      <div class="row"><button id="radarPlace" class="primary" style="margin:0">📍 Place the radar (tap the ground)</button><button id="radarDel" title="Remove the radar">🗑</button></div>
+      <div class="row seg" id="radarSrc"><button data-v="sim" class="on">Simulation</button><button data-v="live">Live flights</button><button data-v="both">Both</button></div>
+      <div class="row"><span>Range</span><select id="radarRange"><option>25</option><option>50</option><option>100</option><option selected>150</option><option>250</option><option>400</option></select><span>km</span><span>Turns/min</span><select id="radarRpm"><option>6</option><option>12</option><option selected>15</option><option>30</option></select></div>
+      <div class="row"><label><input type="checkbox" id="radarFit" checked> Bring aircraft into the 3D view</label><label><input type="checkbox" id="radarAll"> Show undetected</label></div>
+      <canvas id="radarScope" width="300" height="300"></canvas>
+      <div id="radarStat" class="svhelp"></div>
+      <div id="radarList" class="radarlist"></div>
+      <details id="radarHelp"><summary>Live flights: how it works</summary>
+        <div class="svhelp">Live positions come from the open ADS-B exchanges (adsb.lol, adsb.fi) and are refreshed every 10 s. Most of these sites do not allow web pages to read them directly, so the page may need a small proxy. Make a free Cloudflare Worker with the code in <a href="https://github.com/khgeo/cambodia-3d/blob/main/tools/flight-proxy.js" target="_blank">tools/flight-proxy.js</a> and paste its address here (ending in <code>?url=</code>).</div>
+        <div class="row"><input id="radarProxy" placeholder="https://your-worker.workers.dev/?url=" style="flex:1"><button id="radarProxySave">Save</button></div>
+      </details>
     </div>
   </div>
   <div id="topoPanel" class="rpanel" hidden>
@@ -293,6 +316,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=35"></script>
+<script type="module" src="js/app.js?v=36"></script>
 </body>
 </html>

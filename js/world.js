@@ -5,24 +5,25 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=35';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=35';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=35';
-import { buildTrees, GrassField } from './vegetation.js?v=35';
-import { RoadNet, Driver, Walker } from './modes.js?v=35';
-import { vehicleKit } from './vehicles.js?v=35';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=35';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=35';
-import { LayerStack } from './layers.js?v=35';
-import { Survey } from './survey.js?v=35';
-import { Editor } from './editor.js?v=35';
-import { Atmos } from './atmos.js?v=35';
-import { NightLights } from './lights.js?v=35';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=35';
-import { Tactical, loadCatalog } from './tactical.js?v=35';
-import { LcTrainer } from './lctrain.js?v=35';
-import { SEASON } from './vegetation.js?v=35';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=35';
+import * as G from './geo.js?v=36';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=36';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=36';
+import { buildTrees, GrassField } from './vegetation.js?v=36';
+import { RoadNet, Driver, Walker } from './modes.js?v=36';
+import { vehicleKit } from './vehicles.js?v=36';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=36';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=36';
+import { LayerStack } from './layers.js?v=36';
+import { Survey } from './survey.js?v=36';
+import { Editor } from './editor.js?v=36';
+import { Atmos } from './atmos.js?v=36';
+import { NightLights } from './lights.js?v=36';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=36';
+import { Tactical, loadCatalog } from './tactical.js?v=36';
+import { LcTrainer } from './lctrain.js?v=36';
+import { Radar } from './radar.js?v=36';
+import { SEASON } from './vegetation.js?v=36';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=36';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -142,7 +143,10 @@ export class World {
     let painting = false, lastPaint = 0;
     const paintAt = e => { const r = el.getBoundingClientRect(), rc = this._rc || (this._rc = new THREE.Raycaster()); rc.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera);
       const hit = rc.intersectObject(this.terrainMesh, false)[0]; if (!hit) return null; if (this.brush) { this.brush.position.set(hit.point.x, hit.point.y + 0.5, hit.point.z); this.brush.visible = true; } return hit.point; };
-    el.addEventListener('pointerdown', e => { if (!this.lcPaint || this.mode !== 'orbit' || e.button !== 0 || !this.terrainMesh) return; painting = true; this.controls.enabled = false; const p = paintAt(e); if (p) this.onPaint && this.onPaint(p.x, p.z); }, true);
+    let spaceDown = false;
+    addEventListener('keydown', e => { if (e.code === 'Space' && this.lcPaint && !/INPUT|TEXTAREA|SELECT/.test((e.target.tagName || ''))) { spaceDown = true; el.style.cursor = 'grab'; e.preventDefault(); } });
+    addEventListener('keyup', e => { if (e.code === 'Space') { spaceDown = false; el.style.cursor = ''; } });
+    el.addEventListener('pointerdown', e => { if (!this.lcPaint || this.mode !== 'orbit' || e.button !== 0 || spaceDown || e.altKey || !this.terrainMesh) return; painting = true; this.controls.enabled = false; const p = paintAt(e); if (p) this.onPaint && this.onPaint(p.x, p.z); }, true);
     el.addEventListener('pointermove', e => { if (!this.lcPaint || !this.terrainMesh) return; const now = performance.now(); if (now - lastPaint < 30) return; lastPaint = now; const p = paintAt(e); if (painting && p) this.onPaint && this.onPaint(p.x, p.z); });
     addEventListener('pointerup', () => { if (!painting) return; painting = false; this.controls.enabled = this.mode === 'orbit'; this.onPaintEnd && this.onPaintEnd(); });
     // digitizing: live snap marker + rubber band under the cursor
@@ -1083,6 +1087,8 @@ export class World {
         const sx0 = D.pxX(this.F.lon(D.X0)), sx1 = D.pxX(this.F.lon(D.X0 + D.W)), sy0 = D.pxY(this.F.lat(D.Z0)), sy1 = D.pxY(this.F.lat(D.Z0 + D.H));
         g.imageSmoothingEnabled = true; g.drawImage(lcCanvas(D, D.lc), sx0, sy0, sx1 - sx0, sy1 - sy0);
         g.globalCompositeOperation = 'soft-light'; g.globalAlpha = 0.75; g.drawImage(D.img, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+        const base = document.createElement('canvas'); base.width = w; base.height = h; base.getContext('2d').drawImage(c, 0, 0); this._lulcBase = base;
+        if (this.imgOver > 0) { g.globalAlpha = this.imgOver; g.drawImage(D.img, 0, 0); g.globalAlpha = 1; }
         this.texStyl = this.mkTex(c);
       }
       tex = this.texStyl;
@@ -1173,6 +1179,7 @@ export class World {
     this.ensureUnderground(say).then(() => { this.layers.buildUnder(); this.onLayersReady && this.onLayersReady(); }).catch(e => console.warn(e));
     return this.layers;
   }
+  openRadar() { if (!this.radar) this.radar = new Radar(this); return this.radar; }
   async openTactical() { await loadCatalog(); if (!this.tactical) this.tactical = new Tactical(this); this.tactical.active = true; await this.tactical.rebuild(); return this.tactical; }
   openEditor() { if (!this.editor) { this.editor = new Editor(this); this.editor.rebuild(); } this.editor.active = true; return this.editor; }
   // rice-field stage: image (as photographed), planting (flooded), growing (green), ripening (golden), harvested (stubble)
@@ -1207,12 +1214,24 @@ export class World {
     this._cleared = { trees, houses: this.housesList0.length - houses.length, buildings: D.buildings0.length - bld.length };
     return this._cleared;
   }
+  // satellite image laid over the classified land cover (0 = off, 1 = image only)
+  setImageOverlay(a) {
+    this.imgOver = a; const t = this.texStyl; if (!t || !this._lulcBase) return; const g = t.image.getContext('2d');
+    g.globalAlpha = 1; g.drawImage(this._lulcBase, 0, 0); if (a > 0) { g.globalAlpha = a; g.drawImage(this.D.img, 0, 0); g.globalAlpha = 1; } t.needsUpdate = true;
+  }
+  // painting mode: left-drag paints; right-drag rotates, Shift + right-drag or middle-drag pans, wheel zooms; hold Space (or Alt) to use the left button for moving
+  setPaintMode(on) {
+    this.lcPaint = on; const mb = this.controls.mouseButtons;
+    if (on) { mb.LEFT = THREE.MOUSE.ROTATE; mb.MIDDLE = THREE.MOUSE.PAN; mb.RIGHT = THREE.MOUSE.ROTATE; } else { mb.LEFT = THREE.MOUSE.ROTATE; mb.MIDDLE = THREE.MOUSE.DOLLY; mb.RIGHT = THREE.MOUSE.PAN; }
+    if (this.brush) this.brush.visible = on;
+  }
   getTrainer() { if (!this.trainer) this.trainer = new LcTrainer(this); this.trainer.prepare(); return this.trainer; }
   refreshLC() { if (this.texStyl) { this.texStyl.dispose(); this.texStyl = null; } if (this.groundStyle === 'lulc') this.setGround('lulc'); }
   // quick feedback while painting: draw the class colour straight into the land-cover texture
   paintPreview(x, z, r, hex) {
     const D = this.D, t = this.texStyl; if (!t || this.groundStyle !== 'lulc') return; const c = t.image.getContext('2d'), px = D.pxX(this.F.lon(x)), py = D.pxY(this.F.lat(z)), pr = (D.pxX(this.F.lon(x + r)) - px);
-    c.fillStyle = hex; c.globalAlpha = 0.9; c.beginPath(); c.arc(px, py, Math.max(1, pr), 0, 7); c.fill(); c.globalAlpha = 1; t.needsUpdate = true;
+    for (const cc of [c, this._lulcBase && this._lulcBase.getContext('2d')]) { if (!cc) continue; cc.fillStyle = hex; cc.globalAlpha = 0.9; cc.beginPath(); cc.arc(px, py, Math.max(1, pr), 0, 7); cc.fill(); cc.globalAlpha = 1; }
+    if (this.imgOver > 0) { c.globalAlpha = this.imgOver * 0.5; c.save(); c.beginPath(); c.arc(px, py, Math.max(1, pr), 0, 7); c.clip(); c.drawImage(this.D.img, 0, 0); c.restore(); c.globalAlpha = 1; } t.needsUpdate = true;
   }
   getAtmos() { if (!this.atmos) this.atmos = new Atmos(this); return this.atmos; }
   openSurvey() { if (!this.survey) this.survey = new Survey(this); this.survey.active = true; this.survey.redraw(); return this.survey; }
@@ -1262,6 +1281,8 @@ export class World {
   groundAt(x, z) { return this.hAt ? this.hAt(x, z) : 0; }
   pxToMetres(p, px) { const d = this.camera.position.distanceTo(p); return Math.max(0.3, d * 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) / this.renderer.domElement.clientHeight * px); }
   onTap(e) {
+    if (this.radarPick && this.terrainMesh && this.mode === 'orbit') { const r = this.renderer.domElement.getBoundingClientRect(), rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera);
+      const h = rc.intersectObject(this.terrainMesh, false)[0]; if (h) { this.radarPick = false; this.radar.place(h.point.x, h.point.z); } return; }
     const tacPick = this.tactical && this.tactical.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
     const edPick = !tacPick && this.editor && this.editor.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
     const svPick = !edPick && this.survey && this.survey.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);
@@ -1338,6 +1359,7 @@ export class World {
     }
     if (this.layers) this.layers.step(dt);
     if (this.survey) this.survey.step(dt);
+    if (this.radar) this.radar.step(dt);
     if (this.atmos) this.atmos.step(dt);
     if (this.lights) this.lights.step();
     if (this.grass) { if (this.grassOff) this.grass.group.visible = false; else this.grass.update(focus, this.mode === 'orbit' ? this.camera.position.distanceTo(focus) : 0); }

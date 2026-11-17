@@ -1,6 +1,6 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=35';
-import { t, lang, setLang, initLang, onLang } from './i18n.js?v=35';
+import * as G from './geo.js?v=36';
+import { t, lang, setLang, initLang, onLang } from './i18n.js?v=36';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -99,7 +99,7 @@ document.querySelectorAll('#rail [data-fly]').forEach(b => b.onclick = () => {
 function syncRail() {
   const open = !$('scenePanel').classList.contains('hidden');
   document.querySelectorAll('#rail [data-fly]').forEach(b => b.classList.toggle('on', open && b.dataset.fly === flySec));
-  const P = { layersBtn: 'layerPanel', surveyBtn: 'surveyPanel', editBtn: 'editPanel', sectionBtn: 'sectionPanel', tacBtn: 'tacPanel', topoBtn: 'topoPanel', lcBtn: 'lcPanel' };
+  const P = { layersBtn: 'layerPanel', surveyBtn: 'surveyPanel', editBtn: 'editPanel', sectionBtn: 'sectionPanel', tacBtn: 'tacPanel', topoBtn: 'topoPanel', lcBtn: 'lcPanel', radarBtn: 'radarPanel' };
   for (const [b, p] of Object.entries(P)) if ($(b) && $(p)) $(b).classList.toggle('act', !$(p).hidden);
 }
 setInterval(syncRail, 500);
@@ -218,7 +218,7 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=35'); world = new World($('scene')); window.__world = world;
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=36'); world = new World($('scene')); window.__world = world;
     world.onModeChange = m => {
       $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk'; if (SV && !$('surveyPanel').hidden) svRender();
       if (m === 'drive' || m === 'walk') { setOn('views', m); showPanel('scenePanel', false); }
@@ -227,13 +227,13 @@ $('build').onclick = async () => {
     world.onVehicle = k => { $('vehicle').value = k; };
     world.onSectionHint = t => { $('secHint').textContent = t; };
     world.onSection = async S => {
-      const { drawProfile, legendHTML } = await import('./section.js?v=35');
+      const { drawProfile, legendHTML } = await import('./section.js?v=36');
       $('sectionPanel').classList.remove('picking', 'min'); $('secMin').textContent = '▾';
       const cv = $('secCanvas'); cv.width = Math.min(1600, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio))); cv.height = Math.round(cv.width * 0.36);
       drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – ↺ for a new line, ▾ to minimise';
     };
-    const { joystick } = await import('./modes.js?v=35'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=35'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=36'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=36'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -243,6 +243,7 @@ $('build').onclick = async () => {
   catch (e) { console.error(e); progress('Failed: ' + e.message); setTimeout(() => progress(''), 6000); return; }
   await rebuild();
   $('hud').hidden = false;
+  if (world.radar) { world.radar.remove(); world.radarPick = false; } if ($('liveWx').checked) liveWeather();
 };
 function openScene() { $('mapView').hidden = true; $('sceneView').hidden = false; if (world) world.paused = false; }
 $('return3d').onclick = () => openScene();
@@ -282,14 +283,14 @@ document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.
 if (innerWidth < 640) showPanel('mapPanel', false);
 /* right-hand column: keep the layer panel under the inset map, never on top of it */
 const placeRight = () => {
-  const lp = ['surveyPanel', 'editPanel', 'tacPanel', 'topoPanel', 'lcPanel', 'layerPanel'].map($).find(e => !e.hidden) || $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
+  const lp = ['surveyPanel', 'editPanel', 'tacPanel', 'topoPanel', 'lcPanel', 'radarPanel', 'layerPanel'].map($).find(e => !e.hidden) || $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
   document.body.classList.add('lp-open');
   if (innerWidth < 640) { lp.style.top = ''; lp.style.maxHeight = ''; return; }
   const top = hud.hidden ? 12 : hud.getBoundingClientRect().bottom + 8;
   lp.style.top = top + 'px'; lp.style.maxHeight = (innerHeight - top - 12) + 'px';
 };
 addEventListener('resize', placeRight);
-const RP = { layerPanel: 'lpClose', surveyPanel: 'svClose', editPanel: 'edClose', tacPanel: 'tacClose', topoPanel: 'topoClose', lcPanel: 'lcClose' };
+const RP = { layerPanel: 'lpClose', surveyPanel: 'svClose', editPanel: 'edClose', tacPanel: 'tacClose', topoPanel: 'topoClose', lcPanel: 'lcClose', radarPanel: 'radarClose' };
 function closeOthers(keep) { for (const [p, c] of Object.entries(RP)) if (p !== keep && $(p) && !$(p).hidden && $(c)) $(c).onclick(); }
 /* layer explorer */
 let LS = null, LAYERS_DEF = null;
@@ -328,7 +329,7 @@ $('layersBtn').onclick = async () => {
   $('layerPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
   if (world.mode !== 'orbit') world.setMode('orbit');
   $('lpHint').textContent = 'Preparing layers…';
-  const mod = await import('./layers.js?v=35'); LAYERS_DEF = mod.LAYERS;
+  const mod = await import('./layers.js?v=36'); LAYERS_DEF = mod.LAYERS;
   LS = await world.openLayers(t => { $('lpHint').textContent = t; });
   LS.onT = t => { $('lpExplode').value = Math.round(t * 100); };
   LS.onFocus = () => lpRender();
@@ -433,7 +434,7 @@ const svProfile = m => {
 const svOpen = async () => {
   if (!world || !world.D) return;
   closeOthers('surveyPanel');
-  SVM = await import('./survey.js?v=35'); SV = world.openSurvey(); SV.onChange = svRender;
+  SVM = await import('./survey.js?v=36'); SV = world.openSurvey(); SV.onChange = svRender;
   SV.onArrive = () => { svSay('Arrived at the target'); if (SV.tool === 'points') $('svMark').classList.add('pulse'); setTimeout(() => $('svMark').classList.remove('pulse'), 2500); svRender(); };
   if (!$('svCode').options.length) $('svCode').innerHTML = SVM.CODES.map(c => `<option>${c}</option>`).join('');
   $('surveyPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); svRender();
@@ -516,7 +517,7 @@ $('editBtn').onclick = async () => {
   if (!world || !world.D) return;
   closeOthers('editPanel');
   if (world.mode !== 'orbit') world.setMode('orbit');
-  EDM = await import('./editor.js?v=35'); ED = world.openEditor(); ED.onChange = edRender;
+  EDM = await import('./editor.js?v=36'); ED = world.openEditor(); ED.onChange = edRender;
   ED.onHover = p => { $('edSnapKind').textContent = p && p.kind ? '→ ' + p.kind : ''; };
   if (!$('edRoad').options.length) { fillSel('#edRoad'.slice(1), EDM.ROAD_TYPES, ED.opts.road); fillSel('edRoof', EDM.ROOFS, ED.opts.roof); fillSel('edWall', EDM.WALLS, ED.opts.wall); fillSel('edRoofC', EDM.ROOF_COLS, ED.opts.roofC); fillSel('edTree', EDM.TREES, ED.opts.tree); }
   $('editPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); edRender();
@@ -557,18 +558,25 @@ const tacTab = k => { document.querySelectorAll('.tactabs button').forEach(b => 
 document.querySelectorAll('.tactabs button').forEach(b => b.onclick = () => { tacTab(b.dataset.tt); if (TC && b.dataset.tt !== 'ana' && /los|viewshed|ring|measure/.test(TC.mode)) { TC.mode = 'place'; tacRender(); } });
 $('tacBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('tacPanel'); if (world.mode !== 'orbit') world.setMode('orbit');
-  TCM = await import('./tactical.js?v=35'); TCAT = (await TCM.loadCatalog()).CAT;
-  TC = await world.openTactical(); TC.onChange = () => {}; TC.onMsg = m => $('tacHint').textContent = t(m); TC.onResult = tacResult;
+  TCM = await import('./tactical.js?v=36'); TCAT = (await TCM.loadCatalog()).CAT;
+  TC = await world.openTactical(); TC.onChange = () => {}; TC.onMsg = m => $('tacHint').textContent = t(m); TC.onResult = tacResult; TC.lang = lang; TC.labels = $('tacLabels').value;
+  TC.onSelect = f => { if (!f) { $('tacHint').textContent = t('Tap a symbol first'); return; } $('tacHint').textContent = t('Editing') + ': ' + nm(TCAT.catalog[f.code]); $('tacLabel').value = f.label || ''; TC.label = f.label || ''; tacDirSet(f.dir ?? null, false); };
   $('tacPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); tacRender();
 };
 $('tacClose').onclick = () => { $('tacPanel').hidden = true; if (TC) { TC.active = false; TC.cancel(); } placeRight(); };
 $('tacMin').onclick = () => { const c = $('tacPanel').classList.toggle('collapsed'); $('tacMin').textContent = c ? '▾' : '▴'; };
 seg('tacSide', v => { if (TC) { TC.side = v; tacRender(); } });
 $('tacConv').onchange = e => { TC.conv = e.target.value; TC.rebuild(); tacRender(); };
-$('tacLabel').oninput = e => { if (TC) TC.label = e.target.value.trim(); };
+$('tacLabel').oninput = e => { if (!TC) return; TC.label = e.target.value.trim(); if (TC.mode === 'edit' && TC.sel) TC.update(TC.sel, { label: TC.label }); };
+const tacDirSet = (v, apply = true) => { const on = v !== null && v !== '' && !isNaN(v); v = on ? ((Math.round(+v) % 360) + 360) % 360 : null; $('tacDir').value = on ? v : ''; $('tacDirR').value = on ? v : 0; $('tacDirR').disabled = !on;
+  if (!TC) return; TC.dir = v; if (apply && TC.mode === 'edit' && TC.sel) TC.update(TC.sel, { dir: v }); };
+$('tacDir').oninput = e => tacDirSet(e.target.value === '' ? null : +e.target.value);
+$('tacDirR').oninput = e => tacDirSet(+e.target.value);
+$('tacDirX').onclick = () => tacDirSet(null);
+$('tacLabels').onchange = e => { if (TC) { TC.labels = e.target.value; TC.lang = lang; TC.rebuild(); } };
 document.querySelectorAll('#tacPanel [data-am]').forEach(b => b.onclick = () => {
   if (!TC) return; TC.mode = TC.mode === b.dataset.am ? 'place' : b.dataset.am; TC.cancel(); tacRender();
-  const H = { los: 'Tap the observer, then the target', viewshed: 'Tap the observation point', ring: 'Tap the centre of the range rings', move: 'Tap a symbol, then its new place', delete: 'Tap a symbol, line or area to delete it' };
+  const H = { los: 'Tap the observer, then the target', viewshed: 'Tap the observation point', ring: 'Tap the centre of the range rings', move: 'Tap a symbol, then its new place', edit: 'Tap a symbol, then change its label or direction', delete: 'Tap a symbol, line or area to delete it' };
   $('tacHint').textContent = TC.mode === 'place' ? '' : t(H[TC.mode]);
 });
 $('tacObs').oninput = e => TC && (TC.obsH = +e.target.value || 0); $('tacTgt').oninput = e => TC && (TC.tgtH = +e.target.value || 0);
@@ -613,7 +621,7 @@ $('topoBtn').onclick = async () => {
 $('topoClose').onclick = () => { $('topoPanel').hidden = true; placeRight(); };
 $('topoMin').onclick = () => { const c = $('topoPanel').classList.toggle('collapsed'); $('topoMin').textContent = c ? '▾' : '▴'; };
 $('topoMake').onclick = async () => {
-  if (!world || !world.D) return; const M = await import('./topomap.js?v=35'); $('topoMake').disabled = true;
+  if (!world || !world.D) return; const M = await import('./topomap.js?v=36'); $('topoMake').disabled = true;
   try {
     TOPO = await M.makeTopoMap(world, { paper: $('topoPaper').value, scale: $('topoScale').value, ci: $('topoCI').value, lang: $('topoLang').value, dpi: +$('topoDPI').value, title: $('topoTitle').value.trim(), titleKm: $('topoTitleKm').value.trim(),
       names: $('topoNames').checked, hill: $('topoHill').checked, image: $('topoImg').checked, mine: $('topoMine').checked, survey: $('topoSurvey').checked, tac: $('topoTac').checked, legend: $('topoLeg').value }, m => $('topoHint').textContent = t(m));
@@ -625,11 +633,11 @@ $('topoMake').onclick = async () => {
 };
 const topoName = ext => `topo-${($('topoTitle').value || 'map').replace(/[^A-Za-z0-9]+/g, '_')}-1_${TOPO.scale}.${ext}`;
 $('topoPNG').onclick = () => TOPO && TOPO.canvas.toBlob(b => download(topoName('png'), b));
-$('topoPDF').onclick = async () => { if (!TOPO) return; $('topoHint').textContent = t('Making PDF…'); const M = await import('./topomap.js?v=35'); await M.toPDF(TOPO, topoName('pdf')); $('topoHint').textContent = ''; };
+$('topoPDF').onclick = async () => { if (!TOPO) return; $('topoHint').textContent = t('Making PDF…'); const M = await import('./topomap.js?v=36'); await M.toPDF(TOPO, topoName('pdf')); $('topoHint').textContent = ''; };
 
 $('gpkgBtn').onclick = async () => {
   if (!world || !world.D) return; $('gpkgBtn').disabled = true;
-  try { const M = await import('./gpkg.js?v=35'), r = await M.exportGeoPackage(world, m => $('topoHint').textContent = t(m));
+  try { const M = await import('./gpkg.js?v=36'), r = await M.exportGeoPackage(world, m => $('topoHint').textContent = t(m));
     const nm = `cambodia3d-${($('topoTitle').value || 'area').replace(/[^A-Za-z0-9]+/g, '_')}-${new Date().toISOString().slice(0, 10)}.gpkg`; download(nm, r.blob);
     $('topoHint').textContent = `${nm} · ${(r.blob.size / 1e6).toFixed(1)} MB · ${Object.values(r.counts).filter(Boolean).length} ${t('vector layers')} + 2 ${t('rasters')}`;
   } catch (e) { console.error(e); $('topoHint').textContent = 'Error: ' + e.message; }
@@ -647,19 +655,69 @@ $('lcBtn').onclick = () => {
   LT = world.getTrainer(); $('lcPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
   setOn('ground', 'lulc'); world.setGround('lulc');
   import('three').then(T => { if (!world.brushReal) { const m = new T.Mesh(new T.RingGeometry(0.92, 1, 48).rotateX(-Math.PI / 2), new T.MeshBasicMaterial({ color: 0xffe14a, depthTest: false, transparent: true, opacity: 0.9 })); m.renderOrder = 30; world.scene.add(m); world.brush = m; world.brushReal = true; } world.brush.scale.setScalar(LT.radius); world.brush.visible = true; });
-  world.lcPaint = $('lcPaintOn').checked; lcRenderClasses(); lcInfo();
+  lcSetMode(true); world.setImageOverlay($('lcImg').checked ? $('lcImgA').value / 100 : 0); lcRenderClasses(); lcInfo();
   world.onPaint = (x, z) => { const n = LT.paint(x, z); if (n) world.paintPreview(x, z, LT.radius, world.LC[LT.cls].c); };
   world.onPaintEnd = () => { LT.save(); if ($('lcAuto').checked) lcLearn(); else { world.refreshLC(); renderStats(); lcInfo(); } };
 };
-$('lcClose').onclick = () => { $('lcPanel').hidden = true; if (world) { world.lcPaint = false; if (world.brush) world.brush.visible = false; } placeRight(); };
+$('lcClose').onclick = () => { $('lcPanel').hidden = true; if (world) { world.setPaintMode(false); world.setImageOverlay(0); } placeRight(); };
 $('lcMin').onclick = () => { const c = $('lcPanel').classList.toggle('collapsed'); $('lcMin').textContent = c ? '▾' : '▴'; };
 $('lcRad').oninput = e => { if (!LT) return; LT.radius = +e.target.value; $('lcRadV').textContent = e.target.value + ' m'; if (world.brush) world.brush.scale.setScalar(LT.radius); };
 $('lcTau').oninput = e => { if (LT) LT.tau = e.target.value / 100; $('lcTauV').textContent = e.target.value + '%'; };
-$('lcPaintOn').onchange = e => { if (world) world.lcPaint = e.target.checked; if (world.brush) world.brush.visible = e.target.checked; };
+function lcSetMode(paint) { if (world) world.setPaintMode(paint); $('lcModePaint').classList.toggle('on', paint); $('lcModeMove').classList.toggle('on', !paint); $('lcNav').hidden = !paint; }
+$('lcModePaint').onclick = () => lcSetMode(true); $('lcModeMove').onclick = () => lcSetMode(false);
+const lcImgSet = () => { $('lcImgAV').textContent = $('lcImgA').value + '%'; if (world) world.setImageOverlay($('lcImg').checked ? $('lcImgA').value / 100 : 0); };
+$('lcImg').onchange = lcImgSet; $('lcImgA').oninput = () => { $('lcImg').checked = true; lcImgSet(); };
+addEventListener('keydown', e => { if ($('lcPanel').hidden || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; if (e.key === 'i' || e.key === 'I') { $('lcImg').checked = !$('lcImg').checked; lcImgSet(); } if (e.key === 'm' || e.key === 'M') lcSetMode(!world.lcPaint); });
 $('lcAll').onchange = e => { if (LT) LT.useAll = e.target.checked; };
 $('lcLearn').onclick = lcLearn;
 $('lcReset').onclick = () => { if (!LT) return; LT.reset(); world.refreshLC(); renderStats(); lcInfo(t('Back to the automatic map (your samples are kept).')); };
 $('lcForget').onclick = () => { if (!LT || !confirm(t('Delete your training samples in this area?'))) return; LT.forgetHere(); LT.reset(); world.refreshLC(); renderStats(); lcInfo(); };
+
+/* radar */
+let RD = null, radarTimer = 0;
+const kmFmt = m => m >= 10000 ? (m / 1000).toFixed(0) : (m / 1000).toFixed(1), cardinal = d => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(d / 45) % 8];
+const radarUI = () => {
+  if (!RD) return; $('radarDel').disabled = !RD.placed;
+  const L = RD.list(); $('radarStat').textContent = RD.placed ? `${t('Detected')}: ${L.length} · ${t('tracked')}: ${RD.targets.size}${RD.status ? ' · ' + t(RD.status) : ''}` : t('Place the radar on the ground first.');
+  $('radarList').innerHTML = L.length ? `<table><tr><th>${t('Flight')}</th><th>${t('Type')}</th><th>FL</th><th>kt</th><th>${t('Track')}</th><th>km</th><th>${t('Bearing')}</th></tr>` + L.slice(0, 40).map(a => `<tr style="color:${a.src === 'live' ? '#ffd23f' : a.kind === 'drone' ? '#ff8b8b' : a.kind === 'heli' ? '#9fdcff' : '#8dffae'}"><td>${a.flight || '—'}</td><td>${a.type || ''}</td><td>${Math.round(a.alt / 0.3048 / 100)}</td><td>${Math.round(a.gs / 0.514444)}</td><td>${Math.round(a.trk)}°</td><td>${kmFmt(a.dist)}</td><td>${Math.round(a.brg * 180 / Math.PI)}° ${cardinal(a.brg * 180 / Math.PI)}</td></tr>`).join('') + '</table>' : '';
+};
+$('radarBtn').onclick = () => {
+  if (!world || !world.D) return; closeOthers('radarPanel'); if (world.mode !== 'orbit') world.setMode('orbit');
+  RD = world.openRadar(); RD.scope = $('radarScope'); RD.onChange = radarUI; $('radarProxy').value = RD.proxy;
+  $('radarPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
+  if (!RD.placed) { world.radarPick = true; $('radarHint').textContent = t('Tap the ground to place the radar'); }
+  clearInterval(radarTimer); radarTimer = setInterval(radarUI, 1000); radarUI();
+};
+$('radarClose').onclick = () => { $('radarPanel').hidden = true; if (world) world.radarPick = false; clearInterval(radarTimer); placeRight(); };
+$('radarMin').onclick = () => { const c = $('radarPanel').classList.toggle('collapsed'); $('radarMin').textContent = c ? '▾' : '▴'; };
+$('radarPlace').onclick = () => { if (!world) return; world.radarPick = true; $('radarHint').textContent = t('Tap the ground to place the radar'); };
+$('radarDel').onclick = () => { if (RD) { RD.remove(); radarUI(); } };
+seg('radarSrc', v => { if (!RD) return; RD.src = v; RD.lastFetch = 0; if (v === 'sim') { for (const [k, a] of RD.targets) if (a.src === 'live') { RD.dropObj(a); RD.targets.delete(k); } RD.status = ''; } if (RD.placed) RD.seedSim(); radarUI(); });
+$('radarRange').onchange = e => { if (RD) { RD.range = +e.target.value; RD.lastFetch = 0; if (RD.placed) RD.place(RD.x, RD.z); } };
+$('radarRpm').onchange = e => { if (RD) RD.rpm = +e.target.value; };
+$('radarFit').onchange = e => { if (RD) RD.setFit(e.target.checked); };
+$('radarAll').onchange = e => { if (RD) RD.showAll = e.target.checked; };
+$('radarProxySave').onclick = () => { if (!RD) return; RD.setProxy($('radarProxy').value); RD.lastFetch = 0; $('radarHint').textContent = t('Saved'); };
+
+/* live weather (Open-Meteo) */
+let wxTimer = 0;
+const WMO = c => c >= 95 ? ['storm', '⛈️', 'Thunderstorm'] : (c >= 51 && c <= 67) || (c >= 80 && c <= 82) ? ['rain', '🌧️', 'Rain'] : c === 45 || c === 48 ? ['haze', '🌫️', 'Fog'] : c === 3 ? ['haze', '☁️', 'Overcast'] : c === 2 ? ['clear', '⛅', 'Partly cloudy'] : ['clear', '☀️', 'Clear'];
+async function liveWeather() {
+  if (!world || !world.D) return; const a = world.D.aoi, lat = ((a.s + a.n) / 2).toFixed(3), lon = ((a.w + a.e) / 2).toFixed(3);
+  try {
+    const r = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,cloud_cover,wind_speed_10m,wind_direction_10m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia%2FBangkok&forecast_days=1`);
+    const j = await r.json(), c = j.current, d = j.daily, [wx, ic, nm] = WMO(c.weather_code);
+    const now = new Date(Date.now() + 7 * 3600e3), hn = now.getUTCHours() + now.getUTCMinutes() / 60, h = hn < 5 ? 23.5 : Math.min(23.5, hn); // Cambodia local time
+    const A = world.getAtmos(); A.setWeather(wx); A.setHour(h, true); $('hour').value = h; $('hourLbl').textContent = fmtHour(h);
+    document.querySelectorAll('[data-wx]').forEach(x => x.classList.toggle('on', x.dataset.wx === wx));
+    $('liveWxInfo').hidden = false;
+    $('liveWxInfo').innerHTML = `${ic} <b>${t(nm)}</b> · 🌡 <b>${c.temperature_2m.toFixed(0)}°C</b> (${t('feels')} ${c.apparent_temperature.toFixed(0)}°) · 💧 ${c.relative_humidity_2m}% · ☁ ${c.cloud_cover}%<br>` +
+      `🌬 ${c.wind_speed_10m.toFixed(0)} km/h ${t('from')} ${cardinal(c.wind_direction_10m)} · 🌧 ${c.precipitation} mm · ${t('today')} ${d.temperature_2m_min[0].toFixed(0)}–${d.temperature_2m_max[0].toFixed(0)}°C, ${d.precipitation_sum[0]} mm<br>` +
+      `<span style="opacity:.7">${t('Local time')} ${fmtHour(hn)} · Open-Meteo · ${t('updated every 15 min')}</span>`;
+    if (world.atmos) world.atmos.wind = { speed: c.wind_speed_10m, dir: c.wind_direction_10m };
+  } catch (e) { $('liveWxInfo').hidden = false; $('liveWxInfo').textContent = t('Live weather is not reachable right now.'); }
+}
+$('liveWx').onchange = e => { clearInterval(wxTimer); if (e.target.checked) { liveWeather(); wxTimer = setInterval(liveWeather, 15 * 60e3); } else $('liveWxInfo').hidden = true; };
 
 /* cross-section tool */
 $('sectionBtn').onclick = async () => {
@@ -677,7 +735,7 @@ $('secClose').onclick = () => { $('sectionPanel').hidden = true; if (world) { wo
 $('secWall').onchange = e => { if (!world) return; world.sectionWallOn = e.target.checked; if (world.sectionWall) world.sectionWall.visible = e.target.checked; };
 const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 $('secPng').onclick = () => $('secCanvas').toBlob(b => download('cross-section.png', b));
-$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=35'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
+$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=36'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
 
 /* language */
 document.querySelectorAll('.langBtn').forEach(b => b.onclick = () => setLang(lang === 'km' ? 'en' : 'km'));

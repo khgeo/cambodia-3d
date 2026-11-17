@@ -102,6 +102,13 @@ export const KM = {
   'Back to the automatic map (your samples are kept).': 'ត្រឡប់ទៅផែនទីស្វ័យប្រវត្តិ (គំរូរបស់អ្នកនៅរក្សាទុក)។', 'Delete your training samples in this area?': 'លុបគំរូបង្ហាត់របស់អ្នកក្នុងតំបន់នេះ?',
   'cleared for new roads': 'បានឈូសឆាយសម្រាប់ផ្លូវថ្មី', 'trees': 'ដើមឈើ', 'houses': 'ផ្ទះ',
   'Illustrated': 'មានរូបគំនូរ', 'Map sheet (dot leaders)': 'សន្លឹកផែនទី (ចំណុចនាំ)', 'Simple list': 'បញ្ជីសាមញ្ញ',
+  'Paint': 'គូរ', 'Move / rotate': 'ផ្លាស់ទី / បង្វិល', 'Satellite image on top': 'រូបភាពផ្កាយរណបពីលើ', 'Right-drag: rotate · Shift + right-drag: pan · wheel: zoom · hold Space and drag: move': 'អូសប៊ូតុងស្ដាំ៖ បង្វិល · Shift + អូសស្ដាំ៖ រំកិល · កង់៖ ពង្រីក · សង្កត់ Space ហើយអូស៖ ផ្លាស់ទី',
+  'Direction': 'ទិសដៅ', 'No direction': 'គ្មានទិសដៅ', 'Labels': 'ស្លាក', 'Your labels': 'ស្លាករបស់អ្នក', 'Labels + symbol names': 'ស្លាក + ឈ្មោះសញ្ញា', 'Hide labels': 'លាក់ស្លាក', 'Edit': 'កែ', 'Editing': 'កំពុងកែ',
+  'Tap a symbol, then change its label or direction': 'ចុចលើសញ្ញា រួចប្ដូរស្លាក ឬទិសដៅ',
+  'Radar: aircraft in the sky (simulated or live)': 'រ៉ាដា៖ យន្តហោះលើមេឃ (ក្លែងធ្វើ ឬផ្ទាល់)', 'Radar': 'រ៉ាដា', 'Place the radar (tap the ground)': 'ដាក់រ៉ាដា (ចុចលើដី)', 'Simulation': 'ក្លែងធ្វើ', 'Live flights': 'ជើងហោះហើរផ្ទាល់', 'Both': 'ទាំងពីរ',
+  'Range': 'ចម្ងាយ', 'Turns/min': 'ជុំ/នាទី', 'Bring aircraft into the 3D view': 'នាំយន្តហោះចូលទិដ្ឋភាព 3D', 'Show undetected': 'បង្ហាញដែលមិនទាន់រកឃើញ', 'Live flights: how it works': 'ជើងហោះហើរផ្ទាល់៖ របៀបដំណើរការ',
+  'Detected': 'រកឃើញ', 'tracked': 'កំពុងតាមដាន', 'Flight': 'ជើងហោះហើរ', 'Type': 'ប្រភេទ', 'Track': 'ទិស', 'Bearing': 'ទិសពីរ៉ាដា', 'Place the radar on the ground first.': 'សូមដាក់រ៉ាដាលើដីជាមុនសិន។', 'Tap the ground to place the radar': 'ចុចលើដីដើម្បីដាក់រ៉ាដា', 'Saved': 'បានរក្សាទុក',
+  'Live weather & time here': 'អាកាសធាតុ និងម៉ោងផ្ទាល់នៅទីនេះ', 'Thunderstorm': 'ព្យុះផ្គររន្ទះ', 'Rain': 'ភ្លៀង', 'Fog': 'អ័ព្ទ', 'Overcast': 'មេឃស្រទំ', 'Partly cloudy': 'មានពពកខ្លះ', 'Clear': 'មេឃស្រឡះ', 'feels': 'មានអារម្មណ៍', 'from': 'ពី', 'today': 'ថ្ងៃនេះ', 'Local time': 'ម៉ោងក្នុងស្រុក', 'updated every 15 min': 'ធ្វើបច្ចុប្បន្នភាពរៀងរាល់ ១៥ នាទី', 'Live weather is not reachable right now.': 'មិនអាចភ្ជាប់អាកាសធាតុផ្ទាល់បានទេឥឡូវនេះ។',
   'Contours': 'ខ្សែកម្ពស់', 'Grid': 'ក្រឡាចត្រង្គ', 'Your features': 'វត្ថុរបស់អ្នក', 'Survey points & parcels': 'ចំណុចវាស់ និងក្បាលដី', 'Tactical overlay': 'ស្រទាប់យុទ្ធសាស្ត្រ',
 };
 export let lang = 'en';

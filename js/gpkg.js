@@ -2,8 +2,8 @@
 // image houses, contours, spot heights, place names, survey points and parcels, your digitized features, the
 // tactical overlay) in EPSG:4326, the satellite image and the 13-class land cover as raster tiles (EPSG:3857),
 // and a QGIS style for each layer saved as its default (layer_styles), so the layers open styled.
-import { LC } from './landcover.js?v=35';
-import { terrainData } from './topomap.js?v=35';
+import { LC } from './landcover.js?v=36';
+import { terrainData } from './topomap.js?v=36';
 
 let SQL = null;
 async function sqljs() {
@@ -127,11 +127,11 @@ export async function exportGeoPackage(world, say = () => {}) {
   // tactical overlay: TacMap symbols (SVG with param() colours) coloured by side
   const tc = world.tactical;
   if (tc && tc.features.length) {
-    const { CAT } = await (await import('./tactical.js?v=35')).loadCatalog(), feats = tc.features.filter(q => tc.inAOI(q)), base = q => ({ code: q.code, side: q.side, label: q.label || '', name_en: CAT.catalog[q.code].en, name_km: CAT.catalog[q.code].km, color: tc.color(q.side, q.code) });
+    const { CAT } = await (await import('./tactical.js?v=36')).loadCatalog(), feats = tc.features.filter(q => tc.inAOI(q)), base = q => ({ code: q.code, side: q.side, label: q.label || '', name_en: CAT.catalog[q.code].en, name_km: CAT.catalog[q.code].km, color: tc.color(q.side, q.code) });
     const svgs = {}; for (const q of feats.filter(q => q.geom === 'point')) if (!svgs[q.code]) { try { svgs[q.code] = btoa(unescape(encodeURIComponent(await (await fetch('tac/svg/' + CAT.catalog[q.code].svg)).text()))); } catch (e) { } }
     const svgSym = c => `<layer class="SvgMarker" enabled="1" pass="0" locked="0">${opt({ name: 'base64:' + svgs[c], size: 7, size_unit: 'MM', color: '255,255,255,255', outline_color: '232,23,61,255', outline_width: 0.6, outline_width_unit: 'MM', vertical_anchor_point: '2' })}${ddColor('outlineColor', 'color')}</layer>`;
-    cnt.tacP = layer('tactical_points', 'Tactical symbols', 1, [['code', 'TEXT'], ['side', 'TEXT'], ['label', 'TEXT'], ['name_en', 'TEXT'], ['name_km', 'TEXT'], ['color', 'TEXT'], ['rings_m', 'TEXT']],
-      feats.filter(q => q.geom === 'point' || q.geom === 'circle').map(q => ({ g: q.coords[0], ...base(q), rings_m: q.props && q.props.rings ? q.props.rings.join(',') : null })),
+    cnt.tacP = layer('tactical_points', 'Tactical symbols', 1, [['code', 'TEXT'], ['side', 'TEXT'], ['label', 'TEXT'], ['name_en', 'TEXT'], ['name_km', 'TEXT'], ['color', 'TEXT'], ['rings_m', 'TEXT'], ['direction_deg', 'REAL']],
+      feats.filter(q => q.geom === 'point' || q.geom === 'circle').map(q => ({ g: q.coords[0], ...base(q), direction_deg: q.dir ?? null, rings_m: q.props && q.props.rings ? q.props.rings.join(',') : null })),
       qml(categorized('code', 'marker', Object.keys(svgs).map(c => ({ v: c, l: CAT.catalog[c].en, layers: svgSym(c) }))), labels('label', 8, '#111111', 0)));
     cnt.tacL = layer('tactical_lines', 'Tactical lines', 2, [['code', 'TEXT'], ['side', 'TEXT'], ['label', 'TEXT'], ['name_en', 'TEXT'], ['name_km', 'TEXT'], ['color', 'TEXT']],
       feats.filter(q => q.geom === 'line' || q.geom === 'dimension').map(q => ({ g: q.coords, ...base(q) })), qml(single('line', line('#e8173d', 0.8, {}, ddColor('outlineColor', 'color'))), labels('label', 8, '#111111', 2)));

@@ -3,7 +3,7 @@
 // line of sight with profile, viewshed, GO / SLOW-GO / NO-GO mobility, range rings, own ↔ enemy measurement.
 // For planning and training from open data – confirm on the ground.
 import * as THREE from 'three';
-import { TO_SAT2TOPO } from './landcover.js?v=35';
+import { TO_SAT2TOPO } from './landcover.js?v=36';
 
 const KEY = 'cambodia3d.tac.v1';
 let CAT = null, MOB = null;
@@ -13,11 +13,15 @@ export async function loadCatalog() {
   return { CAT, MOB };
 }
 const svgCache = new Map();
+const anchors = new Map();
+export const symbolAnchor = code => anchors.get(code);
 export async function symbolURL(code, color) {
   const k = code + color; if (svgCache.has(k)) return svgCache.get(k);
   const d = CAT.catalog[code]; if (!d || !d.svg) return null;
   let txt = await (await fetch('tac/svg/' + d.svg)).text();
   txt = txt.replace(/param\([^)]*\)\s*/g, '').replace(/#e8173d/gi, color);
+  // flag symbols carry their own staff: its foot is the point on the ground
+  const st = txt.match(/M\s*([\d.]+)\s*,\s*([\d.]+)\s*V\s*(3[4-9]|40)(?![\d.])/); if (st) anchors.set(code, { u: +st[1] / 40, v: 1 - +st[3] / 40 });
   const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(txt); svgCache.set(k, url); return url;
 }
 const img = url => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
@@ -41,12 +45,13 @@ export class Tactical {
   tap(x, z) {
     const m = this.mode;
     if (m === 'delete') { this.deleteNear(x, z); return; }
+    if (m === 'edit') { this.sel = this.nearest(x, z, 40, f => f.geom === 'point'); this.onSelect && this.onSelect(this.sel); return; }
     if (m === 'move') { if (!this.moving) { this.moving = this.nearest(x, z, 40, f => f.geom === 'point'); this.onMsg && this.onMsg(this.moving ? 'Now tap the new place' : 'Tap a symbol first'); } else { this.moving.coords = [this.ll(x, z)]; this.moving = null; this.save(); this.rebuild(); this.onChange && this.onChange(); } return; }
     if (m === 'los' || m === 'measure') { this.verts.push({ x, z }); if (this.verts.length === 2) { const [a, b] = this.verts; this.verts = []; this.lineOfSight(a, b); } this.drawPreview(); return; }
     if (m === 'viewshed') { this.viewshed(x, z); return; }
     if (m === 'ring') { this.add({ code: 'range_ring', geom: 'circle', side: this.side, coords: [this.ll(x, z)], props: { rings: this.rings || [500, 1000, 1500] } }); return; }
     const g = this.geomOf(this.code);
-    if (g === 'point') { this.add({ code: this.code, geom: 'point', side: this.side, coords: [this.ll(x, z)], label: this.label }); return; }
+    if (g === 'point') { this.add({ code: this.code, geom: 'point', side: this.side, coords: [this.ll(x, z)], label: this.label, dir: this.dir ?? null }); return; }
     if (g === 'circle') { this.add({ code: this.code, geom: 'circle', side: this.side, coords: [this.ll(x, z)], props: { rings: this.rings || [500, 1000, 1500] } }); return; }
     this.verts.push({ x, z });
     if (g === 'sector' && this.verts.length === 3) { this.finish(); return; }
@@ -62,7 +67,7 @@ export class Tactical {
     this.verts = []; this.drawPreview(); this.onChange && this.onChange(); return ok;
   }
   undo() { this.verts.pop(); this.drawPreview(); this.onChange && this.onChange(); }
-  cancel() { this.verts = []; this.moving = null; this.drawPreview(); this.onChange && this.onChange(); }
+  cancel() { this.verts = []; this.moving = null; this.sel = null; this.drawPreview(); this.onChange && this.onChange(); }
   add(f, keep) { f.id = Date.now().toString(36) + Math.random().toString(36).slice(2, 5); this.features.push(f); this.save(); this.rebuild(); if (!keep) this.verts = []; this.onChange && this.onChange(); }
   nearest(x, z, tol, filter) {
     let best = null, bd = tol;
@@ -87,17 +92,23 @@ export class Tactical {
       else if (f.geom === 'sector') this.sector(P, col, lw);
     }
   }
+  labelOf(f) { const m = this.labels || 'mine'; if (m === 'none') return ''; if (f.label) return f.label; if (m === 'all') { const d = CAT.catalog[f.code]; return d ? (this.lang === 'km' ? d.km : d.en) : ''; } return ''; }
   async pointSymbol(f, p, col) {
     const w = this.w, y = w.hAt(p.x, p.z), H = Math.max(8, Math.max(w.D.W, w.D.H) / 150), g = new THREE.Group(); g.position.set(p.x, y, p.z);
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.012, H * 0.012, H, 6).translate(0, H / 2, 0), new THREE.MeshBasicMaterial({ color: 0x222222 })); g.add(pole);
-    const foot = new THREE.Mesh(new THREE.RingGeometry(H * 0.05, H * 0.09, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide })); foot.position.y = 0.2; g.add(foot);
+    // direction of movement / facing: an arrow on the ground
+    if (f.dir != null && f.dir !== '') { const a = f.dir * Math.PI / 180, dx = Math.sin(a), dz = -Math.cos(a), L = H * 4, lw = Math.max(1.2, Math.max(w.D.W, w.D.H) / 700), e = { x: p.x + dx * L, z: p.z + dz * L }, hl = L * 0.28;
+      this.drape([{ x: p.x + dx * H * 0.3, z: p.z + dz * H * 0.3 }, e], lw, col); for (const s2 of [1, -1]) { const b = a + Math.PI + s2 * 0.45; this.drape([e, { x: e.x + Math.sin(b) * hl, z: e.z - Math.cos(b) * hl }], lw, col); } }
     try {
-      const url = await symbolURL(f.code, col), im = await img(url), c = document.createElement('canvas'), S = 160; c.width = S; c.height = S + (f.label ? 44 : 0); const x = c.getContext('2d');
-      x.fillStyle = 'rgba(255,255,255,.0)'; x.drawImage(im, 0, 0, S, S);
-      if (f.label) { x.font = '700 30px system-ui, "Noto Sans Khmer", sans-serif'; x.textAlign = 'center'; x.lineWidth = 6; x.strokeStyle = '#fff'; x.strokeText(f.label, S / 2, S + 32); x.fillStyle = col; x.fillText(f.label, S / 2, S + 32); }
-      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, sizeAttenuation: false, depthTest: false, transparent: true })); sp.center.set(0.5, f.label ? 44 / (S + 44) : 0); sp.renderOrder = 15;
-      const k = 0.042; sp.scale.set(k, k * c.height / S, 1); sp.position.y = H; g.add(sp);
+      const url = await symbolURL(f.code, col), anc = symbolAnchor(f.code), lab = this.labelOf(f), im = await img(url), c = document.createElement('canvas'), S = 160, LH = lab ? 44 : 0;
+      if (!anc) { const pole = new THREE.Mesh(new THREE.CylinderGeometry(H * 0.012, H * 0.012, H, 6).translate(0, H / 2, 0), new THREE.MeshBasicMaterial({ color: 0x222222 })); g.add(pole); }
+      const foot = new THREE.Mesh(new THREE.RingGeometry(H * 0.03, H * 0.06, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide })); foot.position.y = 0.2; g.add(foot);
+      // label goes above the symbol so it never hides the staff foot
+      { c.width = S + (lab ? 160 : 0); c.height = S + LH; const x = c.getContext('2d'), ox = (c.width - S) / 2; x.drawImage(im, ox, LH, S, S);
+        if (lab) { x.font = '700 30px system-ui, "Noto Sans Khmer", sans-serif'; x.textAlign = 'center'; x.lineWidth = 6; x.strokeStyle = '#fff'; x.strokeText(lab, c.width / 2, 32); x.fillStyle = col; x.fillText(lab, c.width / 2, 32); }
+        const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, sizeAttenuation: false, depthTest: false, transparent: true })); sp.renderOrder = 15;
+        if (anc) { sp.center.set((ox + anc.u * S) / c.width, anc.v * S / c.height); sp.position.y = 0.3; } else { sp.center.set(0.5, 0); sp.position.y = H; }
+        const k = 0.042; sp.scale.set(k * c.width / S, k * c.height / S, 1); g.add(sp); }
     } catch (e) { console.warn(e); }
     g.userData.fid = f.id; this.group.add(g);
   }
@@ -261,8 +272,9 @@ export class Tactical {
     let best = null, bd = Infinity; for (const o of O) for (const e of E) { const d = Math.hypot(o.x - e.x, o.z - e.z); if (d < bd) { bd = d; best = [o, e]; } }
     this.lineOfSight(best[0], best[1]); return true;
   }
+  update(f, o) { Object.assign(f, o); this.save(); this.rebuild(); }
   geojson() {
-    return JSON.stringify({ type: 'FeatureCollection', features: this.features.map(f => ({ type: 'Feature', properties: { code: f.code, side: f.side, label: f.label || '', name_en: CAT.catalog[f.code].en, name_km: CAT.catalog[f.code].km, ...(f.props || {}) },
+    return JSON.stringify({ type: 'FeatureCollection', features: this.features.map(f => ({ type: 'Feature', properties: { code: f.code, side: f.side, label: f.label || '', direction_deg: f.dir ?? null, name_en: CAT.catalog[f.code].en, name_km: CAT.catalog[f.code].km, ...(f.props || {}) },
       geometry: f.geom === 'point' || f.geom === 'circle' ? { type: 'Point', coordinates: f.coords[0] } : f.geom === 'polygon' ? { type: 'Polygon', coordinates: [[...f.coords, f.coords[0]]] } : { type: 'LineString', coordinates: f.coords } })) }, null, 1);
   }
 }

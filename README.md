@@ -105,7 +105,7 @@ The classes are:
 These classes are used by the *Land cover* ground style, the statistics panel, the topographic map and the mobility analysis.
 
 ### Train the land cover (🖌️)
-Correct the classification yourself (supervised classification). Pick the class you see in the image, then paint over it on the ground. A Gaussian naive-Bayes model learns from your strokes (image colour, greenness, saturation, texture, tree density, slope, nearness to water and villages) together with samples of the automatic map, and re-classifies the whole area live. Only cells it is confident about change (set the confidence); your painted cells always keep your class; OpenStreetMap water, roads and buildings stay as mapped. Your samples are kept in this browser and can be used in every area you open, so the model keeps learning. The edited land cover goes into the topographic map and the GeoPackage (land_cover raster + land_cover_training points).
+Correct the classification yourself (supervised classification). Tick "Satellite image on top" (or press I) to check the image under the classes. Left-drag paints; right-drag rotates, Shift + right-drag pans, the wheel zooms, hold Space to move with the left button, or switch to ✋ Move (M). Pick the class you see in the image, then paint over it on the ground. A Gaussian naive-Bayes model learns from your strokes (image colour, greenness, saturation, texture, tree density, slope, nearness to water and villages) together with samples of the automatic map, and re-classifies the whole area live. Only cells it is confident about change (set the confidence); your painted cells always keep your class; OpenStreetMap water, roads and buildings stay as mapped. Your samples are kept in this browser and can be used in every area you open, so the model keeps learning. The edited land cover goes into the topographic map and the GeoPackage (land_cover raster + land_cover_training points).
 
 ## Topographic map (🗺)
 Builds an A4, A3 or A2 sheet (landscape or portrait) at an automatic or chosen scale, in Khmer, English or both. It contains:
@@ -129,6 +129,8 @@ Adapted from the author's **Terrain Ops** and **TacMap KH** QGIS plugins (`tac/`
 - **Mobility:** GO / SLOW-GO / NO-GO from slope, land cover, water, roads, vehicle type (wheeled, tracked, foot) and dry or wet season.
 
 Export as GeoJSON. For planning and training from open data. Confirm by reconnaissance.
+
+Tactical symbols: flags stand on their own staff (the foot of the staff is the point), labels can show your text, your text plus symbol names, or be hidden, and each symbol can have a direction (an arrow on the ground). Use ✎ Edit to change a placed symbol.
 
 ## Digitize: your own roads, buildings, trees and ponds
 **✏️ Digitize** opens the editor.
@@ -159,6 +161,12 @@ OpenStreetMap has few buildings in rural Cambodia. When OSM has none nearby, vil
 - **⏺ Rec:** records the 3D view (for example the 🎥 flight or a drive) as an MP4 or WebM video.
 - **Esc:** leaves Walk or Drive and stops the flight, so you don't have to move the cursor to Exit (which turns the view).
 - **Digitizing snaps** to road centrelines and ends, building and house corners, your own features, survey points and parcels. It also squares corners to 90° and closes a shape when you tap its first point. A yellow ring shows a snap and names the target. Turn it off with 🧲.
+
+## Radar (📡)
+Place a radar station on the ground: the antenna turns, a green sweep scans the range rings and the radar scope (PPI) shows each aircraft when the sweep paints it (inside the range and above the radar horizon). Sources: **Simulation** (airliners, regional flights to Phnom Penh, Techo, Siem Reap and Sihanoukville, a helicopter and a drone), **Live flights** (open ADS-B data from adsb.lol / adsb.fi, refreshed every 10 s) or **Both**. Aircraft appear in 3D with call sign, flight level and speed; "Bring aircraft into the 3D view" scales the radar range down to the scene. The ADS-B sites mostly block web pages from reading them, so live data may need a free proxy: deploy `tools/flight-proxy.js` as a Cloudflare Worker and paste its address in the panel.
+
+## Live weather
+In ⛅ Environment, "Live weather & time here" reads the current weather for the area from Open-Meteo (temperature, humidity, cloud, wind, rain, today's range) every 15 min and sets the scene's weather and the local time.
 
 ## Survey: measure, mark and go to
 Open **📐 Survey**. It has three tools:
