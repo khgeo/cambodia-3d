@@ -109,6 +109,7 @@ export const KM = {
   'Range': 'ចម្ងាយ', 'Turns/min': 'ជុំ/នាទី', 'Bring aircraft into the 3D view': 'នាំយន្តហោះចូលទិដ្ឋភាព 3D', 'Show undetected': 'បង្ហាញដែលមិនទាន់រកឃើញ', 'Live flights: how it works': 'ជើងហោះហើរផ្ទាល់៖ របៀបដំណើរការ',
   'Detected': 'រកឃើញ', 'tracked': 'កំពុងតាមដាន', 'Flight': 'ជើងហោះហើរ', 'Type': 'ប្រភេទ', 'Track': 'ទិស', 'Bearing': 'ទិសពីរ៉ាដា', 'Place the radar on the ground first.': 'សូមដាក់រ៉ាដាលើដីជាមុនសិន។', 'Tap the ground to place the radar': 'ចុចលើដីដើម្បីដាក់រ៉ាដា', 'Saved': 'បានរក្សាទុក',
   'Live weather & time here': 'អាកាសធាតុ និងម៉ោងផ្ទាល់នៅទីនេះ', 'Thunderstorm': 'ព្យុះផ្គររន្ទះ', 'Rain': 'ភ្លៀង', 'Fog': 'អ័ព្ទ', 'Overcast': 'មេឃស្រទំ', 'Partly cloudy': 'មានពពកខ្លះ', 'Clear': 'មេឃស្រឡះ', 'feels': 'មានអារម្មណ៍', 'from': 'ពី', 'today': 'ថ្ងៃនេះ', 'Local time': 'ម៉ោងក្នុងស្រុក', 'updated every 15 min': 'ធ្វើបច្ចុប្បន្នភាពរៀងរាល់ ១៥ នាទី', 'Live weather is not reachable right now.': 'មិនអាចភ្ជាប់អាកាសធាតុផ្ទាល់បានទេឥឡូវនេះ។',
+  'Satellite image on top (I)': 'រូបភាពផ្កាយរណបពីលើ (I)', 'Image opacity': 'ភាពស្រអាប់រូបភាព',
   'Contours': 'ខ្សែកម្ពស់', 'Grid': 'ក្រឡាចត្រង្គ', 'Your features': 'វត្ថុរបស់អ្នក', 'Survey points & parcels': 'ចំណុចវាស់ និងក្បាលដី', 'Tactical overlay': 'ស្រទាប់យុទ្ធសាស្ត្រ',
 };
 export let lang = 'en';

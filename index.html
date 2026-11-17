@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=36">
+<link rel="stylesheet" href="css/app.css?v=37">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -252,7 +252,8 @@
       <div class="row"><span>Brush</span><input type="range" id="lcRad" min="2" max="40" value="6"><b id="lcRadV">6 m</b></div>
       <div class="row seg"><button id="lcModePaint" class="on">🖌 Paint</button><button id="lcModeMove">✋ Move / rotate</button></div>
       <div class="svhelp" id="lcNav">Right-drag: rotate · Shift + right-drag: pan · wheel: zoom · hold Space and drag: move</div>
-      <div class="row"><label><input type="checkbox" id="lcImg"> 🛰 Satellite image on top</label><input type="range" id="lcImgA" min="10" max="100" value="60"><b id="lcImgAV">60%</b></div>
+      <div class="row"><label><input type="checkbox" id="lcImg"> 🛰 Satellite image on top (I)</label></div>
+      <div class="row"><span>Image opacity</span><input type="range" id="lcImgA" min="10" max="100" value="60"><b id="lcImgAV">60%</b></div>
       <div class="row"><label><input type="checkbox" id="lcAuto" checked> Learn after each stroke</label></div>
       <div class="row"><label><input type="checkbox" id="lcAll" checked> Use samples from all my areas</label></div>
       <div class="row"><span>Confidence</span><input type="range" id="lcTau" min="40" max="95" value="60"><b id="lcTauV">60%</b></div>
@@ -316,6 +317,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=36"></script>
+<script type="module" src="js/app.js?v=37"></script>
 </body>
 </html>
