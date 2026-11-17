@@ -110,7 +110,7 @@ export class Globe {
     const g = (A, x, y) => A[y * W.NX + x], b = A => (g(A, x0, y0) * (1 - tx) + g(A, x1, y0) * tx) * (1 - ty) + (g(A, x0, y0 + 1) * (1 - tx) + g(A, x1, y0 + 1) * tx) * ty; return [b(W.U), b(W.V)]; }
   initParticles() {
     if (this.windLines) { this.dyn.remove(this.windLines); this.windLines.geometry.dispose(); }
-    const N = this.nP = 5000, pos = new Float32Array(N * 6), col = new Float32Array(N * 8); this.P = new Float32Array(N * 3); // lat, lon, age
+    const N = this.nP = 7000, pos = new Float32Array(N * 6), col = new Float32Array(N * 8); this.P = new Float32Array(N * 3); // lat, lon, age
     for (let i = 0; i < N; i++) this.respawn(i, Math.random() * 80);
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.BufferAttribute(col, 4));
     this.windLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false })); this.windLines.frustumCulled = false; this.dyn.add(this.windLines);
@@ -121,7 +121,7 @@ export class Globe {
     const P = this.P, pos = this.windLines.geometry.attributes.position.array, col = this.windLines.geometry.attributes.color.array, K = 2.2e4 * dt; // time lapse
     for (let i = 0; i < this.nP; i++) {
       let la = P[i * 3], lo = P[i * 3 + 1]; const [u, v] = this.windAt_(la, lo), s = Math.hypot(u, v), la1 = la + v * K / 111000, lo1 = lo + u * K / (111000 * Math.max(0.2, Math.cos(la * D2R)));
-      P[i * 3 + 2] += dt; const Tt = 22000, a = xyz(la - v * Tt / 111000, lo - u * Tt / (111000 * Math.max(0.2, Math.cos(la * D2R))), 1.008), b = xyz(la1, lo1, 1.008); pos.set([a.x, a.y, a.z, b.x, b.y, b.z], i * 6); // short streak behind each particle
+      P[i * 3 + 2] += dt; const Tt = 50000 * Math.min(1, 12 / Math.max(s, 0.1)) * Math.min(1, s / 2 + 0.3), a = xyz(la - v * Tt / 111000, lo - u * Tt / (111000 * Math.max(0.2, Math.cos(la * D2R))), 1.008), b = xyz(la1, lo1, 1.008); pos.set([a.x, a.y, a.z, b.x, b.y, b.z], i * 6); // short streak behind each particle
       const t = Math.min(1, s / 18), fade = Math.min(1, P[i * 3 + 2] / 2) * Math.min(1, (90 - P[i * 3 + 2]) / 5); const r = 0.55 + t * 0.45, gg = 0.85 - t * 0.45, bb = 1 - t * 0.85; col.set([r, gg, bb, 0, r, gg, bb, 0.95 * fade], i * 8);
       P[i * 3] = la1; P[i * 3 + 1] = ((lo1 + 540) % 360) - 180; if (P[i * 3 + 2] > 90 || Math.abs(la1) > 82 || s < 0.3 && Math.random() < 0.02) this.respawn(i);
     }
