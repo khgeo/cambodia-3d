@@ -258,13 +258,14 @@ export class Globe {
   }
   // next passes of Landsat / Sentinel over your area (within the swath), for the next 5 days
   predictPasses() {
-    const g = this.satObjs.resource; if (!g || this.lat == null) return; const SJ = this.SJ, site = xyz(this.lat, this.lon), items = g.userData.sp.filter(i => i.s.sp.swath), out = [], t0 = Date.now(), step = 20e3, end = t0 + 5 * 864e5;
+    const g = this.satObjs.resource; if (!g || this.lat == null) return; const SJ = this.SJ, site = xyz(this.lat, this.lon), items = g.userData.sp.filter(i => i.s.sp.swath), out = [], t0 = Date.now(), step = 20e3, end = t0 + 10 * 864e5;
     const sunUp = d => { const [sl, so] = sunLatLon(d); return xyz(sl, so).dot(site) > 0.1; };
     let k = 0; const work = () => {
-      const it = items[k]; if (!it) { out.sort((a, b) => a.t - b.t); this.passes = out; this.status.passes = out.length ? 'Next passes over your area: ' + out.slice(0, 8).map(p => `${p.name} ${p.when}${p.dark ? ' (night)' : ''}`).join(' · ') : 'No Landsat / Sentinel pass over your area in the next 5 days'; this.onInfo && this.onInfo(); return; }
+      const it = items[k]; if (!it) { out.sort((a, b) => a.t - b.t); this.passes = out; this.status.passes = out.length ? 'Next imaging passes over your area (local time; optical in daylight only): ' + out.slice(0, 10).map(p => `${p.name} – ${p.when}`).join(' · ') : 'No Landsat / Sentinel pass over your area in the next 10 days'; this.onInfo && this.onInfo(); return; }
       const hw = it.s.sp.swath / 2 / R_KM; let inPass = false, got = 0;
       for (let t = t0; t < end && got < 2; t += step) { const d = new Date(t), e = this.ecf(it.s.rec, d); if (!e) break; const gd = SJ.eciToGeodetic(e, SJ.gstime(d)), ang = xyz(gd.latitude / D2R, gd.longitude / D2R).angleTo(site);
-        if (ang < hw) { if (!inPass) { inPass = true; got++; const dt = (t - t0) / 3600e3, loc = new Date(t + 7 * 3600e3); out.push({ name: it.s.sp.label, t, dark: it.s.sp.optical && !sunUp(d), when: dt < 24 ? `in ${Math.floor(dt)} h ${Math.round((dt % 1) * 60)} min` : `${loc.toISOString().slice(5, 10)} ${loc.toISOString().slice(11, 16)}` }); } } else inPass = false; }
+        if (ang < hw) { if (!inPass) { inPass = true; const dark = !sunUp(d); if (it.s.sp.optical && dark) continue; got++; const dt = (t - t0) / 3600e3, loc = new Date(t + 7 * 3600e3), W = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][loc.getUTCDay()], M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][loc.getUTCMonth()];
+          out.push({ name: it.s.sp.label, t, dark, when: (dt < 24 ? `in ${Math.floor(dt)} h ${Math.round((dt % 1) * 60)} min, ` : '') + `${W} ${loc.getUTCDate()} ${M} ${loc.toISOString().slice(11, 16)}` }); } } else inPass = false; }
       k++; setTimeout(work, 0); };
     work();
   }
