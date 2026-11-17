@@ -172,6 +172,13 @@ Keep zooming out past the farthest view (or press 🌍). Zoom back in anywhere a
 - **Zoom to the cursor** in the 3D scene and on the globe; **right-click** finishes the line or area you are drawing (digitize, tactical, survey).
 - **MGRS** grid references in the readout, and you can type an MGRS reference (e.g. `48P VU 58981 50268`) in Survey → Go to.
 - **🕘 Change detection**: compare the scene with any older version of the Esri World Imagery archive (Wayback) for the same area — swipe, before / after, or a change map (new roofs, roads or clearing; vegetation gain; water) with the changed area in % and hectares.
+- **🛰️ Intel** panel:
+  - **📌 Notes**: pins on the ground with title, text, source, confidence (high / medium / low), time and an optional photo; listed, exported as GeoJSON, in the GeoPackage (intel_notes) and in the brief.
+  - **🧭 Routes & access** on the road network (car, motorbike, truck, on foot): shortest route A → B with time and detour factor; "how far in N minutes" (roads coloured by quarter of the time); choke points — the road pieces most trips depend on (sampled betweenness) and all bridges.
+  - **⚠️ Alerts** within 100–1,000 km: GDACS (earthquakes, cyclones, floods, volcanoes, wildfires, drought), NASA EONET and NASA VIIRS fire detections of the last two days; "Watch" checks every 15 min and notifies you of new ones.
+  - **🔢 Count**: tap one example object (roof, vehicle, boat, tree crown); similar ones in the whole area are found and counted, also in the older image from Change detection (then vs now), and can be exported as GeoJSON.
+  - **🔗 Share**: a link with the area, view, notes, tactical symbols and drawings; opening it rebuilds the area with that work.
+- **▶ Time-lapse** in 🕘 Change detection plays every archive image version of the area in turn.
 - **📝 GEOINT area brief** (🗺 panel): one printable page (save as PDF) with location (lat/lon, UTM, MGRS), nearest settlements, 3D view and image, terrain, land cover, roads and buildings, weather now and for 3 days, change detection, next Landsat / Sentinel passes, tactical overlay, radar picture and survey points.
 
 ## Live weather

@@ -1,6 +1,6 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=49';
-import { t, lang, setLang, initLang, onLang } from './i18n.js?v=49';
+import * as G from './geo.js?v=50';
+import { t, lang, setLang, initLang, onLang } from './i18n.js?v=50';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -99,7 +99,7 @@ document.querySelectorAll('#rail [data-fly]').forEach(b => b.onclick = () => {
 function syncRail() {
   const open = !$('scenePanel').classList.contains('hidden');
   document.querySelectorAll('#rail [data-fly]').forEach(b => b.classList.toggle('on', open && b.dataset.fly === flySec));
-  const P = { layersBtn: 'layerPanel', surveyBtn: 'surveyPanel', editBtn: 'editPanel', sectionBtn: 'sectionPanel', tacBtn: 'tacPanel', topoBtn: 'topoPanel', lcBtn: 'lcPanel', radarBtn: 'radarPanel', globeBtn: 'globePanel', changeBtn: 'changePanel' };
+  const P = { layersBtn: 'layerPanel', surveyBtn: 'surveyPanel', editBtn: 'editPanel', sectionBtn: 'sectionPanel', tacBtn: 'tacPanel', topoBtn: 'topoPanel', lcBtn: 'lcPanel', radarBtn: 'radarPanel', globeBtn: 'globePanel', changeBtn: 'changePanel', intelBtn: 'intelPanel' };
   for (const [b, p] of Object.entries(P)) if ($(b) && $(p)) $(b).classList.toggle('act', !$(p).hidden);
 }
 setInterval(syncRail, 500);
@@ -218,7 +218,7 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=49'); world = new World($('scene')); window.__world = world; world.onGlobe = v => globeUI(v);
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=50'); world = new World($('scene')); window.__world = world; world.onGlobe = v => globeUI(v);
     world.onRightClick = () => { // finish the current drawing
       if (ED && ED.active && !$('editPanel').hidden && ED.verts.length) { $('edFinish').onclick(); return; }
       if (TC && TC.active && !$('tacPanel').hidden && TC.verts.length) { if (TC.finish()) $('tacHint').textContent = t('Added'); return; }
@@ -232,13 +232,13 @@ $('build').onclick = async () => {
     world.onVehicle = k => { $('vehicle').value = k; };
     world.onSectionHint = t => { $('secHint').textContent = t; };
     world.onSection = async S => {
-      const { drawProfile, legendHTML } = await import('./section.js?v=49');
+      const { drawProfile, legendHTML } = await import('./section.js?v=50');
       $('sectionPanel').classList.remove('picking', 'min'); $('secMin').textContent = '▾';
       const cv = $('secCanvas'); cv.width = Math.min(1600, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio))); cv.height = Math.round(cv.width * 0.36);
       drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – ↺ for a new line, ▾ to minimise';
     };
-    const { joystick } = await import('./modes.js?v=49'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=49'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=50'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=50'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -248,7 +248,7 @@ $('build').onclick = async () => {
   catch (e) { console.error(e); progress('Failed: ' + e.message); setTimeout(() => progress(''), 6000); return; }
   await rebuild();
   $('hud').hidden = false;
-  if (world.globe && world.globe.on) world.globe.finishLeave(); if (world.radar) { world.radar.remove(); world.radarPick = false; } if ($('liveWx').checked) liveWeather();
+  if (world.globe && world.globe.on) world.globe.finishLeave(); if (world.radar) { world.radar.remove(); world.radarPick = false; } if (world.notes) world.notes.rebuild(); applyShared(); if ($('liveWx').checked) liveWeather();
 };
 function openScene() { $('mapView').hidden = true; $('sceneView').hidden = false; if (world) world.paused = false; }
 $('return3d').onclick = () => openScene();
@@ -288,14 +288,14 @@ document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.
 if (innerWidth < 640) showPanel('mapPanel', false);
 /* right-hand column: keep the layer panel under the inset map, never on top of it */
 const placeRight = () => {
-  const lp = ['surveyPanel', 'editPanel', 'tacPanel', 'topoPanel', 'lcPanel', 'radarPanel', 'globePanel', 'changePanel', 'layerPanel'].map($).find(e => !e.hidden) || $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
+  const lp = ['surveyPanel', 'editPanel', 'tacPanel', 'topoPanel', 'lcPanel', 'radarPanel', 'globePanel', 'changePanel', 'intelPanel', 'layerPanel'].map($).find(e => !e.hidden) || $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
   document.body.classList.add('lp-open');
   if (innerWidth < 640) { lp.style.top = ''; lp.style.maxHeight = ''; return; }
   const top = hud.hidden ? 12 : hud.getBoundingClientRect().bottom + 8;
   lp.style.top = top + 'px'; lp.style.maxHeight = (innerHeight - top - 12) + 'px';
 };
 addEventListener('resize', placeRight);
-const RP = { layerPanel: 'lpClose', surveyPanel: 'svClose', editPanel: 'edClose', tacPanel: 'tacClose', topoPanel: 'topoClose', lcPanel: 'lcClose', radarPanel: 'radarClose', changePanel: 'chClose' };
+const RP = { layerPanel: 'lpClose', surveyPanel: 'svClose', editPanel: 'edClose', tacPanel: 'tacClose', topoPanel: 'topoClose', lcPanel: 'lcClose', radarPanel: 'radarClose', changePanel: 'chClose', intelPanel: 'inClose' };
 function closeOthers(keep) { for (const [p, c] of Object.entries(RP)) if (p !== keep && $(p) && !$(p).hidden && $(c)) $(c).onclick(); }
 /* layer explorer */
 let LS = null, LAYERS_DEF = null;
@@ -335,7 +335,7 @@ $('layersBtn').onclick = async () => {
   if (world.mode !== 'orbit') world.setMode('orbit');
   if (world.groundStyle && world.groundStyle !== 'sat') { world.setGround('sat'); setOn('ground', 'sat'); } // the satellite surface stays the original image
   $('lpHint').textContent = 'Preparing layers…';
-  const mod = await import('./layers.js?v=49'); LAYERS_DEF = mod.LAYERS;
+  const mod = await import('./layers.js?v=50'); LAYERS_DEF = mod.LAYERS;
   LS = await world.openLayers(t => { $('lpHint').textContent = t; });
   LS.onT = t => { $('lpExplode').value = Math.round(t * 100); };
   LS.onFocus = () => lpRender();
@@ -440,7 +440,7 @@ const svProfile = m => {
 const svOpen = async () => {
   if (!world || !world.D) return;
   closeOthers('surveyPanel');
-  SVM = await import('./survey.js?v=49'); SV = world.openSurvey(); SV.onChange = svRender;
+  SVM = await import('./survey.js?v=50'); SV = world.openSurvey(); SV.onChange = svRender;
   SV.onArrive = () => { svSay('Arrived at the target'); if (SV.tool === 'points') $('svMark').classList.add('pulse'); setTimeout(() => $('svMark').classList.remove('pulse'), 2500); svRender(); };
   if (!$('svCode').options.length) $('svCode').innerHTML = SVM.CODES.map(c => `<option>${c}</option>`).join('');
   $('surveyPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); svRender();
@@ -523,7 +523,7 @@ $('editBtn').onclick = async () => {
   if (!world || !world.D) return;
   closeOthers('editPanel');
   if (world.mode !== 'orbit') world.setMode('orbit');
-  EDM = await import('./editor.js?v=49'); ED = world.openEditor(); ED.onChange = edRender;
+  EDM = await import('./editor.js?v=50'); ED = world.openEditor(); ED.onChange = edRender;
   ED.onHover = p => { $('edSnapKind').textContent = p && p.kind ? '→ ' + p.kind : ''; };
   if (!$('edRoad').options.length) { fillSel('#edRoad'.slice(1), EDM.ROAD_TYPES, ED.opts.road); fillSel('edRoof', EDM.ROOFS, ED.opts.roof); fillSel('edWall', EDM.WALLS, ED.opts.wall); fillSel('edRoofC', EDM.ROOF_COLS, ED.opts.roofC); fillSel('edTree', EDM.TREES, ED.opts.tree); }
   $('editPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); edRender();
@@ -564,7 +564,7 @@ const tacTab = k => { document.querySelectorAll('.tactabs button').forEach(b => 
 document.querySelectorAll('.tactabs button').forEach(b => b.onclick = () => { tacTab(b.dataset.tt); if (TC && b.dataset.tt !== 'ana' && /los|viewshed|ring|measure/.test(TC.mode)) { TC.mode = 'place'; tacRender(); } });
 $('tacBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('tacPanel'); if (world.mode !== 'orbit') world.setMode('orbit');
-  TCM = await import('./tactical.js?v=49'); TCAT = (await TCM.loadCatalog()).CAT;
+  TCM = await import('./tactical.js?v=50'); TCAT = (await TCM.loadCatalog()).CAT;
   TC = await world.openTactical(); TC.onChange = () => {}; TC.onMsg = m => $('tacHint').textContent = t(m); TC.onResult = tacResult; TC.lang = lang; TC.labels = $('tacLabels').value;
   TC.onSelect = f => { if (!f) { $('tacHint').textContent = t('Tap a symbol first'); return; } $('tacHint').textContent = t('Editing') + ': ' + nm(TCAT.catalog[f.code]); $('tacLabel').value = f.label || ''; TC.label = f.label || ''; tacDirSet(f.dir ?? null, false); };
   $('tacPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); tacRender();
@@ -627,7 +627,7 @@ $('topoBtn').onclick = async () => {
 $('topoClose').onclick = () => { $('topoPanel').hidden = true; placeRight(); };
 $('topoMin').onclick = () => { const c = $('topoPanel').classList.toggle('collapsed'); $('topoMin').textContent = c ? '▾' : '▴'; };
 $('topoMake').onclick = async () => {
-  if (!world || !world.D) return; const M = await import('./topomap.js?v=49'); $('topoMake').disabled = true;
+  if (!world || !world.D) return; const M = await import('./topomap.js?v=50'); $('topoMake').disabled = true;
   try {
     TOPO = await M.makeTopoMap(world, { paper: $('topoPaper').value, scale: $('topoScale').value, ci: $('topoCI').value, lang: $('topoLang').value, dpi: +$('topoDPI').value, title: $('topoTitle').value.trim(), titleKm: $('topoTitleKm').value.trim(),
       names: $('topoNames').checked, hill: $('topoHill').checked, image: $('topoImg').checked, mine: $('topoMine').checked, survey: $('topoSurvey').checked, tac: $('topoTac').checked, legend: $('topoLeg').value }, m => $('topoHint').textContent = t(m));
@@ -639,11 +639,11 @@ $('topoMake').onclick = async () => {
 };
 const topoName = ext => `topo-${($('topoTitle').value || 'map').replace(/[^A-Za-z0-9]+/g, '_')}-1_${TOPO.scale}.${ext}`;
 $('topoPNG').onclick = () => TOPO && TOPO.canvas.toBlob(b => download(topoName('png'), b));
-$('topoPDF').onclick = async () => { if (!TOPO) return; $('topoHint').textContent = t('Making PDF…'); const M = await import('./topomap.js?v=49'); await M.toPDF(TOPO, topoName('pdf')); $('topoHint').textContent = ''; };
+$('topoPDF').onclick = async () => { if (!TOPO) return; $('topoHint').textContent = t('Making PDF…'); const M = await import('./topomap.js?v=50'); await M.toPDF(TOPO, topoName('pdf')); $('topoHint').textContent = ''; };
 
 $('gpkgBtn').onclick = async () => {
   if (!world || !world.D) return; $('gpkgBtn').disabled = true;
-  try { const M = await import('./gpkg.js?v=49'), r = await M.exportGeoPackage(world, m => $('topoHint').textContent = t(m));
+  try { const M = await import('./gpkg.js?v=50'), r = await M.exportGeoPackage(world, m => $('topoHint').textContent = t(m));
     const nm = `cambodia3d-${($('topoTitle').value || 'area').replace(/[^A-Za-z0-9]+/g, '_')}-${new Date().toISOString().slice(0, 10)}.gpkg`; download(nm, r.blob);
     $('topoHint').textContent = `${nm} · ${(r.blob.size / 1e6).toFixed(1)} MB · ${Object.values(r.counts).filter(Boolean).length} ${t('vector layers')} + 2 ${t('rasters')}`;
   } catch (e) { console.error(e); $('topoHint').textContent = 'Error: ' + e.message; }
@@ -714,13 +714,13 @@ let CH = null, CHV = null, CHS = { mode: 'swipe', swipe: 0.5 };
 const chSay = m => $('chHint').textContent = t(m);
 $('changeBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('changePanel'); if (world.mode !== 'orbit') world.setMode('orbit'); $('changePanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
-  CH = CH || await import('./change.js?v=49');
+  CH = CH || await import('./change.js?v=50');
   if (!CHV || CHV.aoi !== world.D.aoi) { chSay('Checking image versions…'); try { const v = await CH.versions(world.D, chSay); CHV = { aoi: world.D.aoi, v };
       $('chBefore').innerHTML = v.map((r, i) => `<option value="${r.num}" ${i === Math.min(v.length - 1, 3) ? 'selected' : ''}>${r.date}</option>`).join('') || `<option>${t('No older images here')}</option>`;
       $('chAfter').innerHTML = `<option value="">${t('Current scene image')}</option>` + v.map(r => `<option value="${r.num}">${r.date}</option>`).join('');
       chSay(`${v.length} ${t('image versions')}`); } catch (e) { chSay('Image archive not reachable'); } }
 };
-$('chClose').onclick = () => { $('changePanel').hidden = true; if (world && world._cmp) world.setCompare(null); placeRight(); };
+$('chClose').onclick = () => { if (chPlay) $('chPlay').onclick(); $('changePanel').hidden = true; if (world && world._cmp) world.setCompare(null); placeRight(); };
 $('chMin').onclick = () => { const c = $('changePanel').classList.toggle('collapsed'); $('chMin').textContent = c ? '▾' : '▴'; };
 $('chLoad').onclick = async () => {
   if (!CH || !world.D || !$('chBefore').value) return; $('chLoad').disabled = true;
@@ -736,12 +736,106 @@ $('chLoad').onclick = async () => {
   } catch (e) { console.error(e); chSay('Could not load the old image'); }
   $('chLoad').disabled = false;
 };
+// time-lapse: every image version of the area in turn (activity over the years)
+let chPlay = null; const chMosaics = new Map();
+$('chPlay').onclick = async () => {
+  if (chPlay) { clearInterval(chPlay); chPlay = null; $('chPlay').textContent = '▶ ' + t('Time-lapse of all dates'); $('chDate').hidden = true; return; }
+  if (!CH || !CHV || !CHV.v.length) return; const vs = CHV.v.slice().reverse(); $('chPlay').disabled = true;
+  for (let i = 0; i < vs.length; i++) { const r = vs[i], k = world.D.aoi.w + ',' + r.num; if (!chMosaics.has(k)) chMosaics.set(k, await CH.mosaic(world.D, r.num, () => chSay(`${t('Loading')} ${r.date} (${i + 1}/${vs.length})`))); }
+  chSay(''); $('chPlay').disabled = false; $('chPlay').textContent = '⏸ ' + t('Stop'); $('chDate').hidden = false; let i = 0;
+  const show = () => { const r = vs[i % vs.length]; world.setCompare({ mode: 'before', before: chMosaics.get(world.D.aoi.w + ',' + r.num) }); $('chDate').textContent = r.date; i++; }; show(); chPlay = setInterval(show, 1300);
+};
 seg('chMode', v => { CHS.mode = v; if (world && world._cmp) world.setCompare({ mode: v }); });
 $('chSwipe').oninput = e => { CHS.swipe = e.target.value / 100; if (world && world._cmp) world.setCompare({ swipe: CHS.swipe, mode: 'swipe' }); setOn('chMode', 'swipe'); CHS.mode = 'swipe'; };
 
+/* Intel: notes, routes & access, alerts, counting, share */
+let IN = null, NT = null, RT = null, INT = { tab: 'notes', mode: 'route', sel: null, photo: null, A: null, alerts: null, count: null, choke: null, route: null };
+const inSay = m => $('inHint').textContent = t(m);
+const ago = iso => { const d = (Date.now() - Date.parse(iso)) / 36e5; return d < 1 ? t('just now') : d < 48 ? `${Math.round(d)} h ${t('ago')}` : `${Math.round(d / 24)} d ${t('ago')}`; };
+const ntRender = () => { if (!NT) return; const L = NT.here().slice().reverse(); $('ntList').innerHTML = L.map((n, i) => `<div class="it" data-i="${i}">${n.photo ? `<img src="${n.photo}">` : `<span style="font-size:22px">📌</span>`}<div><b style="color:${{ high: '#5fe07f', medium: '#ffc56b', low: '#ff7a5c' }[n.conf]}">${n.title.replace(/</g, '&lt;')}</b>${(n.text || '').replace(/</g, '&lt;').slice(0, 120)}<br><small>${n.source ? n.source.replace(/</g, '&lt;') + ' · ' : ''}${t(n.conf)} · ${ago(n.t)}</small></div></div>`).join('') || `<div class="svhelp">${t('No notes in this area yet.')}</div>`;
+  $('ntList').querySelectorAll('.it').forEach(el => el.onclick = () => { const n = L[+el.dataset.i]; ntSelect(n); world.teleport(world.F.x(n.lon), world.F.z(n.lat)); }); };
+const ntSelect = n => { INT.sel = n; $('ntTitle').value = n ? n.title : ''; $('ntText').value = n ? n.text : ''; $('ntSource').value = n ? n.source : ''; $('ntConf').value = n ? n.conf : 'medium'; INT.photo = n ? n.photo : null; $('ntPhotoName').textContent = INT.photo ? '📷 ✓' : ''; $('ntDel').disabled = !n; inSay(n ? 'Editing the note – change it and Save' : ''); };
+const inTab = k => { INT.tab = k; document.querySelectorAll('.intabs button').forEach(b => b.classList.toggle('on', b.dataset.it === k)); document.querySelectorAll('#intelPanel [data-ip]').forEach(d => d.hidden = d.dataset.ip !== k);
+  inSay(k === 'notes' ? 'Tap the ground to add a note, or a pin to edit it' : k === 'route' ? (INT.mode === 'route' ? 'Tap the start (A), then the end (B)' : INT.mode === 'reach' ? 'Tap the start point' : '') : k === 'count' ? 'Tap one example object in the image' : ''); };
+document.querySelectorAll('.intabs button').forEach(b => b.onclick = () => inTab(b.dataset.it));
+$('intelBtn').onclick = async () => {
+  if (!world || !world.D) return; closeOthers('intelPanel'); if (world.mode !== 'orbit') world.setMode('orbit'); $('intelPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
+  IN = IN || await import('./intel.js?v=50'); if (!world.notes) world.notes = new IN.Notes(world); NT = world.notes; NT.rebuild(); RT = new IN.Router(world); RT.profile = $('rtProf').value;
+  world.pickHandler = intelPick; ntRender(); inTab(INT.tab); ntSelect(null);
+};
+$('inClose').onclick = () => { $('intelPanel').hidden = true; if (world) world.pickHandler = null; placeRight(); };
+$('inMin').onclick = () => { const c = $('intelPanel').classList.toggle('collapsed'); $('inMin').textContent = c ? '▾' : '▴'; };
+// image pixel <-> scene metres (for counting)
+const pxOf = (x, z) => [Math.round(world.D.pxX(world.F.lon(x))), Math.round(world.D.pxY(world.F.lat(z)))];
+const llOfPx = (px, py) => { const D = world.D, n = 2 ** D.zi, tx = px / 256 + D.ir.x0, ty = py / 256 + D.ir.y0; return [tx / n * 360 - 180, Math.atan(Math.sinh(Math.PI * (1 - 2 * ty / n))) * 180 / Math.PI]; };
+const asCanvas = im => { if (im.getContext) return im; const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; c.getContext('2d').drawImage(im, 0, 0); return c; };
+let ctGroup = null;
+async function intelPick(x, z) {
+  if (INT.tab === 'notes') { const near = NT.nearest(x, z, world.pxToMetres(new (world.camera.position.constructor)(x, world.hAt(x, z), z), 18)); if (near) { ntSelect(near); return; }
+    const n = NT.add(x, z, { title: $('ntTitle').value.trim() || t('Note') + ' ' + (NT.here().length + 1), text: $('ntText').value.trim(), source: $('ntSource').value.trim(), conf: $('ntConf').value, photo: INT.photo }); ntSelect(n); ntRender(); inSay('Note added – write it and Save'); return; }
+  if (INT.tab === 'route') { RT.profile = $('rtProf').value;
+    if (INT.mode === 'route') { if (!INT.A) { INT.A = [x, z]; RT.clear(); inSay('Now tap the end (B)'); return; } const [x0, z0] = INT.A; INT.A = null; const r = RT.route(x0, z0, x, z);
+      if (!r || r.none) { $('rtRes').textContent = t('No road connection between these points for this way of travel.'); return; }
+      const T = r.T / 60; INT.route = { ...r, prof: $('rtProf').selectedOptions[0].text }; $('rtRes').innerHTML = `${t('Route')}: <b>${(r.L / 1000).toFixed(2)} km</b> · <b>${T < 60 ? T.toFixed(0) + ' min' : (T / 60).toFixed(1) + ' h'}</b> (${$('rtProf').selectedOptions[0].text}) · ${t('straight line')} ${(r.crow / 1000).toFixed(2)} km · ${t('detour')} ×${(r.L / Math.max(1, r.crow)).toFixed(2)}${r.bridges ? ` · ${t('crosses')} ${r.bridges} ${t('bridge pieces')}` : ''}`; inSay('Tap a new start (A)'); return; }
+    if (INT.mode === 'reach') { const m = +$('rtMin').value, r = RT.reach(x, z, m); if (!r) return; $('rtRes').innerHTML = `${t('Reachable in')} ${m} min: <b>${r.km.toFixed(1)} km</b> ${t('of road')} · <span style="color:#2fdc6a">■</span> ¼ <span style="color:#c6e83a">■</span> ½ <span style="color:#ffb02e">■</span> ¾ <span style="color:#ff4a3a">■</span> ${t('of the time')}`; return; } }
+  if (INT.tab === 'count') {
+    const D = world.D, img = asCanvas(D.img), [px, py] = pxOf(x, z), [a, b] = $('ctSize').value.split(',').map(Number), tol = +$('ctTol').value; inSay('Counting…'); await new Promise(r => setTimeout(r, 20));
+    const res = IN.findSimilar(img, px, py, tol, a, b); if (!res.example) { inSay('Nothing found there – tap the middle of an object'); return; }
+    let old = null; if (world._cmp && world._cmp.before) old = IN.findSimilar(asCanvas(world._cmp.before), px, py, tol, a, b, { ref: res.ref, ex: res.example });
+    const mpp = D.W / (D.pxX(world.F.lon(D.X0 + D.W)) - D.pxX(world.F.lon(D.X0))), size = Math.sqrt(res.example.n) * mpp;
+    if (ctGroup) { world.root.remove(ctGroup); ctGroup.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); }); }
+    const T3 = await import('three'); ctGroup = new T3.Group(); const ringG = new T3.RingGeometry(0.75, 1, 24).rotateX(-Math.PI / 2), mat = new T3.MeshBasicMaterial({ color: 0xffe14a, depthTest: false, transparent: true, opacity: 0.95 }), inst = new T3.InstancedMesh(ringG, mat, res.items.length), M4 = new T3.Matrix4();
+    INT.count = { n: res.count, old: old ? old.count : null, size, items: res.items.map(it => llOfPx(it.cx, it.cy)) };
+    INT.count.items.forEach(([lo, la], i) => { const X = world.F.x(lo), Z = world.F.z(la), r = Math.max(1.5, size * 0.8); M4.makeScale(r, 1, r).setPosition(X, world.hAt(X, Z) + 0.6, Z); inst.setMatrixAt(i, M4); }); inst.renderOrder = 35; ctGroup.add(inst); world.root.add(ctGroup);
+    $('ctRes').innerHTML = `${t('Found')} <b>${res.count}</b> ${t('similar objects')} (≈ ${size.toFixed(1)} m ${t('across')})${old ? ` · ${t('in the older image')}: <b>${old.count}</b> (${res.count - old.count >= 0 ? '+' : ''}${res.count - old.count})` : ''}`; inSay(''); }
+}
+$('ntPhoto').onchange = async e => { const f = e.target.files[0]; if (!f) return; const im = await new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = URL.createObjectURL(f); }), k = Math.min(1, 640 / Math.max(im.width, im.height)), c = document.createElement('canvas'); c.width = im.width * k; c.height = im.height * k; c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+  INT.photo = c.toDataURL('image/jpeg', 0.72); $('ntPhotoName').textContent = '📷 ✓'; if (INT.sel) { NT.update(INT.sel, { photo: INT.photo }); ntRender(); } e.target.value = ''; };
+$('ntSave').onclick = () => { if (!NT || !INT.sel) { inSay('Tap the ground to place the note first'); return; } NT.update(INT.sel, { title: $('ntTitle').value.trim() || INT.sel.title, text: $('ntText').value.trim(), source: $('ntSource').value.trim(), conf: $('ntConf').value, photo: INT.photo }); ntRender(); inSay('Saved'); };
+$('ntDel').onclick = () => { if (!INT.sel || !confirm(t('Delete this note?'))) return; NT.remove(INT.sel); ntSelect(null); ntRender(); };
+$('ntExport').onclick = () => { if (!NT) return; const b = new Blob([JSON.stringify(NT.geojson(), null, 1)], { type: 'application/geo+json' }), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'intel_notes.geojson'; a.click(); };
+seg('rtMode', v => { INT.mode = v; INT.A = null; $('rtMinRow').hidden = v !== 'reach'; $('rtRun').hidden = v !== 'choke'; inTab('route'); });
+$('rtRun').hidden = true; $('rtProf').onchange = () => { if (RT) RT.profile = $('rtProf').value; };
+$('rtRun').onclick = async () => { if (!RT) return; RT.profile = $('rtProf').value; $('rtRun').disabled = true; const top = await RT.choke(40, inSay); INT.choke = top; inSay(''); $('rtRun').disabled = false;
+  $('rtRes').innerHTML = top.length ? `${t('Road pieces most trips depend on')} (<span style="color:#d36bff">■</span> ${t('bridges')}):<br>` + top.map(p => `${p.rank}. ${t(p.road)}${p.bridge ? ' 🌉' : ''} – ${Math.round(p.share * 100)}% · <a href="#" data-ll="${p.lon},${p.lat}">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</a>`).join('<br>') : t('No road network here.');
+  $('rtRes').querySelectorAll('a[data-ll]').forEach(a => a.onclick = e => { e.preventDefault(); const [lo, la] = a.dataset.ll.split(',').map(Number); world.teleport(world.F.x(lo), world.F.z(la)); }); };
+$('rtClear').onclick = () => { if (RT) RT.clear(); INT.A = null; $('rtRes').textContent = ''; };
+// alerts
+const alRender = L => { $('alList').innerHTML = L.length ? L.slice(0, 60).map(a => `<div class="it" data-ll="${a.lon},${a.lat}"><span style="font-size:20px">${a.icon}</span><div><b>${a.title.replace(/</g, '&lt;')}</b><small>${t(a.type)}${a.level ? ' · ' + a.level : ''} · ${Math.round(a.km)} km · ${(a.to || a.from || '').slice(0, 10)} · ${a.src}${a.url ? ` · <a href="${a.url}" target="_blank">${t('details')}</a>` : ''}</small></div></div>`).join('') : `<div class="svhelp">${t('Nothing reported near this area.')}</div>`;
+  $('alList').querySelectorAll('.it').forEach(el => el.onclick = e => { if (e.target.tagName === 'A') return; const [lo, la] = el.dataset.ll.split(',').map(Number); const D = world.D, x = world.F.x(lo), z = world.F.z(la); if (x >= D.X0 && x <= D.X0 + D.W && z >= D.Z0 && z <= D.Z0 + D.H) world.teleport(x, z); else inSay('Outside this 3D area – see it on 🌍 the globe'); }); };
+const alCheck = async (notify) => { if (!IN || !world.D) return; const a = world.D.aoi, L = await IN.alertsNear((a.s + a.n) / 2, (a.w + a.e) / 2, +$('alKm').value, inSay); INT.alerts = L; alRender(L);
+  const key = 'cambodia3d.alertsSeen', seen = new Set(JSON.parse(localStorage.getItem(key) || '[]')), fresh = L.filter(x => !seen.has(x.id)); L.forEach(x => seen.add(x.id)); try { localStorage.setItem(key, JSON.stringify([...seen].slice(-3000))); } catch (e) { }
+  if (notify && fresh.length && window.Notification && Notification.permission === 'granted') new Notification(`⚠️ ${fresh.length} ${t('new alerts near your area')}`, { body: fresh.slice(0, 4).map(x => `${x.icon} ${x.title} (${Math.round(x.km)} km)`).join('\n') }); };
+$('alRun').onclick = () => alCheck(false);
+let alTimer = 0; $('alWatch').onchange = async e => { clearInterval(alTimer); if (e.target.checked) { if (window.Notification && Notification.permission === 'default') await Notification.requestPermission(); alCheck(false); alTimer = setInterval(() => alCheck(true), 15 * 60e3); } };
+$('ctTol').oninput = e => $('ctTolV').textContent = e.target.value;
+$('ctClear').onclick = () => { if (ctGroup) { world.root.remove(ctGroup); ctGroup = null; } INT.count = null; $('ctRes').textContent = ''; };
+$('ctExport').onclick = () => { if (!INT.count) return; const g = { type: 'FeatureCollection', features: INT.count.items.map(([lo, la], i) => ({ type: 'Feature', properties: { id: i + 1 }, geometry: { type: 'Point', coordinates: [+lo.toFixed(7), +la.toFixed(7)] } })) }, b = new Blob([JSON.stringify(g)], { type: 'application/geo+json' }), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'counted_objects.geojson'; a.click(); };
+// share link
+$('shMake').onclick = async () => {
+  if (!world || !world.D) return; IN = IN || await import('./intel.js?v=50'); const D = world.D, a = D.aoi, inA = c => c[0] >= a.w && c[0] <= a.e && c[1] >= a.s && c[1] <= a.n;
+  const notes = world.notes ? world.notes.here().map(n => ({ ...n, photo: null })) : JSON.parse(localStorage.getItem('cambodia3d.notes.v1') || '[]').filter(n => inA([n.lon, n.lat])).map(n => ({ ...n, photo: null }));
+  const tac = world.tactical ? world.tactical.features.filter(f => world.tactical.inAOI(f)) : JSON.parse(localStorage.getItem('cambodia3d.tac.v1') || '[]').filter(f => f.coords.some(inA));
+  const edits = (world.editor ? world.editor.features : JSON.parse(localStorage.getItem('cambodia3d.edits.v1') || '[]')).filter(f => f.coords && f.coords.some(inA));
+  const c = world.camera.position, tg = world.controls.target, st = { v: 1, cam: [c.x, c.y, c.z, tg.x, tg.y, tg.z].map(v => +v.toFixed(1)), notes, tac, edits };
+  const url = `${location.origin}${location.pathname}#aoi=${a.w.toFixed(5)},${a.s.toFixed(5)},${a.e.toFixed(5)},${a.n.toFixed(5)}&s=${await IN.packState(st)}`;
+  $('shOut').value = url; try { await navigator.clipboard.writeText(url); inSay('Link copied'); } catch (e) { $('shOut').select(); inSay('Copy the link below'); }
+  if (url.length > 60000) inSay('The link is very long – some apps may cut it');
+};
+// open a shared link: after the area is built, add the shared notes, symbols and drawings, and set the view
+async function applyShared() {
+  const m = location.hash.match(/[#&]s=([A-Za-z0-9_-]+)/); if (!m || applyShared.done === m[1]) return; applyShared.done = m[1]; IN = IN || await import('./intel.js?v=50');
+  let st; try { st = await IN.unpackState(m[1]); } catch (e) { return; } if (!st) return;
+  if (st.notes && st.notes.length) { if (!world.notes) world.notes = new IN.Notes(world); const have = new Set(world.notes.list.map(n => n.id)); for (const n of st.notes) if (!have.has(n.id)) world.notes.list.push(n); world.notes.save(); world.notes.rebuild(); }
+  if (st.tac && st.tac.length) { const T = await world.openTactical(); T.active = false; const have = new Set(T.features.map(f => f.id)); for (const f of st.tac) if (!have.has(f.id)) T.features.push(f); T.save(); await T.rebuild(); }
+  if (st.edits && st.edits.length) { const E = world.openEditor(); E.active = false; const have = new Set(E.features.map(f => f.id)); for (const f of st.edits) if (!have.has(f.id)) E.features.push(f); E.save(); E.rebuild(); }
+  if (st.cam) { world.camera.position.set(st.cam[0], st.cam[1], st.cam[2]); world.controls.target.set(st.cam[3], st.cam[4], st.cam[5]); world.controls.update(); }
+  $('driveHint').textContent = t('Shared work loaded: notes, symbols and drawings.');
+}
+
 /* GEOINT area brief: one printable page with everything known about the area */
 $('briefBtn').onclick = async () => {
-  if (!world || !world.D) return; const D = world.D, a = D.aoi, lat = (a.s + a.n) / 2, lon = (a.w + a.e) / 2, HM = await import('./hud.js?v=49'), TM = await import('./topomap.js?v=49'), u = HM.utm(lat, lon);
+  if (!world || !world.D) return; const D = world.D, a = D.aoi, lat = (a.s + a.n) / 2, lon = (a.w + a.e) / 2, HM = await import('./hud.js?v=50'), TM = await import('./topomap.js?v=50'), u = HM.utm(lat, lon);
   const win = window.open('', '_blank'); if (!win) { alert(t('Please allow pop-ups to open the brief.')); return; } win.document.write('<p style="font:14px system-ui">Preparing the brief…</p>');
   world.renderer.render(world.scene, world.camera); const shot = world.renderer.domElement.toDataURL('image/jpeg', 0.85);
   const img = (() => { const c = document.createElement('canvas'), k = Math.min(1, 900 / D.img.width); c.width = D.img.width * k; c.height = D.img.height * k; c.getContext('2d').drawImage(D.img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.85); })();
@@ -752,9 +846,10 @@ $('briefBtn').onclick = async () => {
   const poi = names.filter(p => !p.tags.place).map(p => p.tags.amenity || p.tags.natural || p.tags.waterway).reduce((m, k) => (m[k] = (m[k] || 0) + 1, m), {});
   // terrain
   let lo = 1e9, hi = -1e9, sl = 0, ns = 0; for (let j = 0; j < 40; j++) for (let i = 0; i < 40; i++) { const x = D.X0 + (i + .5) / 40 * D.W, z = D.Z0 + (j + .5) / 40 * D.H, e = world.rawElevation(x, z); lo = Math.min(lo, e); hi = Math.max(hi, e); const s1 = Math.hypot(world.rawElevation(x + 15, z) - world.rawElevation(x - 15, z), world.rawElevation(x, z + 15) - world.rawElevation(x, z - 15)) / 30; sl += Math.atan(s1) * 180 / Math.PI; ns++; }
-  const roadLen = {}; for (const r of D.roads || []) { const k = r.cls || 'road'; let L = 0; for (let i = 1; i < r.pts.length; i++) L += Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]); roadLen[k] = (roadLen[k] || 0) + L; }
+  const HWn = (await import('./intel.js?v=50')).HW, roadLen = {}; for (const r of D.roads || []) { const k = HWn[r.cls] || 'road'; let L = 0; for (let i = 1; i < r.pts.length; i++) L += Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]); roadLen[k] = (roadLen[k] || 0) + L; }
   const lcRows = Object.entries(D.lcPct || {}).filter(([k, v]) => +k > 0 && v > 0.002).sort((x, y) => y[1] - x[1]).map(([k, v]) => `<tr><td><i style="background:${world.LC[k].c}"></i>${world.LC[k].en} <span class=km>${world.LC[k].km}</span></td><td>${(v * 100).toFixed(1)}%</td><td>${(v * D.W * D.H / 1e4).toFixed(1)} ha</td></tr>`).join('');
   const tac = world.tactical ? world.tactical.features.filter(f => world.tactical.inAOI(f)) : [], rd = world.radar && world.radar.placed ? world.radar.list() : [], sv = world.survey ? world.survey.points || [] : [];
+  const notesH = world.notes ? world.notes.here() : [];
   const G = world.globe, passes = G && G.passes ? G.passes.slice(0, 8) : null, ch = CHS.res;
   const esc = x => String(x ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const S = D.stats || {}, dirs = d => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(d / 45) % 8];
@@ -775,6 +870,10 @@ $('briefBtn').onclick = async () => {
   ${wx && wx.current ? `<h2>5. Weather now</h2><p>${wx.current.temperature_2m}°C · humidity ${wx.current.relative_humidity_2m}% · cloud ${wx.current.cloud_cover}% · wind ${wx.current.wind_speed_10m} km/h from ${dirs(wx.current.wind_direction_10m)} · rain ${wx.current.precipitation} mm<br>Next 3 days: ${wx.daily.time.map((d, i) => `${d.slice(5)} ${wx.daily.temperature_2m_min[i]}–${wx.daily.temperature_2m_max[i]}°C, ${wx.daily.precipitation_sum[i]} mm`).join(' · ')}</p>` : ''}
   ${ch ? `<h2>6. Change detection</h2><p>${$('chBefore').selectedOptions[0] ? $('chBefore').selectedOptions[0].text : ''} → ${$('chAfter').value ? $('chAfter').selectedOptions[0].text : 'scene image'}: changed ${ch.pct.all.toFixed(1)}% of the area — built / cleared ${ch.pct.built.toFixed(1)}%, vegetation gain ${ch.pct.veg.toFixed(1)}%, water ${ch.pct.water.toFixed(1)}%.</p>` : ''}
   ${passes ? `<h2>7. Satellite collection</h2><table><tr><th>Satellite</th><th>Next imaging pass over the area</th></tr>${passes.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.when)}</td></tr>`).join('')}</table>` : ''}
+  ${notesH.length ? `<h2>Field notes</h2><table><tr><th>Note</th><th>Source · confidence · time</th><th>MGRS</th></tr>${notesH.map(n => `<tr><td><b>${esc(n.title)}</b><br>${esc(n.text)}${n.photo ? `<br><img src="${n.photo}" style="max-width:220px;margin-top:4px">` : ''}</td><td>${esc(n.source)} · ${esc(n.conf)} · ${esc(n.t.slice(0, 16).replace('T', ' '))} UTC</td><td>${HM.mgrs(n.lat, n.lon)}</td></tr>`).join('')}</table>` : ''}
+  ${INT.alerts && INT.alerts.length ? `<h2>Alerts near the area</h2><table><tr><th></th><th>Event</th><th>Distance</th><th>Date</th><th>Source</th></tr>${INT.alerts.slice(0, 25).map(x => `<tr><td>${x.icon}</td><td>${esc(x.title)}${x.level ? ' (' + x.level + ')' : ''}</td><td>${Math.round(x.km)} km</td><td>${esc((x.to || x.from || '').slice(0, 10))}</td><td>${esc(x.src)}</td></tr>`).join('')}</table>` : ''}
+  ${INT.route || INT.choke ? `<h2>Routes and access</h2>${INT.route ? `<p>Route A → B (${esc(INT.route.prof)}): ${(INT.route.L / 1000).toFixed(2)} km, ${(INT.route.T / 60).toFixed(0)} min, detour ×${(INT.route.L / Math.max(1, INT.route.crow)).toFixed(2)}${INT.route.bridges ? ', crosses bridges' : ''}.</p>` : ''}${INT.choke ? `<table><tr><th>#</th><th>Choke point</th><th>Share of trips</th><th>MGRS</th></tr>${INT.choke.map(p => `<tr><td>${p.rank}</td><td>${esc(p.road)}${p.bridge ? ' – bridge' : ''}</td><td>${Math.round(p.share * 100)}%</td><td>${HM.mgrs(p.lat, p.lon)}</td></tr>`).join('')}</table>` : ''}` : ''}
+  ${INT.count ? `<h2>Object count</h2><p>${INT.count.n} similar objects (≈ ${INT.count.size.toFixed(1)} m across)${INT.count.old != null ? `; ${INT.count.old} in the older image (${INT.count.n - INT.count.old >= 0 ? '+' : ''}${INT.count.n - INT.count.old})` : ''}.</p>` : ''}
   ${tac.length ? `<h2>8. Tactical overlay</h2><table><tr><th>Symbol</th><th>Side</th><th>Label</th><th>Position (MGRS)</th></tr>${tac.map(f => `<tr><td>${esc(f.code)}</td><td>${esc(f.side)}</td><td>${esc(f.label)}</td><td>${HM.mgrs(f.coords[0][1], f.coords[0][0])}</td></tr>`).join('')}</table>` : ''}
   ${rd.length ? `<h2>9. Radar picture</h2><table><tr><th>Track</th><th>Type</th><th>FL</th><th>Speed</th><th>Range</th><th>Bearing</th></tr>${rd.slice(0, 20).map(r => `<tr><td>${esc(r.flight)}${r.src === 'sim' ? ' (sim)' : ''}</td><td>${esc(r.type)}</td><td>${Math.round(r.alt / 0.3048 / 100)}</td><td>${Math.round(r.gs / 0.514444)} kt</td><td>${(r.dist / 1000).toFixed(1)} km</td><td>${Math.round(r.brg * 180 / Math.PI)}°</td></tr>`).join('')}</table>` : ''}
   ${sv.length ? `<h2>10. Survey points</h2><table><tr><th>ID</th><th>MGRS</th><th>Elevation</th></tr>${sv.slice(0, 30).map(p => `<tr><td>${esc(p.id)}</td><td>${p.lat != null ? HM.mgrs(p.lat, p.lon) : ''}</td><td>${p.h != null ? (+p.h).toFixed(2) + ' m' : ''}</td></tr>`).join('')}</table>` : ''}
@@ -838,7 +937,7 @@ $('secClose').onclick = () => { $('sectionPanel').hidden = true; if (world) { wo
 $('secWall').onchange = e => { if (!world) return; world.sectionWallOn = e.target.checked; if (world.sectionWall) world.sectionWall.visible = e.target.checked; };
 const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 $('secPng').onclick = () => $('secCanvas').toBlob(b => download('cross-section.png', b));
-$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=49'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
+$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=50'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
 
 /* language */
 document.querySelectorAll('.langBtn').forEach(b => b.onclick = () => setLang(lang === 'km' ? 'en' : 'km'));

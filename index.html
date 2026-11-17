@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=49">
+<link rel="stylesheet" href="css/app.css?v=50">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -69,6 +69,7 @@
     <button id="surveyBtn" data-tip="Survey: measure, mark &amp; go to">📐</button>
     <button id="editBtn" data-tip="Digitize: roads, buildings, trees">✏️</button>
     <button id="sectionBtn" data-tip="Cross-section: soil &amp; geology">✂️</button>
+    <button id="intelBtn" data-tip="Intel: notes, routes &amp; access, alerts, counting, share">🛰️</button>
     <button id="changeBtn" data-tip="Change detection: compare with older images">🕘</button>
     <button id="lcBtn" data-tip="Train land cover: paint what you see, the model learns">🖌️</button>
     <button id="globeBtn" data-tip="Whole Earth: where this area is, live clouds, wind, satellites, flights">🌍</button>
@@ -291,13 +292,54 @@
       <div id="globeInfo" class="svhelp"></div>
     </div>
   </div>
+  <div id="intelPanel" class="rpanel" hidden>
+    <div class="row lphead"><b>🛰️ Intel</b><span id="inHint" class="hint"></span><button id="inMin" title="Hide / show">▴</button><button id="inClose" title="Close">✕</button></div>
+    <div id="inContent">
+      <div class="row svtabs intabs"><button data-it="notes" class="on">📌 Notes</button><button data-it="route">🧭 Routes</button><button data-it="alerts">⚠️ Alerts</button><button data-it="count">🔢 Count</button><button data-it="share">🔗 Share</button></div>
+      <div data-ip="notes">
+        <div class="svhelp">Tap the ground to pin a note. Give it a source and how sure you are; add a photo if you have one.</div>
+        <div class="row"><input id="ntTitle" placeholder="Title" style="flex:1"><select id="ntConf"><option value="high">High confidence</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></div>
+        <textarea id="ntText" rows="2" placeholder="What did you see / learn here?" style="width:100%;box-sizing:border-box"></textarea>
+        <div class="row"><input id="ntSource" placeholder="Source (e.g. field visit, image 2025-07-31, report)" style="flex:1"></div>
+        <div class="row"><label class="filebtn">📷 Photo<input type="file" id="ntPhoto" accept="image/*" hidden></label><span id="ntPhotoName" class="hint"></span><button id="ntSave" class="primary" style="margin:0">💾 Save</button><button id="ntDel" title="Delete this note">🗑</button></div>
+        <div id="ntList" class="ntlist"></div>
+        <div class="row"><button id="ntExport">⬇ GeoJSON</button></div>
+      </div>
+      <div data-ip="route" hidden>
+        <div class="row"><span>Travel by</span><select id="rtProf"><option value="car">Car</option><option value="moto">Motorbike</option><option value="truck">Truck</option><option value="foot">On foot</option></select></div>
+        <div class="row seg" id="rtMode"><button data-v="route" class="on">A → B route</button><button data-v="reach">How far in…</button><button data-v="choke">Choke points</button></div>
+        <div class="row" id="rtMinRow" hidden><span>Minutes</span><select id="rtMin"><option>2</option><option selected>5</option><option>10</option><option>15</option><option>30</option></select><span class="hint">tap the start point</span></div>
+        <div class="row"><button id="rtRun" class="primary" style="margin:0">▶ Find choke points</button><button id="rtClear">Clear</button></div>
+        <div id="rtRes" class="svhelp"></div>
+      </div>
+      <div data-ip="alerts" hidden>
+        <div class="row"><span>Within</span><select id="alKm"><option value="100">100 km</option><option value="300" selected>300 km</option><option value="1000">1,000 km</option></select><button id="alRun" class="primary" style="margin:0">⟳ Check now</button></div>
+        <div class="row"><label><input type="checkbox" id="alWatch"> 🔔 Watch this area (every 15 min, notify me)</label></div>
+        <div id="alList" class="ntlist"></div>
+        <div class="svhelp" style="opacity:.75">Sources: GDACS (earthquakes, cyclones, floods, volcanoes, wildfires, drought), NASA EONET, NASA VIIRS fire detections of the last 2 days.</div>
+      </div>
+      <div data-ip="count" hidden>
+        <div class="svhelp">Tap one example object in the image (a roof, a vehicle, a boat, a tree crown…). The tool finds and counts all similar ones in the area — and in the older image too, if you loaded one in 🕘 Change detection.</div>
+        <div class="row"><span>Colour tolerance</span><input type="range" id="ctTol" min="8" max="60" value="26" style="flex:1"><b id="ctTolV">26</b></div>
+        <div class="row"><span>Size range</span><select id="ctSize"><option value="0.5,2">Close (½–2×)</option><option value="0.3,3" selected>Medium (⅓–3×)</option><option value="0.15,6">Wide</option></select></div>
+        <div id="ctRes" class="svhelp"></div>
+        <div class="row"><button id="ctClear">Clear</button><button id="ctExport">⬇ GeoJSON of objects</button></div>
+      </div>
+      <div data-ip="share" hidden>
+        <div class="svhelp">Makes a link with this area, your view, notes, tactical symbols and drawings. Whoever opens it builds the same area and sees your work (photos are not included).</div>
+        <div class="row"><button id="shMake" class="primary" style="margin:0">🔗 Make &amp; copy the link</button></div>
+        <textarea id="shOut" rows="3" readonly style="width:100%;box-sizing:border-box;font-size:10.5px"></textarea>
+      </div>
+    </div>
+  </div>
   <div id="changePanel" class="rpanel" hidden>
     <div class="row lphead"><b>🕘 Change detection</b><span id="chHint" class="hint"></span><button id="chMin" title="Hide / show">▴</button><button id="chClose" title="Close">✕</button></div>
     <div id="chContent">
       <div class="svhelp">Compare the scene image with an older version of the Esri World Imagery archive (Wayback) for this same area.</div>
       <div class="row"><span>Before</span><select id="chBefore" style="flex:1"><option>Loading the image versions…</option></select></div>
       <div class="row"><span>After</span><select id="chAfter" style="flex:1"><option value="">Current scene image</option></select></div>
-      <div class="row"><button id="chLoad" class="primary" style="margin:0">⇄ Compare</button></div>
+      <div class="row"><button id="chLoad" class="primary" style="margin:0">⇄ Compare</button><button id="chPlay" style="margin:0">▶ Time-lapse of all dates</button></div>
+      <div id="chDate" class="chdate" hidden></div>
       <div class="row seg" id="chMode"><button data-v="swipe" class="on">Swipe</button><button data-v="before">Before</button><button data-v="after">After</button><button data-v="changes">Changes</button></div>
       <div class="row"><span>Swipe (west ← → east)</span><input type="range" id="chSwipe" min="0" max="100" value="50" style="flex:1"></div>
       <div id="chStats" class="svhelp"></div>
@@ -360,6 +402,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=49"></script>
+<script type="module" src="js/app.js?v=50"></script>
 </body>
 </html>

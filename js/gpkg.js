@@ -2,8 +2,8 @@
 // image houses, contours, spot heights, place names, survey points and parcels, your digitized features, the
 // tactical overlay) in EPSG:4326, the satellite image and the 13-class land cover as raster tiles (EPSG:3857),
 // and a QGIS style for each layer saved as its default (layer_styles), so the layers open styled.
-import { LC } from './landcover.js?v=49';
-import { terrainData } from './topomap.js?v=49';
+import { LC } from './landcover.js?v=50';
+import { terrainData } from './topomap.js?v=50';
 
 let SQL = null;
 async function sqljs() {
@@ -127,7 +127,7 @@ export async function exportGeoPackage(world, say = () => {}) {
   // tactical overlay: TacMap symbols (SVG with param() colours) coloured by side
   const tc = world.tactical;
   if (tc && tc.features.length) {
-    const { CAT } = await (await import('./tactical.js?v=49')).loadCatalog(), feats = tc.features.filter(q => tc.inAOI(q)), base = q => ({ code: q.code, side: q.side, label: q.label || '', name_en: CAT.catalog[q.code].en, name_km: CAT.catalog[q.code].km, color: tc.color(q.side, q.code) });
+    const { CAT } = await (await import('./tactical.js?v=50')).loadCatalog(), feats = tc.features.filter(q => tc.inAOI(q)), base = q => ({ code: q.code, side: q.side, label: q.label || '', name_en: CAT.catalog[q.code].en, name_km: CAT.catalog[q.code].km, color: tc.color(q.side, q.code) });
     const svgs = {}; for (const q of feats.filter(q => q.geom === 'point')) if (!svgs[q.code]) { try { svgs[q.code] = btoa(unescape(encodeURIComponent(await (await fetch('tac/svg/' + CAT.catalog[q.code].svg)).text()))); } catch (e) { } }
     const svgSym = c => `<layer class="SvgMarker" enabled="1" pass="0" locked="0">${opt({ name: 'base64:' + svgs[c], size: 7, size_unit: 'MM', color: '255,255,255,255', outline_color: '232,23,61,255', outline_width: 0.6, outline_width_unit: 'MM', vertical_anchor_point: '2' })}${ddColor('outlineColor', 'color')}</layer>`;
     cnt.tacP = layer('tactical_points', 'Tactical symbols', 1, [['code', 'TEXT'], ['side', 'TEXT'], ['label', 'TEXT'], ['name_en', 'TEXT'], ['name_km', 'TEXT'], ['color', 'TEXT'], ['rings_m', 'TEXT'], ['direction_deg', 'REAL']],
@@ -146,6 +146,9 @@ export async function exportGeoPackage(world, say = () => {}) {
       hs.map(q => ({ g: [q.lon, q.lat], class_id: q.c, class_en: LC[q.c].en, class_km: LC[q.c].km, color: LC[q.c].c })),
       qml(single('marker', marker('circle', '#ffffff', 1.2, '#111111', ddColor('fillColor', 'color')))));
   }
+  // your field notes (pins with source and confidence)
+  if (world.notes && world.notes.here().length) cnt.notes = layer('intel_notes', 'Field notes', 1, [['title', 'TEXT'], ['text', 'TEXT'], ['source', 'TEXT'], ['confidence', 'TEXT'], ['time', 'TEXT'], ['photo_jpeg', 'TEXT']],
+    world.notes.here().map(n => ({ g: [n.lon, n.lat], title: n.title, text: n.text, source: n.source, confidence: n.conf, time: n.t, photo_jpeg: n.photo || null })), qml(single('marker', marker('circle', '#ffb547', 3, '#111111')), labels('title', 8, '#111111', 0)));
   // land-cover classes as a lookup table
   db.run(`CREATE TABLE land_cover_classes (id INTEGER PRIMARY KEY, class_en TEXT, class_km TEXT, color TEXT, percent REAL)`);
   for (const k of Object.keys(LC)) db.run('INSERT INTO land_cover_classes VALUES (?,?,?,?,?)', [+k, LC[k].en, LC[k].km, LC[k].c, D.lcPct && D.lcPct[k] ? +(D.lcPct[k] * 100).toFixed(2) : 0]);

@@ -5,26 +5,26 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=49';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=49';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=49';
-import { buildTrees, GrassField } from './vegetation.js?v=49';
-import { RoadNet, Driver, Walker } from './modes.js?v=49';
-import { vehicleKit } from './vehicles.js?v=49';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=49';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=49';
-import { LayerStack } from './layers.js?v=49';
-import { Survey } from './survey.js?v=49';
-import { Editor } from './editor.js?v=49';
-import { Atmos } from './atmos.js?v=49';
-import { NightLights } from './lights.js?v=49';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=49';
-import { Tactical, loadCatalog } from './tactical.js?v=49';
-import { LcTrainer } from './lctrain.js?v=49';
-import { Radar } from './radar.js?v=49';
-import { Globe } from './globe.js?v=49';
-import { SEASON } from './vegetation.js?v=49';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=49';
+import * as G from './geo.js?v=50';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=50';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=50';
+import { buildTrees, GrassField } from './vegetation.js?v=50';
+import { RoadNet, Driver, Walker } from './modes.js?v=50';
+import { vehicleKit } from './vehicles.js?v=50';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=50';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=50';
+import { LayerStack } from './layers.js?v=50';
+import { Survey } from './survey.js?v=50';
+import { Editor } from './editor.js?v=50';
+import { Atmos } from './atmos.js?v=50';
+import { NightLights } from './lights.js?v=50';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=50';
+import { Tactical, loadCatalog } from './tactical.js?v=50';
+import { LcTrainer } from './lctrain.js?v=50';
+import { Radar } from './radar.js?v=50';
+import { Globe } from './globe.js?v=50';
+import { SEASON } from './vegetation.js?v=50';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=50';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -622,7 +622,7 @@ export class World {
       ribbon(pts, st.w / 2, [st.mk, st.lanes, st.s]);
       const oneway = (r.flags & 1) || (r.flags & 16) ? 1 : 0;
       if (r.cls <= 14 && r.cls !== 13 && L > 20) this.lanesForTraffic.push({ pts, st, cls: r.cls, oneway, urban: r.flags & 8 });
-      if (r.cls <= 16 && r.cls !== 15) netRoads.push({ pts, hw: st.w / 2, oneway, cls: r.cls, urban: r.flags & 8 });
+      if (r.cls <= 16 && r.cls !== 15) netRoads.push({ pts, hw: st.w / 2, oneway, cls: r.cls, urban: r.flags & 8, bridge: !!isBridge });
     }
     for (const pts of railPts) { for (const p of pts) p.y = Math.max(p.g, hAt(p.x, p.z)) + 0.32; ribbon(pts, 1.8, [0, 1, 10]); }
     if (RB.pos.length) {
@@ -1299,6 +1299,8 @@ export class World {
   pxToMetres(p, px) { const d = this.camera.position.distanceTo(p); return Math.max(0.3, d * 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) / this.renderer.domElement.clientHeight * px); }
   onTap(e) {
     if (this.globe && this.globe.on) return;
+    if (this.pickHandler && this.mode === 'orbit' && this.terrainMesh) { const r = this.renderer.domElement.getBoundingClientRect(), rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera);
+      const h = rc.intersectObject(this.terrainMesh, false)[0]; if (h) this.pickHandler(h.point.x, h.point.z, e); return; }
     if (this.radarPick && this.terrainMesh && this.mode === 'orbit') { const r = this.renderer.domElement.getBoundingClientRect(), rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera);
       const h = rc.intersectObject(this.terrainMesh, false)[0]; if (h) { this.radarPick = false; this.radar.place(h.point.x, h.point.z); } return; }
     const tacPick = this.tactical && this.tactical.active && this.mode === 'orbit' && !this.sectionPick && !(this.layers && this.layers.t > 0.01);

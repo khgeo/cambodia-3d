@@ -458,3 +458,38 @@ body.nocredit #credit{display:none}
 #changePanel [hidden]{display:none!important}#changePanel .row span{color:#9fb0c0;font-size:11px}
 #changePanel .seg{gap:0}#changePanel .seg button{flex:1;margin:0;border-radius:0}#changePanel .seg button:first-child{border-radius:6px 0 0 6px}#changePanel .seg button:last-child{border-radius:0 6px 6px 0}#changePanel .seg button.on{background:#ffb547;color:#1a1a1a;font-weight:600}
 @media (max-width:640px){#changePanel{top:auto;bottom:62px;right:6px;left:6px;width:auto;max-height:55%}}
+
+#intelPanel{position:absolute;right:12px;top:200px;width:260px;overflow:auto;overscroll-behavior:contain;z-index:7;background:rgba(17,23,31,.88);color:#e8eef4;border-radius:12px;padding:10px;box-sizing:border-box;font-size:12px;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 8px 28px rgba(0,0,0,.35)}
+#intelPanel[hidden]{display:none}
+#intelPanel .row{display:flex;gap:6px;align-items:center;margin:0 0 7px}
+#intelPanel .row button{flex:1;padding:6px 4px;font-size:11.5px}
+#intelPanel .lphead{position:sticky;top:-10px;z-index:2;background:rgba(17,23,31,.97);margin:-10px -10px 8px;padding:10px 10px 8px;border-radius:12px 12px 0 0}
+#intelPanel .lphead b{font-size:14px}#intelPanel .lphead .hint{flex:1;color:#ffd88a;font-size:11px}
+#intelPanel .lphead button{flex:0;padding:4px 9px}
+#intelPanel.collapsed #inContent{display:none}
+#intelPanel.collapsed .lphead{margin-bottom:-10px;border-radius:12px}
+.svtabs button.on{background:#2d7a55;color:#fff}
+.svhelp{color:#9fb0c0;font-size:11px;line-height:1.45;margin:0 0 7px}
+#svCodeRow span{color:#9fb0c0;width:34px}#svCodeRow select{flex:1}
+#svResult{line-height:1.55;margin:2px 0 6px}
+#svResult table{width:100%;border-collapse:collapse}#svResult td{padding:1px 0}#svResult td:last-child{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+#svProfile{width:100%;height:auto;border-radius:8px;background:#f7f4ee;margin-bottom:6px}
+.svsec{border-top:1px solid rgba(255,255,255,.12);padding-top:8px;margin-top:6px}
+.svsec input{width:100%;box-sizing:border-box;margin:6px 0;padding:7px 8px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff}
+#svList{max-height:150px;overflow:auto;margin:6px 0;font-size:11px;font-variant-numeric:tabular-nums}
+#svList div{display:grid;grid-template-columns:30px 1fr 46px 16px;gap:4px;padding:3px 2px;border-bottom:1px solid rgba(255,255,255,.07)}
+#svList div span:nth-child(2){color:#c9d3dc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#svList button{padding:0;background:none;color:#ff8a7a;font-size:12px}
+
+
+#intelPanel [hidden]{display:none!important}#intelPanel .row span{color:#9fb0c0;font-size:11px}#intelPanel label{font-size:11.5px;display:flex;gap:5px;align-items:center}
+#intelPanel .intabs{flex-wrap:wrap;gap:2px}#intelPanel .intabs button{flex:1;font-size:11px;padding:4px 2px}
+#intelPanel textarea,#intelPanel input,#intelPanel select{background:#1a2430;color:#e8eef5;border:1px solid #3a4858;border-radius:6px;padding:4px 6px;font:12px system-ui,"Noto Sans Khmer",sans-serif}
+#intelPanel .seg{gap:0}#intelPanel .seg button{flex:1;margin:0;border-radius:0;font-size:11px}#intelPanel .seg button:first-child{border-radius:6px 0 0 6px}#intelPanel .seg button:last-child{border-radius:0 6px 6px 0}#intelPanel .seg button.on{background:#23d5ff;color:#06141b;font-weight:600}
+.ntlist{max-height:200px;overflow:auto;margin:6px 0;font-size:11.5px}.ntlist .it{display:flex;gap:6px;align-items:flex-start;padding:4px;border-radius:6px;cursor:pointer}.ntlist .it:hover{background:#26313e}.ntlist .it img{width:42px;height:42px;object-fit:cover;border-radius:4px}.ntlist .it b{display:block}.ntlist .it small{color:#9fb0c0}
+.filebtn{background:#2a3644;border-radius:6px;padding:4px 8px;cursor:pointer}
+#rail{overflow-y:auto;scrollbar-width:none}#rail::-webkit-scrollbar{display:none}
+@media (max-width:640px){#intelPanel{top:auto;bottom:62px;right:6px;left:6px;width:auto;max-height:60%}}
+
+.chdate{font:700 22px system-ui;color:#ffd23f;text-align:center;letter-spacing:.04em;margin:4px 0}
