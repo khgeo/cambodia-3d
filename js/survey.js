@@ -2,7 +2,7 @@
 // (planimetric and 3D surface), draped on the terrain; go to / stake out a coordinate; walk with a GNSS rover pole.
 // Heights come from the terrain model (not exaggerated); this is a simulation, not survey-grade.
 import * as THREE from 'three';
-import { utm } from './hud.js?v=48';
+import { utm, mgrsParse } from './hud.js?v=49';
 
 export const CODES = ['Point', 'Boundary corner', 'Tree', 'Well / water', 'Building corner', 'Road / track', 'Benchmark', 'Other'];
 const COL = { line: 0xffd23f, area: 0x29c7d9, point: 0xff6b3d, target: 0x37e07a };
@@ -20,6 +20,7 @@ export function utmInv(E, N, zone = 48, north = true) {
 /* "11.56, 104.92" · "104.92 11.56" · "11°33'40\"N 104°55'38\"E" · "491500 1278000" · "48N 491500 1278000" */
 export function parseCoord(txt) {
   const t = txt.trim().toUpperCase(); if (!t) return null;
+  const mg = mgrsParse(t); if (mg) return { ...utmInv(mg.E, mg.N, mg.zone, mg.north), utm: true, mgrs: true };
   const dms = [...t.matchAll(/(\d+(?:\.\d+)?)\s*°\s*(?:(\d+(?:\.\d+)?)\s*['′]\s*)?(?:(\d+(?:\.\d+)?)\s*["″]\s*)?([NSEW])?/g)];
   if (dms.length >= 2) {
     const v = dms.map(m => ({ d: +m[1] + (+m[2] || 0) / 60 + (+m[3] || 0) / 3600, h: m[4] }));
@@ -108,6 +109,7 @@ export class Survey {
   setTool(t) { this.tool = t; this.verts = []; this.redraw(); }
   /* ---- adding vertices / points ---- */
   add(x, z, src) {
+    if (this.finished && this.tool !== 'points') { this.verts = []; this.finished = false; }
     if (!this.D || !this.inside(x, z)) return;
     if (this.tool === 'points') {
       const ll = this.toLL(x, z), u = utm(ll.lat, ll.lon);

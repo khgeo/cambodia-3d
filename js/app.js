@@ -1,6 +1,6 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=48';
-import { t, lang, setLang, initLang, onLang } from './i18n.js?v=48';
+import * as G from './geo.js?v=49';
+import { t, lang, setLang, initLang, onLang } from './i18n.js?v=49';
 
 const $ = id => document.getElementById(id);
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
@@ -99,7 +99,7 @@ document.querySelectorAll('#rail [data-fly]').forEach(b => b.onclick = () => {
 function syncRail() {
   const open = !$('scenePanel').classList.contains('hidden');
   document.querySelectorAll('#rail [data-fly]').forEach(b => b.classList.toggle('on', open && b.dataset.fly === flySec));
-  const P = { layersBtn: 'layerPanel', surveyBtn: 'surveyPanel', editBtn: 'editPanel', sectionBtn: 'sectionPanel', tacBtn: 'tacPanel', topoBtn: 'topoPanel', lcBtn: 'lcPanel', radarBtn: 'radarPanel', globeBtn: 'globePanel' };
+  const P = { layersBtn: 'layerPanel', surveyBtn: 'surveyPanel', editBtn: 'editPanel', sectionBtn: 'sectionPanel', tacBtn: 'tacPanel', topoBtn: 'topoPanel', lcBtn: 'lcPanel', radarBtn: 'radarPanel', globeBtn: 'globePanel', changeBtn: 'changePanel' };
   for (const [b, p] of Object.entries(P)) if ($(b) && $(p)) $(b).classList.toggle('act', !$(p).hidden);
 }
 setInterval(syncRail, 500);
@@ -218,7 +218,12 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=48'); world = new World($('scene')); window.__world = world; world.onGlobe = v => globeUI(v);
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=49'); world = new World($('scene')); window.__world = world; world.onGlobe = v => globeUI(v);
+    world.onRightClick = () => { // finish the current drawing
+      if (ED && ED.active && !$('editPanel').hidden && ED.verts.length) { $('edFinish').onclick(); return; }
+      if (TC && TC.active && !$('tacPanel').hidden && TC.verts.length) { if (TC.finish()) $('tacHint').textContent = t('Added'); return; }
+      if (SV && SV.active && !$('surveyPanel').hidden && SV.verts.length) { SV.finished = true; $('svHint') && ($('svHint').textContent = t('Done – click to start a new one')); }
+    };
     world.onModeChange = m => {
       $('driveBar').hidden = m !== 'drive'; $('walkBar').hidden = m !== 'walk'; $('joy').hidden = m !== 'walk'; if (SV && !$('surveyPanel').hidden) svRender();
       if (m === 'drive' || m === 'walk') { setOn('views', m); showPanel('scenePanel', false); }
@@ -227,13 +232,13 @@ $('build').onclick = async () => {
     world.onVehicle = k => { $('vehicle').value = k; };
     world.onSectionHint = t => { $('secHint').textContent = t; };
     world.onSection = async S => {
-      const { drawProfile, legendHTML } = await import('./section.js?v=48');
+      const { drawProfile, legendHTML } = await import('./section.js?v=49');
       $('sectionPanel').classList.remove('picking', 'min'); $('secMin').textContent = '▾';
       const cv = $('secCanvas'); cv.width = Math.min(1600, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio))); cv.height = Math.round(cv.width * 0.36);
       drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – ↺ for a new line, ▾ to minimise';
     };
-    const { joystick } = await import('./modes.js?v=48'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=48'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=49'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=49'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -283,14 +288,14 @@ document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.
 if (innerWidth < 640) showPanel('mapPanel', false);
 /* right-hand column: keep the layer panel under the inset map, never on top of it */
 const placeRight = () => {
-  const lp = ['surveyPanel', 'editPanel', 'tacPanel', 'topoPanel', 'lcPanel', 'radarPanel', 'globePanel', 'layerPanel'].map($).find(e => !e.hidden) || $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
+  const lp = ['surveyPanel', 'editPanel', 'tacPanel', 'topoPanel', 'lcPanel', 'radarPanel', 'globePanel', 'changePanel', 'layerPanel'].map($).find(e => !e.hidden) || $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
   document.body.classList.add('lp-open');
   if (innerWidth < 640) { lp.style.top = ''; lp.style.maxHeight = ''; return; }
   const top = hud.hidden ? 12 : hud.getBoundingClientRect().bottom + 8;
   lp.style.top = top + 'px'; lp.style.maxHeight = (innerHeight - top - 12) + 'px';
 };
 addEventListener('resize', placeRight);
-const RP = { layerPanel: 'lpClose', surveyPanel: 'svClose', editPanel: 'edClose', tacPanel: 'tacClose', topoPanel: 'topoClose', lcPanel: 'lcClose', radarPanel: 'radarClose' };
+const RP = { layerPanel: 'lpClose', surveyPanel: 'svClose', editPanel: 'edClose', tacPanel: 'tacClose', topoPanel: 'topoClose', lcPanel: 'lcClose', radarPanel: 'radarClose', changePanel: 'chClose' };
 function closeOthers(keep) { for (const [p, c] of Object.entries(RP)) if (p !== keep && $(p) && !$(p).hidden && $(c)) $(c).onclick(); }
 /* layer explorer */
 let LS = null, LAYERS_DEF = null;
@@ -330,7 +335,7 @@ $('layersBtn').onclick = async () => {
   if (world.mode !== 'orbit') world.setMode('orbit');
   if (world.groundStyle && world.groundStyle !== 'sat') { world.setGround('sat'); setOn('ground', 'sat'); } // the satellite surface stays the original image
   $('lpHint').textContent = 'Preparing layers…';
-  const mod = await import('./layers.js?v=48'); LAYERS_DEF = mod.LAYERS;
+  const mod = await import('./layers.js?v=49'); LAYERS_DEF = mod.LAYERS;
   LS = await world.openLayers(t => { $('lpHint').textContent = t; });
   LS.onT = t => { $('lpExplode').value = Math.round(t * 100); };
   LS.onFocus = () => lpRender();
@@ -435,7 +440,7 @@ const svProfile = m => {
 const svOpen = async () => {
   if (!world || !world.D) return;
   closeOthers('surveyPanel');
-  SVM = await import('./survey.js?v=48'); SV = world.openSurvey(); SV.onChange = svRender;
+  SVM = await import('./survey.js?v=49'); SV = world.openSurvey(); SV.onChange = svRender;
   SV.onArrive = () => { svSay('Arrived at the target'); if (SV.tool === 'points') $('svMark').classList.add('pulse'); setTimeout(() => $('svMark').classList.remove('pulse'), 2500); svRender(); };
   if (!$('svCode').options.length) $('svCode').innerHTML = SVM.CODES.map(c => `<option>${c}</option>`).join('');
   $('surveyPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); svRender();
@@ -518,7 +523,7 @@ $('editBtn').onclick = async () => {
   if (!world || !world.D) return;
   closeOthers('editPanel');
   if (world.mode !== 'orbit') world.setMode('orbit');
-  EDM = await import('./editor.js?v=48'); ED = world.openEditor(); ED.onChange = edRender;
+  EDM = await import('./editor.js?v=49'); ED = world.openEditor(); ED.onChange = edRender;
   ED.onHover = p => { $('edSnapKind').textContent = p && p.kind ? '→ ' + p.kind : ''; };
   if (!$('edRoad').options.length) { fillSel('#edRoad'.slice(1), EDM.ROAD_TYPES, ED.opts.road); fillSel('edRoof', EDM.ROOFS, ED.opts.roof); fillSel('edWall', EDM.WALLS, ED.opts.wall); fillSel('edRoofC', EDM.ROOF_COLS, ED.opts.roofC); fillSel('edTree', EDM.TREES, ED.opts.tree); }
   $('editPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); edRender();
@@ -559,7 +564,7 @@ const tacTab = k => { document.querySelectorAll('.tactabs button').forEach(b => 
 document.querySelectorAll('.tactabs button').forEach(b => b.onclick = () => { tacTab(b.dataset.tt); if (TC && b.dataset.tt !== 'ana' && /los|viewshed|ring|measure/.test(TC.mode)) { TC.mode = 'place'; tacRender(); } });
 $('tacBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('tacPanel'); if (world.mode !== 'orbit') world.setMode('orbit');
-  TCM = await import('./tactical.js?v=48'); TCAT = (await TCM.loadCatalog()).CAT;
+  TCM = await import('./tactical.js?v=49'); TCAT = (await TCM.loadCatalog()).CAT;
   TC = await world.openTactical(); TC.onChange = () => {}; TC.onMsg = m => $('tacHint').textContent = t(m); TC.onResult = tacResult; TC.lang = lang; TC.labels = $('tacLabels').value;
   TC.onSelect = f => { if (!f) { $('tacHint').textContent = t('Tap a symbol first'); return; } $('tacHint').textContent = t('Editing') + ': ' + nm(TCAT.catalog[f.code]); $('tacLabel').value = f.label || ''; TC.label = f.label || ''; tacDirSet(f.dir ?? null, false); };
   $('tacPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); tacRender();
@@ -622,7 +627,7 @@ $('topoBtn').onclick = async () => {
 $('topoClose').onclick = () => { $('topoPanel').hidden = true; placeRight(); };
 $('topoMin').onclick = () => { const c = $('topoPanel').classList.toggle('collapsed'); $('topoMin').textContent = c ? '▾' : '▴'; };
 $('topoMake').onclick = async () => {
-  if (!world || !world.D) return; const M = await import('./topomap.js?v=48'); $('topoMake').disabled = true;
+  if (!world || !world.D) return; const M = await import('./topomap.js?v=49'); $('topoMake').disabled = true;
   try {
     TOPO = await M.makeTopoMap(world, { paper: $('topoPaper').value, scale: $('topoScale').value, ci: $('topoCI').value, lang: $('topoLang').value, dpi: +$('topoDPI').value, title: $('topoTitle').value.trim(), titleKm: $('topoTitleKm').value.trim(),
       names: $('topoNames').checked, hill: $('topoHill').checked, image: $('topoImg').checked, mine: $('topoMine').checked, survey: $('topoSurvey').checked, tac: $('topoTac').checked, legend: $('topoLeg').value }, m => $('topoHint').textContent = t(m));
@@ -634,11 +639,11 @@ $('topoMake').onclick = async () => {
 };
 const topoName = ext => `topo-${($('topoTitle').value || 'map').replace(/[^A-Za-z0-9]+/g, '_')}-1_${TOPO.scale}.${ext}`;
 $('topoPNG').onclick = () => TOPO && TOPO.canvas.toBlob(b => download(topoName('png'), b));
-$('topoPDF').onclick = async () => { if (!TOPO) return; $('topoHint').textContent = t('Making PDF…'); const M = await import('./topomap.js?v=48'); await M.toPDF(TOPO, topoName('pdf')); $('topoHint').textContent = ''; };
+$('topoPDF').onclick = async () => { if (!TOPO) return; $('topoHint').textContent = t('Making PDF…'); const M = await import('./topomap.js?v=49'); await M.toPDF(TOPO, topoName('pdf')); $('topoHint').textContent = ''; };
 
 $('gpkgBtn').onclick = async () => {
   if (!world || !world.D) return; $('gpkgBtn').disabled = true;
-  try { const M = await import('./gpkg.js?v=48'), r = await M.exportGeoPackage(world, m => $('topoHint').textContent = t(m));
+  try { const M = await import('./gpkg.js?v=49'), r = await M.exportGeoPackage(world, m => $('topoHint').textContent = t(m));
     const nm = `cambodia3d-${($('topoTitle').value || 'area').replace(/[^A-Za-z0-9]+/g, '_')}-${new Date().toISOString().slice(0, 10)}.gpkg`; download(nm, r.blob);
     $('topoHint').textContent = `${nm} · ${(r.blob.size / 1e6).toFixed(1)} MB · ${Object.values(r.counts).filter(Boolean).length} ${t('vector layers')} + 2 ${t('rasters')}`;
   } catch (e) { console.error(e); $('topoHint').textContent = 'Error: ' + e.message; }
@@ -704,6 +709,80 @@ $('radarProxySave').onclick = () => { if (!RD) return; RD.setProxy($('radarProxy
 try { if (localStorage.getItem('cambodia3d.nocredit') === '1') document.body.classList.add('nocredit'); } catch (e) { }
 $('creditBtn').onclick = () => { const h = document.body.classList.toggle('nocredit'); try { localStorage.setItem('cambodia3d.nocredit', h ? '1' : '0'); } catch (e) { } };
 let creditHTML = '';
+/* change detection (Esri Wayback) */
+let CH = null, CHV = null, CHS = { mode: 'swipe', swipe: 0.5 };
+const chSay = m => $('chHint').textContent = t(m);
+$('changeBtn').onclick = async () => {
+  if (!world || !world.D) return; closeOthers('changePanel'); if (world.mode !== 'orbit') world.setMode('orbit'); $('changePanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
+  CH = CH || await import('./change.js?v=49');
+  if (!CHV || CHV.aoi !== world.D.aoi) { chSay('Checking image versions…'); try { const v = await CH.versions(world.D, chSay); CHV = { aoi: world.D.aoi, v };
+      $('chBefore').innerHTML = v.map((r, i) => `<option value="${r.num}" ${i === Math.min(v.length - 1, 3) ? 'selected' : ''}>${r.date}</option>`).join('') || `<option>${t('No older images here')}</option>`;
+      $('chAfter').innerHTML = `<option value="">${t('Current scene image')}</option>` + v.map(r => `<option value="${r.num}">${r.date}</option>`).join('');
+      chSay(`${v.length} ${t('image versions')}`); } catch (e) { chSay('Image archive not reachable'); } }
+};
+$('chClose').onclick = () => { $('changePanel').hidden = true; if (world && world._cmp) world.setCompare(null); placeRight(); };
+$('chMin').onclick = () => { const c = $('changePanel').classList.toggle('collapsed'); $('chMin').textContent = c ? '▾' : '▴'; };
+$('chLoad').onclick = async () => {
+  if (!CH || !world.D || !$('chBefore').value) return; $('chLoad').disabled = true;
+  try {
+    const before = await CH.mosaic(world.D, +$('chBefore').value, chSay), after = $('chAfter').value ? await CH.mosaic(world.D, +$('chAfter').value, chSay) : world.D.img;
+    chSay('Finding changes…'); await new Promise(r => setTimeout(r, 20)); const cm = CH.changeMap(before, after);
+    if (after !== world.D.img) { // show the chosen "after" date instead of the scene image
+      CHS.afterImg = after; } else CHS.afterImg = null;
+    world.setCompare({ before, diff: cm.canvas, mode: CHS.mode, swipe: CHS.swipe, after: CHS.afterImg }); CHS.res = cm;
+    const p = cm.pct, f = v => v.toFixed(v < 1 ? 2 : 1) + '%', area = world.D.W * world.D.H / 1e4;
+    $('chStats').innerHTML = `${t('Changed')}: <b>${f(p.all)}</b> ${t('of the area')} (≈ ${(p.all / 100 * area).toFixed(1)} ha) · <span style="color:#ff7a5c">${t('built / cleared')} ${f(p.built)}</span> · <span style="color:#5fe07f">${t('vegetation gain')} ${f(p.veg)}</span> · <span style="color:#6fb3ff">${t('water')} ${f(p.water)}</span> · ${t('other')} ${f(p.other)}<br>${$('chBefore').selectedOptions[0].text} → ${$('chAfter').value ? $('chAfter').selectedOptions[0].text : t('scene image')}`;
+    chSay('');
+  } catch (e) { console.error(e); chSay('Could not load the old image'); }
+  $('chLoad').disabled = false;
+};
+seg('chMode', v => { CHS.mode = v; if (world && world._cmp) world.setCompare({ mode: v }); });
+$('chSwipe').oninput = e => { CHS.swipe = e.target.value / 100; if (world && world._cmp) world.setCompare({ swipe: CHS.swipe, mode: 'swipe' }); setOn('chMode', 'swipe'); CHS.mode = 'swipe'; };
+
+/* GEOINT area brief: one printable page with everything known about the area */
+$('briefBtn').onclick = async () => {
+  if (!world || !world.D) return; const D = world.D, a = D.aoi, lat = (a.s + a.n) / 2, lon = (a.w + a.e) / 2, HM = await import('./hud.js?v=49'), TM = await import('./topomap.js?v=49'), u = HM.utm(lat, lon);
+  const win = window.open('', '_blank'); if (!win) { alert(t('Please allow pop-ups to open the brief.')); return; } win.document.write('<p style="font:14px system-ui">Preparing the brief…</p>');
+  world.renderer.render(world.scene, world.camera); const shot = world.renderer.domElement.toDataURL('image/jpeg', 0.85);
+  const img = (() => { const c = document.createElement('canvas'), k = Math.min(1, 900 / D.img.width); c.width = D.img.width * k; c.height = D.img.height * k; c.getContext('2d').drawImage(D.img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.85); })();
+  const lcC = (() => { const LCm = world.LC, c = document.createElement('canvas'); c.width = D.gw; c.height = D.gh; const g = c.getContext('2d'), im = g.createImageData(D.gw, D.gh); for (let i = 0; i < D.lc.length; i++) { const h = (LCm[D.lc[i]] || { c: '#cccccc' }).c; im.data.set([parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16), 255], i * 4); } g.putImageData(im, 0, 0); return c.toDataURL('image/png'); })();
+  let wx = null; try { wx = (await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&current=temperature_2m,relative_humidity_2m,precipitation,cloud_cover,wind_speed_10m,wind_direction_10m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia%2FBangkok&forecast_days=3`)).json()); } catch (e) { }
+  let names = []; try { names = await TM.localNames({ w: a.w - 0.05, e: a.e + 0.05, s: a.s - 0.05, n: a.n + 0.05 }); } catch (e) { }
+  const near = names.filter(p => p.tags.place).map(p => ({ n: p.tags['name:en'] || p.tags['name:km'], km: p.tags['name:km'] || '', d: Math.hypot((p.lon - lon) * 108.7, (p.lat - lat) * 110.6) })).filter(p => p.n).sort((x, y) => x.d - y.d).slice(0, 8);
+  const poi = names.filter(p => !p.tags.place).map(p => p.tags.amenity || p.tags.natural || p.tags.waterway).reduce((m, k) => (m[k] = (m[k] || 0) + 1, m), {});
+  // terrain
+  let lo = 1e9, hi = -1e9, sl = 0, ns = 0; for (let j = 0; j < 40; j++) for (let i = 0; i < 40; i++) { const x = D.X0 + (i + .5) / 40 * D.W, z = D.Z0 + (j + .5) / 40 * D.H, e = world.rawElevation(x, z); lo = Math.min(lo, e); hi = Math.max(hi, e); const s1 = Math.hypot(world.rawElevation(x + 15, z) - world.rawElevation(x - 15, z), world.rawElevation(x, z + 15) - world.rawElevation(x, z - 15)) / 30; sl += Math.atan(s1) * 180 / Math.PI; ns++; }
+  const roadLen = {}; for (const r of D.roads || []) { const k = r.cls || 'road'; let L = 0; for (let i = 1; i < r.pts.length; i++) L += Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]); roadLen[k] = (roadLen[k] || 0) + L; }
+  const lcRows = Object.entries(D.lcPct || {}).filter(([k, v]) => +k > 0 && v > 0.002).sort((x, y) => y[1] - x[1]).map(([k, v]) => `<tr><td><i style="background:${world.LC[k].c}"></i>${world.LC[k].en} <span class=km>${world.LC[k].km}</span></td><td>${(v * 100).toFixed(1)}%</td><td>${(v * D.W * D.H / 1e4).toFixed(1)} ha</td></tr>`).join('');
+  const tac = world.tactical ? world.tactical.features.filter(f => world.tactical.inAOI(f)) : [], rd = world.radar && world.radar.placed ? world.radar.list() : [], sv = world.survey ? world.survey.points || [] : [];
+  const G = world.globe, passes = G && G.passes ? G.passes.slice(0, 8) : null, ch = CHS.res;
+  const esc = x => String(x ?? '').replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const S = D.stats || {}, dirs = d => ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][Math.round(d / 45) % 8];
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>GEOINT brief ${lat.toFixed(4)}, ${lon.toFixed(4)}</title><style>
+  body{font:12px/1.45 system-ui,"Noto Sans Khmer",sans-serif;color:#1b2430;max-width:900px;margin:18px auto;padding:0 16px}h1{font-size:20px;margin:0}h2{font-size:13.5px;margin:16px 0 6px;padding-bottom:3px;border-bottom:2px solid #1f3f8f;color:#1f3f8f;text-transform:uppercase;letter-spacing:.04em}
+  .hdr{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #1b2430;padding-bottom:6px}.cls{font-weight:700;color:#b00020;font-size:11px;letter-spacing:.08em}table{border-collapse:collapse;width:100%}td,th{padding:3px 6px;border-bottom:1px solid #e3e7ec;text-align:left;vertical-align:top}th{background:#f2f5f9;font-weight:600}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.k{background:#f4f7fb;border-radius:6px;padding:6px 8px}.k b{display:block;font-size:15px}img{width:100%;border-radius:4px;border:1px solid #ccd}i{display:inline-block;width:10px;height:10px;margin-right:5px;border-radius:2px;vertical-align:-1px}.km{color:#667;font-size:11px}.foot{margin-top:18px;font-size:10px;color:#667;border-top:1px solid #ccd;padding-top:6px}@media print{.noprint{display:none}body{margin:0}}</style></head><body>
+  <div class="hdr"><div><div class="cls">UNCLASSIFIED · FOR REFERENCE · OPEN SOURCES ONLY</div><h1>GEOINT area brief</h1><div>${new Date().toLocaleString('en-GB', { timeZone: 'Asia/Phnom_Penh' })} (Cambodia time)</div></div><div style="text-align:right"><b>Geoinformatics and Research Lab, RUPP</b><br>Cambodia 3D Landscape<br><button class="noprint" onclick="print()">🖨 Print / save as PDF</button></div></div>
+  <h2>1. Location</h2><div class="g3"><div class="k">Centre<b>${lat.toFixed(5)}°N ${lon.toFixed(5)}°E</b></div><div class="k">MGRS<b>${HM.mgrs(lat, lon)}</b></div><div class="k">UTM ${u.zone}${u.hemi} (WGS 84)<b>${u.E.toFixed(0)} E ${u.N.toFixed(0)} N</b></div></div>
+  <p>Area ${(D.W / 1000).toFixed(2)} × ${(D.H / 1000).toFixed(2)} km (${(D.W * D.H / 1e6).toFixed(2)} km²) · extent ${a.w.toFixed(4)}–${a.e.toFixed(4)}°E, ${a.s.toFixed(4)}–${a.n.toFixed(4)}°N · imagery: ${esc((world.credit || '').replace(/<[^>]+>/g, ''))}</p>
+  ${near.length ? `<p><b>Nearest settlements:</b> ${near.map(p => `${esc(p.n)} <span class=km>${esc(p.km)}</span> (${p.d.toFixed(1)} km)`).join(' · ')}</p>` : ''}
+  <div class="g2"><div><img src="${shot}"><div class="km">3D view at the time of the brief</div></div><div><img src="${img}"><div class="km">Satellite image of the area (north up)</div></div></div>
+  <h2>2. Terrain</h2><div class="g3"><div class="k">Elevation<b>${lo.toFixed(0)}–${hi.toFixed(0)} m</b></div><div class="k">Relief<b>${(hi - lo).toFixed(0)} m</b></div><div class="k">Mean slope<b>${(sl / ns).toFixed(1)}°</b></div></div>
+  <h2>3. Land cover</h2><div class="g2"><table><tr><th>Class</th><th>Share</th><th>Area</th></tr>${lcRows}</table><div><img src="${lcC}" style="image-rendering:pixelated"><div class="km">Land cover (13 classes${world.trainer && world.trainer.samples.length ? ', corrected with your training samples' : ''})</div></div></div>
+  <h2>4. Infrastructure</h2><div class="g3"><div class="k">Buildings (OSM)<b>${S.buildings || 0}</b></div><div class="k">Houses seen in the image<b>${(world.housesList || []).length}</b></div><div class="k">Road segments<b>${S.roads || 0}</b></div></div>
+  <table><tr><th>Road class</th><th>Length</th></tr>${Object.entries(roadLen).sort((x, y) => y[1] - x[1]).map(([k, L]) => `<tr><td>${esc(k)}</td><td>${(L / 1000).toFixed(2)} km</td></tr>`).join('')}</table>
+  ${Object.keys(poi).length ? `<p><b>Landmarks within 5 km:</b> ${Object.entries(poi).map(([k, n]) => `${esc(k.replace('place_of_worship', 'pagoda / temple'))} ${n}`).join(' · ')}</p>` : ''}
+  ${wx && wx.current ? `<h2>5. Weather now</h2><p>${wx.current.temperature_2m}°C · humidity ${wx.current.relative_humidity_2m}% · cloud ${wx.current.cloud_cover}% · wind ${wx.current.wind_speed_10m} km/h from ${dirs(wx.current.wind_direction_10m)} · rain ${wx.current.precipitation} mm<br>Next 3 days: ${wx.daily.time.map((d, i) => `${d.slice(5)} ${wx.daily.temperature_2m_min[i]}–${wx.daily.temperature_2m_max[i]}°C, ${wx.daily.precipitation_sum[i]} mm`).join(' · ')}</p>` : ''}
+  ${ch ? `<h2>6. Change detection</h2><p>${$('chBefore').selectedOptions[0] ? $('chBefore').selectedOptions[0].text : ''} → ${$('chAfter').value ? $('chAfter').selectedOptions[0].text : 'scene image'}: changed ${ch.pct.all.toFixed(1)}% of the area — built / cleared ${ch.pct.built.toFixed(1)}%, vegetation gain ${ch.pct.veg.toFixed(1)}%, water ${ch.pct.water.toFixed(1)}%.</p>` : ''}
+  ${passes ? `<h2>7. Satellite collection</h2><table><tr><th>Satellite</th><th>Next imaging pass over the area</th></tr>${passes.map(p => `<tr><td>${esc(p.name)}</td><td>${esc(p.when)}</td></tr>`).join('')}</table>` : ''}
+  ${tac.length ? `<h2>8. Tactical overlay</h2><table><tr><th>Symbol</th><th>Side</th><th>Label</th><th>Position (MGRS)</th></tr>${tac.map(f => `<tr><td>${esc(f.code)}</td><td>${esc(f.side)}</td><td>${esc(f.label)}</td><td>${HM.mgrs(f.coords[0][1], f.coords[0][0])}</td></tr>`).join('')}</table>` : ''}
+  ${rd.length ? `<h2>9. Radar picture</h2><table><tr><th>Track</th><th>Type</th><th>FL</th><th>Speed</th><th>Range</th><th>Bearing</th></tr>${rd.slice(0, 20).map(r => `<tr><td>${esc(r.flight)}${r.src === 'sim' ? ' (sim)' : ''}</td><td>${esc(r.type)}</td><td>${Math.round(r.alt / 0.3048 / 100)}</td><td>${Math.round(r.gs / 0.514444)} kt</td><td>${(r.dist / 1000).toFixed(1)} km</td><td>${Math.round(r.brg * 180 / Math.PI)}°</td></tr>`).join('')}</table>` : ''}
+  ${sv.length ? `<h2>10. Survey points</h2><table><tr><th>ID</th><th>MGRS</th><th>Elevation</th></tr>${sv.slice(0, 30).map(p => `<tr><td>${esc(p.id)}</td><td>${p.lat != null ? HM.mgrs(p.lat, p.lon) : ''}</td><td>${p.h != null ? (+p.h).toFixed(2) + ' m' : ''}</td></tr>`).join('')}</table>` : ''}
+  <div class="foot">Sources: ${esc((world.credit || '').replace(/<[^>]+>/g, ''))} · Elevation: Mapzen / AWS Terrain Tiles · Land cover: classification of the image + Esri | Impact Observatory 10 m + OpenStreetMap · Roads, buildings, names: © OpenStreetMap contributors · Weather: Open-Meteo · Satellites: CelesTrak. Derived from open data for reference; not an official survey or assessment.</div>
+  </body></html>`;
+  win.document.open(); win.document.write(html); win.document.close();
+};
+
 /* whole Earth */
 let GL = null, globeTimer = 0;
 const globeInfo = () => { GL = GL || (world && world.globe); if (!GL) return; const i = GL.info(); $('globeInfo').innerHTML = [`UTC ${i.utc}`, GL.opt.storms && i.storms && '🌀 ' + i.storms, GL.opt.clouds && i.clouds, (GL.opt.wind || GL.opt.temp) && i.wind, GL.opt.rain && i.rain, i.sats && '🛰️ ' + i.sats, GL.opt.sats.resource && i.passes && '🛰️ ' + i.passes, GL.opt.sats['gps-ops'] && i.gps && '📍 ' + i.gps, i.hires && '🔍 ' + i.hires, GL.opt.flights && i.flights && '✈️ ' + i.flights + (GL.flightsLive ? '' : ' · 60× faster'), GL.opt.radar && i.radar && '📡 ' + i.radar, i.base].filter(Boolean).map(x => t(x)).join('<br>') + ''; };
@@ -759,7 +838,7 @@ $('secClose').onclick = () => { $('sectionPanel').hidden = true; if (world) { wo
 $('secWall').onchange = e => { if (!world) return; world.sectionWallOn = e.target.checked; if (world.sectionWall) world.sectionWall.visible = e.target.checked; };
 const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 $('secPng').onclick = () => $('secCanvas').toBlob(b => download('cross-section.png', b));
-$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=48'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
+$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=49'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
 
 /* language */
 document.querySelectorAll('.langBtn').forEach(b => b.onclick = () => setLang(lang === 'km' ? 'en' : 'km'));

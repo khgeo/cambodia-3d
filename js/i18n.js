@@ -116,6 +116,12 @@ export const KM = {
   'Space stations (ISS, Tiangong)': 'ស្ថានីយអវកាស (ISS, Tiangong)', 'Brightest satellites': 'ផ្កាយរណបភ្លឺបំផុត', 'Weather satellites': 'ផ្កាយរណបឧតុនិយម', 'Starlink (thousands)': 'Starlink (រាប់ពាន់)',
   'Temperature (live)': 'សីតុណ្ហភាព (ផ្ទាល់)', 'Rain (NASA IMERG)': 'ភ្លៀង (NASA IMERG)', 'Tropical storms: track & forecast': 'ព្យុះត្រូពិច៖ គន្លង និងការព្យាករ', 'Aircraft & routes': 'យន្តហោះ និងផ្លូវហោះហើរ', 'My radar (range, sweep, targets)': 'រ៉ាដារបស់ខ្ញុំ (ចម្ងាយ ការស្កេន គោលដៅ)',
   'Earth observation (Landsat, Sentinel …)': 'ផ្កាយរណបសង្កេតផែនដី (Landsat, Sentinel …)', 'Show / hide the data credits': 'បង្ហាញ / លាក់ប្រភពទិន្នន័យ',
+  'Finish (right-click)': 'បញ្ចប់ (ចុចស្ដាំ)', 'Right-click or Enter also finishes': 'ចុចស្ដាំ ឬ Enter ក៏បញ្ចប់បានដែរ', 'Right-click also finishes': 'ចុចស្ដាំក៏បញ្ចប់បានដែរ', 'Done – click to start a new one': 'រួចរាល់ – ចុចដើម្បីចាប់ផ្ដើមថ្មី', 'Added': 'បានបន្ថែម',
+  'Change detection: compare with older images': 'រកការប្រែប្រួល៖ ប្រៀបធៀបជាមួយរូបភាពចាស់', 'Change detection': 'រកការប្រែប្រួល', 'Before': 'មុន', 'After': 'ក្រោយ', 'Compare': 'ប្រៀបធៀប', 'Swipe': 'អូសប្រៀបធៀប', 'Changes': 'ការប្រែប្រួល', 'Current scene image': 'រូបភាពបច្ចុប្បន្ន',
+  'Swipe (west ← → east)': 'អូស (ខាងលិច ← → ខាងកើត)', 'Checking image versions…': 'កំពុងពិនិត្យកំណែរូបភាព…', 'image versions': 'កំណែរូបភាព', 'No older images here': 'គ្មានរូបភាពចាស់នៅទីនេះ', 'Image archive not reachable': 'មិនអាចភ្ជាប់បណ្ណសាររូបភាព',
+  'Finding changes…': 'កំពុងរកការប្រែប្រួល…', 'Changed': 'បានប្រែប្រួល', 'of the area': 'នៃផ្ទៃ', 'built / cleared': 'សំណង់ / ឈូសឆាយ', 'vegetation gain': 'រុក្ខជាតិកើនឡើង', 'water': 'ទឹក', 'other': 'ផ្សេងៗ', 'scene image': 'រូបភាពបច្ចុប្បន្ន', 'Could not load the old image': 'មិនអាចផ្ទុករូបភាពចាស់',
+  'GEOINT area brief (print / PDF)': 'របាយការណ៍សង្ខេបភូមិសាស្ត្រ (បោះពុម្ព / PDF)', 'Please allow pop-ups to open the brief.': 'សូមអនុញ្ញាតផ្ទាំងលោតដើម្បីបើករបាយការណ៍។',
+  'Compare the scene image with an older version of the Esri World Imagery archive (Wayback) for this same area.': 'ប្រៀបធៀបរូបភាពបច្ចុប្បន្ន ជាមួយកំណែចាស់នៃបណ្ណសាររូបភាព Esri (Wayback) សម្រាប់តំបន់ដដែល។',
   'Contours': 'ខ្សែកម្ពស់', 'Grid': 'ក្រឡាចត្រង្គ', 'Your features': 'វត្ថុរបស់អ្នក', 'Survey points & parcels': 'ចំណុចវាស់ និងក្បាលដី', 'Tactical overlay': 'ស្រទាប់យុទ្ធសាស្ត្រ',
 };
 export let lang = 'en';

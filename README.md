@@ -168,6 +168,12 @@ Place a radar station on the ground: the antenna turns, a fan-shaped beam (from 
 ## Whole Earth (🌍)
 Keep zooming out past the farthest view (or press 🌍). Zoom back in anywhere and high-resolution Esri imagery loads down to a few kilometres above the ground. and the scene becomes the globe, with your area marked as a small plate. The Earth shows the real day and night now, live clouds from the Himawari, GOES-East and GOES-West geostationary satellites (NASA GIBS, infrared, about 10–20 minutes old; Europe, Africa and the Indian Ocean are not covered by these three), live wind and temperature (Open-Meteo, animated; finer near where you look so storms show their turning), rain (NASA IMERG), tropical cyclones from GDACS with their past track, forecast track and wind areas, satellites on their real orbits from CelesTrak (Earth observation: Landsat 8/9 and Sentinel-1/2/3/5P/6 labelled with their orbit, ground track and imaging swath, and the next daylight imaging passes over your area for the next 10 days; GPS with PRN numbers and which GPS satellites your area sees now; space stations, brightest, GPS, weather, Starlink), aircraft with their routes (simulated world traffic, or live through your proxy via OpenSky) and your radar, which keeps scanning with its real range and the aircraft it detects. The ⓘ button hides the credits bar. Zoom down onto your area, or press "Back to my 3D area", to return.
 
+## Geospatial intelligence tools
+- **Zoom to the cursor** in the 3D scene and on the globe; **right-click** finishes the line or area you are drawing (digitize, tactical, survey).
+- **MGRS** grid references in the readout, and you can type an MGRS reference (e.g. `48P VU 58981 50268`) in Survey → Go to.
+- **🕘 Change detection**: compare the scene with any older version of the Esri World Imagery archive (Wayback) for the same area — swipe, before / after, or a change map (new roofs, roads or clearing; vegetation gain; water) with the changed area in % and hectares.
+- **📝 GEOINT area brief** (🗺 panel): one printable page (save as PDF) with location (lat/lon, UTM, MGRS), nearest settlements, 3D view and image, terrain, land cover, roads and buildings, weather now and for 3 days, change detection, next Landsat / Sentinel passes, tactical overlay, radar picture and survey points.
+
 ## Live weather
 In ⛅ Environment, "Live weather & time here" reads the current weather for the area from Open-Meteo (temperature, humidity, cloud, wind, rain, today's range) every 15 min and sets the scene's weather and the local time.
 

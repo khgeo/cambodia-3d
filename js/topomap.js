@@ -2,9 +2,9 @@
 // spot heights, water, roads by class, railways, buildings, place names and landmarks (OpenStreetMap), your own
 // features, survey points, parcels and the tactical overlay; UTM grid with edge labels, bilingual legend,
 // scale bar, north arrows with grid convergence, location map and credits. PNG or PDF.
-import { LC } from './landcover.js?v=48';
-import { utm } from './hud.js?v=48';
-import { utmInv } from './survey.js?v=48';
+import { LC } from './landcover.js?v=49';
+import { utm } from './hud.js?v=49';
+import { utmInv } from './survey.js?v=49';
 
 const PAPER = { A4: [210, 297], A3: [297, 420], A2: [420, 594] };
 const SCALES = [1000, 2000, 2500, 5000, 7500, 10000, 15000, 20000, 25000, 50000, 100000];
@@ -22,7 +22,7 @@ const LC_SYM = { 3: 'tree', 4: 'tree2', 5: 'shrub', 6: 'orchard', 7: 'rice', 8: 
 
 function loadImg(src) { return new Promise((res, rej) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
 // place names and landmarks: OpenStreetMap extract bundled with the site (data/places/<ix>_<iy>.json, 0.25° cells)
-async function localNames(aoi) {
+export async function localNames(aoi) {
   const PL = new Set(['city', 'town', 'village', 'hamlet', 'suburb', 'neighbourhood', 'locality', 'isolated_dwelling']), out = [];
   for (let i = Math.floor((aoi.w - 102) / 0.25); i <= Math.floor((aoi.e - 102) / 0.25); i++) for (let j = Math.floor((aoi.s - 10) / 0.25); j <= Math.floor((aoi.n - 10) / 0.25); j++) {
     try { const a = await (await fetch(`data/places/${i}_${j}.json`)).json();
@@ -213,7 +213,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
     for (const p of sv.points) { g.fillStyle = '#e04020'; g.beginPath(); g.moveTo(X(p.x), Y(p.z) - mm(0.9)); g.lineTo(X(p.x) + mm(0.8), Y(p.z) + mm(0.5)); g.lineTo(X(p.x) - mm(0.8), Y(p.z) + mm(0.5)); g.closePath(); g.fill(); g.fillStyle = '#111'; g.fillText(p.id, X(p.x) + mm(1), Y(p.z)); }
   }
   if (o.tac && world.tactical) {
-    const tc = world.tactical, { symbolURL } = await import('./tactical.js?v=48');
+    const tc = world.tactical, { symbolURL } = await import('./tactical.js?v=49');
     for (const f of tc.features.filter(f => tc.inAOI(f))) {
       const col = tc.color(f.side, f.code), P = f.coords.map(c => [F.x(c[0]), F.z(c[1])]); g.strokeStyle = g.fillStyle = col; g.lineWidth = mm(0.5);
       if (f.geom === 'point') { try { const im = await loadImg(await symbolURL(f.code, col)); const sz = mm(6); g.drawImage(im, X(P[0][0]) - sz / 2, Y(P[0][1]) - sz, sz, sz); if (f.label) { font(1.8, 700); g.textAlign = 'center'; g.fillText(f.label, X(P[0][0]), Y(P[0][1]) + mm(1.5)); } } catch (e) { } }

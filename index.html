@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=48">
+<link rel="stylesheet" href="css/app.css?v=49">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -69,6 +69,7 @@
     <button id="surveyBtn" data-tip="Survey: measure, mark &amp; go to">📐</button>
     <button id="editBtn" data-tip="Digitize: roads, buildings, trees">✏️</button>
     <button id="sectionBtn" data-tip="Cross-section: soil &amp; geology">✂️</button>
+    <button id="changeBtn" data-tip="Change detection: compare with older images">🕘</button>
     <button id="lcBtn" data-tip="Train land cover: paint what you see, the model learns">🖌️</button>
     <button id="globeBtn" data-tip="Whole Earth: where this area is, live clouds, wind, satellites, flights">🌍</button>
     <button id="radarBtn" data-tip="Radar: aircraft in the sky (simulated or live)">📡</button>
@@ -209,7 +210,7 @@
       </div>
       <div class="edopt" data-for="tree"><div class="row"><span>Kind</span><select id="edTree"></select></div></div>
       <div class="row"><label title="Snap to road centrelines and ends, building and house corners, your own features, survey points and parcels; squares corners to 90°"><input type="checkbox" id="edSnap" checked> 🧲 Snap</label><span id="edSnapKind" class="svhelp" style="margin:0"></span></div>
-      <div class="row edact"><button id="edFinish" class="primary">✓ Finish</button><button id="edUndo">↶ Undo</button><button id="edCancel">✕ Cancel</button></div>
+      <div class="row edact"><button id="edFinish" class="primary" title="Right-click or Enter also finishes">✓ Finish (right-click)</button><button id="edUndo">↶ Undo</button><button id="edCancel">✕ Cancel</button></div>
       <div class="svsec"><b>In this area</b> <span id="edCount"></span>
         <div class="row" style="margin-top:6px"><button id="edExport">⬇ GeoJSON</button><button id="edImport">⬆ Import</button><button id="edClear">🗑 Clear</button></div>
         <input type="file" id="edFile" accept=".geojson,.json" hidden>
@@ -224,7 +225,7 @@
       <div class="row"><span>Convention</span><select id="tacConv"></select></div>
       <div class="row svtabs tactabs"><button data-tt="sym" class="on">Symbols</button><button data-tt="line">Lines & areas</button><button data-tt="ana">Analysis</button></div>
       <div data-tp="sym"><div id="tacSyms" class="symgrid"></div></div>
-      <div data-tp="line" hidden><div id="tacLines" class="linelist"></div><div class="row edact"><button id="tacFinish" class="primary">✓ Finish</button><button id="tacUndo">↶ Undo</button><button id="tacCancel">✕ Cancel</button></div></div>
+      <div data-tp="line" hidden><div id="tacLines" class="linelist"></div><div class="row edact"><button id="tacFinish" class="primary" title="Right-click also finishes">✓ Finish (right-click)</button><button id="tacUndo">↶ Undo</button><button id="tacCancel">✕ Cancel</button></div></div>
       <div data-tp="ana" hidden>
         <div class="row"><button data-am="los">👁 Line of sight</button><button data-am="viewshed">◎ Viewshed</button></div>
         <div class="row"><button id="tacOE">⚔ Own ↔ enemy</button><button data-am="ring">◯ Range rings</button></div>
@@ -290,6 +291,19 @@
       <div id="globeInfo" class="svhelp"></div>
     </div>
   </div>
+  <div id="changePanel" class="rpanel" hidden>
+    <div class="row lphead"><b>🕘 Change detection</b><span id="chHint" class="hint"></span><button id="chMin" title="Hide / show">▴</button><button id="chClose" title="Close">✕</button></div>
+    <div id="chContent">
+      <div class="svhelp">Compare the scene image with an older version of the Esri World Imagery archive (Wayback) for this same area.</div>
+      <div class="row"><span>Before</span><select id="chBefore" style="flex:1"><option>Loading the image versions…</option></select></div>
+      <div class="row"><span>After</span><select id="chAfter" style="flex:1"><option value="">Current scene image</option></select></div>
+      <div class="row"><button id="chLoad" class="primary" style="margin:0">⇄ Compare</button></div>
+      <div class="row seg" id="chMode"><button data-v="swipe" class="on">Swipe</button><button data-v="before">Before</button><button data-v="after">After</button><button data-v="changes">Changes</button></div>
+      <div class="row"><span>Swipe (west ← → east)</span><input type="range" id="chSwipe" min="0" max="100" value="50" style="flex:1"></div>
+      <div id="chStats" class="svhelp"></div>
+      <div class="svhelp" style="opacity:.75">Changes: <b style="color:#ff5a3c">■</b> new roofs, roads or clearing · <b style="color:#3fdc5f">■</b> vegetation gain · <b style="color:#3f9bff">■</b> water · <b style="color:#ffd23f">■</b> other. The dates are when the image was published in the archive; the photo can be older.</div>
+    </div>
+  </div>
   <div id="radarPanel" class="rpanel" hidden>
     <div class="row lphead"><b>📡 Radar</b><span id="radarHint" class="hint"></span><button id="radarMin" title="Hide / show">▴</button><button id="radarClose" title="Close">✕</button></div>
     <div id="radarContent">
@@ -329,6 +343,7 @@
       <div class="svsec"><b>GeoPackage for QGIS</b>
         <div class="svhelp">All layers of this area (roads, water, buildings, houses, contours, spot heights, place names, land cover, image, your survey, digitized and tactical layers) with their map styles.</div>
         <div class="row"><button id="gpkgBtn" class="primary" style="margin:0">⬇ Export GeoPackage (QGIS)</button></div>
+        <div class="row"><button id="briefBtn" style="margin:0;width:100%">📝 GEOINT area brief (print / PDF)</button></div>
       </div>
     </div>
   </div>
@@ -345,6 +360,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=48"></script>
+<script type="module" src="js/app.js?v=49"></script>
 </body>
 </html>

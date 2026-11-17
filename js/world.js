@@ -5,26 +5,26 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=48';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=48';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=48';
-import { buildTrees, GrassField } from './vegetation.js?v=48';
-import { RoadNet, Driver, Walker } from './modes.js?v=48';
-import { vehicleKit } from './vehicles.js?v=48';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=48';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=48';
-import { LayerStack } from './layers.js?v=48';
-import { Survey } from './survey.js?v=48';
-import { Editor } from './editor.js?v=48';
-import { Atmos } from './atmos.js?v=48';
-import { NightLights } from './lights.js?v=48';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=48';
-import { Tactical, loadCatalog } from './tactical.js?v=48';
-import { LcTrainer } from './lctrain.js?v=48';
-import { Radar } from './radar.js?v=48';
-import { Globe } from './globe.js?v=48';
-import { SEASON } from './vegetation.js?v=48';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=48';
+import * as G from './geo.js?v=49';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=49';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=49';
+import { buildTrees, GrassField } from './vegetation.js?v=49';
+import { RoadNet, Driver, Walker } from './modes.js?v=49';
+import { vehicleKit } from './vehicles.js?v=49';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=49';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=49';
+import { LayerStack } from './layers.js?v=49';
+import { Survey } from './survey.js?v=49';
+import { Editor } from './editor.js?v=49';
+import { Atmos } from './atmos.js?v=49';
+import { NightLights } from './lights.js?v=49';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=49';
+import { Tactical, loadCatalog } from './tactical.js?v=49';
+import { LcTrainer } from './lctrain.js?v=49';
+import { Radar } from './radar.js?v=49';
+import { Globe } from './globe.js?v=49';
+import { SEASON } from './vegetation.js?v=49';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=49';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -113,7 +113,7 @@ export class World {
     const sc = this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.3, 60000);
     this.controls = new OrbitControls(this.camera, r.domElement);
-    this.controls.enableDamping = true; this.controls.maxPolarAngle = Math.PI * 0.49; this.controls.screenSpacePanning = true;
+    this.controls.enableDamping = true; this.controls.maxPolarAngle = Math.PI * 0.49; this.controls.screenSpacePanning = true; this.controls.zoomToCursor = true; // zoom towards the point under the cursor
 
     this.sky = new Sky(); this.sky.scale.setScalar(45000); sc.add(this.sky);
     const u = this.sky.material.uniforms; u.turbidity.value = 4; u.rayleigh.value = 2.2; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.8;
@@ -139,7 +139,9 @@ export class World {
 
     // taps (short press without drag) for picking roads / teleporting
     const el = r.domElement; let down = null;
-    el.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY, performance.now()]; });
+    el.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY, performance.now(), e.button]; });
+    // a right-click (without dragging) finishes the line or area being drawn
+    el.addEventListener('contextmenu', e => e.preventDefault());
     // land-cover training: paint with the left button while painting is on
     let painting = false, lastPaint = 0;
     const paintAt = e => { const r = el.getBoundingClientRect(), rc = this._rc || (this._rc = new THREE.Raycaster()); rc.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.camera);
@@ -165,7 +167,7 @@ export class World {
     });
     el.addEventListener('pointerup', e => {
       if (!down) return; const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]), dt = performance.now() - down[2]; down = null;
-      if (moved < 8 && dt < 450) this.onTap(e);
+      if (moved < 8 && dt < 450) { if (e.button === 2) { if (!(this.globe && this.globe.on)) this.onRightClick && this.onRightClick(e); } else this.onTap(e); }
     });
 
     // hover tracking (mouse/trackpad): look around without dragging
@@ -1229,6 +1231,16 @@ export class World {
     this.lcPaint = on; const mb = this.controls.mouseButtons;
     if (on) { mb.LEFT = THREE.MOUSE.ROTATE; mb.MIDDLE = THREE.MOUSE.PAN; mb.RIGHT = THREE.MOUSE.ROTATE; } else { mb.LEFT = THREE.MOUSE.ROTATE; mb.MIDDLE = THREE.MOUSE.DOLLY; mb.RIGHT = THREE.MOUSE.PAN; }
     if (this.brush) this.brush.visible = on;
+  }
+  // change detection view on the ground: 'swipe' (old image west of the line, new east), 'before', 'after', 'changes'
+  setCompare(o) {
+    const D = this.D; if (!o) { this._cmp = null; if (this.texCmp) { this.texCmp.dispose(); this.texCmp = null; } this.setGround(this.groundStyle || 'sat'); return; }
+    this._cmp = { ...(this._cmp || {}), ...o }; const c = this._cmp, W = D.img.width, H = D.img.height;
+    if (!this.texCmp) { const cv = document.createElement('canvas'); cv.width = W; cv.height = H; this.texCmp = this.mkTex(cv); }
+    const g = this.texCmp.image.getContext('2d'); g.globalAlpha = 1; const aft = c.after || D.img; g.drawImage(c.mode === 'before' ? c.before : aft, 0, 0);
+    if (c.mode === 'swipe' && c.before) { const sx = Math.round(W * c.swipe); g.drawImage(c.before, 0, 0, sx, H, 0, 0, sx, H); g.fillStyle = '#ffd23f'; g.fillRect(sx - 2, 0, 4, H); }
+    if (c.mode === 'changes' && c.diff) { g.globalAlpha = 0.85; g.imageSmoothingEnabled = true; g.drawImage(c.diff, 0, 0, W, H); g.globalAlpha = 1; }
+    this.texCmp.needsUpdate = true; this.terrainMat.map = this.texCmp; this.terrainMat.needsUpdate = true; this.uniforms.uImg.value = this.texCmp;
   }
   getTrainer() { if (!this.trainer) this.trainer = new LcTrainer(this); this.trainer.prepare(); return this.trainer; }
   refreshLC() { if (this.texStyl) { this.texStyl.dispose(); this.texStyl = null; } if (this.groundStyle === 'lulc') this.setGround('lulc'); if (this.layers && this.layers.refreshLulc) this.layers.refreshLulc(); }

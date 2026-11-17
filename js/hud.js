@@ -12,6 +12,23 @@ export function utm(lat, lon) {
   return { zone, hemi: lat >= 0 ? 'N' : 'S', E, N: Nn };
 }
 
+// MGRS (military grid reference), e.g. 48P VU 58857 50159
+const BANDS = 'CDEFGHJKLMNPQRSTUVWX', COLS = ['ABCDEFGH', 'JKLMNPQR', 'STUVWXYZ'], ROWS = 'ABCDEFGHJKLMNPQRSTUV';
+export function mgrs(lat, lon, digits = 5) {
+  if (lat < -80 || lat > 84) return ''; const u = utm(lat, lon), band = BANDS[Math.min(19, Math.floor((lat + 80) / 8))], set = ((u.zone - 1) % 3);
+  const col = COLS[set][Math.floor(u.E / 100000) - 1], row = ROWS[(Math.floor(u.N / 100000) % 20 + (u.zone % 2 === 0 ? 5 : 0)) % 20], d = 10 ** (5 - digits);
+  const e = String(Math.floor((u.E % 100000) / d)).padStart(digits, '0'), n = String(Math.floor((u.N % 100000) / d)).padStart(digits, '0');
+  return `${u.zone}${band} ${col}${row} ${e} ${n}`;
+}
+export function mgrsParse(txt) { // → { zone, north, E, N } or null
+  const m = String(txt).toUpperCase().replace(/\s+/g, '').match(/^(\d{1,2})([C-HJ-NP-X])([A-HJ-NP-Z])([A-HJ-NP-V])(\d*)$/); if (!m || m[5].length % 2) return null;
+  const zone = +m[1], band = m[2], set = (zone - 1) % 3, ci = COLS[set].indexOf(m[3]), ri0 = ROWS.indexOf(m[4]); if (ci < 0 || ri0 < 0) return null;
+  const k = m[5].length / 2, sc = 10 ** (5 - k), E = (ci + 1) * 100000 + (k ? +m[5].slice(0, k) * sc : 0) + sc / 2 * (k < 5 ? 1 : 0), ri = (ri0 - (zone % 2 === 0 ? 5 : 0) + 20) % 20;
+  const bandLat = -80 + BANDS.indexOf(band) * 8, minN = utm(bandLat, (zone - 1) * 6 - 177).N;
+  let N = ri * 100000 + (k ? +m[5].slice(k) * sc : 0) + sc / 2 * (k < 5 ? 1 : 0); while (N < minN - 150000) N += 2000000;
+  return { zone, north: bandLat >= 0, E, N };
+}
+
 export class Hud {
   constructor(root, world) {
     this.w = world; this.root = root; this.canvas = root.querySelector('canvas'); this.text = root.querySelector('.hudtext');
@@ -63,7 +80,7 @@ export class Hud {
     // readout
     const u = utm(h.lat, h.lon), dir = DIRS[Math.round(h.heading / 45) % 8], kmh = (h.speedShown || 0) * 3.6;
     this.text.innerHTML = `<b>${dir} ${h.heading.toFixed(0).padStart(3, '0')}°</b>${h.mode === 'orbit' ? '' : ` · <b>${kmh.toFixed(kmh < 10 ? 1 : 0)} km/h</b>`} · Elevation ${h.elev.toFixed(0)} m<br>` +
-      `${h.lat.toFixed(5)}°N ${h.lon.toFixed(5)}°E<br>UTM ${u.zone}${u.hemi} ${u.E.toFixed(0)} E ${u.N.toFixed(0)} N`;
+      `${h.lat.toFixed(5)}°N ${h.lon.toFixed(5)}°E<br>UTM ${u.zone}${u.hemi} ${u.E.toFixed(0)} E ${u.N.toFixed(0)} N<br>MGRS ${mgrs(h.lat, h.lon)}`;
     if (sv && g) this.text.innerHTML += `<br><b style="color:#37e07a">🎯 ${g.d >= 1000 ? (g.d / 1000).toFixed(2) + ' km' : g.d.toFixed(g.d < 10 ? 2 : 1) + ' m'} · ${DIRS[Math.round(g.brg / 45) % 8]} ${g.brg.toFixed(0).padStart(3, '0')}° · Δh ${g.dh >= 0 ? '+' : ''}${g.dh.toFixed(1)} m</b>`;
   }
 }

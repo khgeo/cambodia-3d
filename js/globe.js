@@ -25,7 +25,13 @@ export class Globe {
     this.cam = new THREE.PerspectiveCamera(40, 1, 0.001, 200);
     this.ctl = new OrbitControls(this.cam, world.renderer.domElement); this.ctl.enabled = false; this.ctl.enablePan = false; this.ctl.minDistance = 1.0003; this.ctl.maxDistance = 9; this.ctl.enableZoom = false; this.ctl.enableDamping = true; this.ctl.dampingFactor = 0.08;
     // zoom by height above the ground, so you can go from space down to a few km smoothly
-    world.renderer.domElement.addEventListener('wheel', e => { if (!this.on || this.anim) return; e.preventDefault(); const d = this.cam.position.length(), alt = Math.min(8, Math.max(0.0003, (d - 1) * Math.exp(e.deltaY * 0.0012))); this.cam.position.setLength(1 + alt); }, { passive: false });
+    world.renderer.domElement.addEventListener('wheel', e => { if (!this.on || this.anim) return; e.preventDefault();
+      const d = this.cam.position.length(), alt0 = d - 1, alt = Math.min(8, Math.max(0.0003, alt0 * Math.exp(e.deltaY * 0.0012)));
+      // keep the place under the cursor under the cursor: turn the view towards it by the same share as the height changes
+      const el = world.renderer.domElement, r = el.getBoundingClientRect(), rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.cam);
+      const hit = rc.intersectObject(this.earth, false)[0], c = this.cam.position.clone().normalize();
+      if (hit) { const p = hit.point.clone().normalize(), ang = c.angleTo(p), f = 1 - alt / alt0; if (ang > 1e-6) { const ax = new THREE.Vector3().crossVectors(c, p).normalize(); c.applyAxisAngle(ax, ang * Math.max(-1, Math.min(1, f))); } }
+      this.cam.position.copy(c.multiplyScalar(1 + alt)); this.cam.up.set(0, 1, 0); this.cam.lookAt(0, 0, 0); }, { passive: false });
     this.tiles = new Map();
     // stars
     { const N = 4000, p = new Float32Array(N * 3); for (let i = 0; i < N; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(50); p.set([v.x, v.y, v.z], i * 3); }
