@@ -54,7 +54,7 @@ export class LcTrainer {
     const per = {}; for (let t = 0; t < 40000; t++) { const q = (Math.random() * n) | 0, c = D.lcBase[q]; if (!c || c === 13 || (per[c] || 0) > 250 || this.painted[q] !== 255) continue; per[c] = (per[c] || 0) + 1; add(c, this.F.subarray(q * NF, q * NF + NF), 1); }
     const model = {};
     for (const [c, s] of Object.entries(stats)) { if (s.w < 5) continue; const mu = [], va = []; for (let k = 0; k < NF; k++) { const m = s.m[k] / s.w; mu.push(m); va.push(Math.max(1e-4, s.q[k] / s.w - m * m)); } model[c] = { mu, va, lp: Math.log(s.w), ln: va.reduce((a, v) => a + Math.log(v), 0) }; }
-    this.model = model; return { classes: Object.keys(model).length, userSamples: user.length };
+    this.taught = new Set(user.map(s => s.c)); this.model = model; return { classes: Object.keys(model).length, userSamples: user.length };
   }
   classify() {
     const D = this.w.D, M = this.model; if (!M) return 0; const keys = Object.keys(M).map(Number), n = D.lcBase.length, F = this.F, lp = new Float64Array(keys.length);
@@ -65,7 +65,7 @@ export class LcTrainer {
       const o = q * NF; let best = -1, bv = -Infinity;
       for (let a = 0; a < keys.length; a++) { const m = M[keys[a]]; let s = m.lp - 0.5 * m.ln; for (let k = 0; k < NF; k++) { const d = F[o + k] - m.mu[k]; s -= d * d / (2 * m.va[k]); } lp[a] = s; if (s > bv) { bv = s; best = a; } }
       let z = 0; for (let a = 0; a < keys.length; a++) z += Math.exp(lp[a] - bv); const post = 1 / z, c = keys[best];
-      const v = post >= this.tau || !base ? c : base; if (v !== D.lc[q]) changed++; D.lc[q] = v;
+      const v = !base || (post >= this.tau && this.taught.has(c)) ? c : base; // only classes you taught can take cells over if (v !== D.lc[q]) changed++; D.lc[q] = v;
     }
     this.updateStats(); return changed;
   }
