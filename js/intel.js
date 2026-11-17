@@ -122,21 +122,25 @@ async function firesNear(lat, lon, km, dist) {
 }
 
 /* ================= count objects: click one example, find all similar ones in the image ================= */
-export function findSimilar(canvas, px, py, tol = 28, minF = 0.4, maxF = 2.5, given = null) {
-  const W = canvas.width, H = canvas.height, g = canvas.getContext('2d', { willReadFrequently: true }), d = g.getImageData(0, 0, W, H).data;
-  const at = (x, y) => { const q = (y * W + x) * 4; return [d[q], d[q + 1], d[q + 2]]; }, lab = ([r, g2, b]) => [0.299 * r + 0.587 * g2 + 0.114 * b, r - g2, (r + g2) / 2 - b];
-  // example colour = mean of a 3×3 window; example blob by flood fill
-  let ref = [0, 0, 0]; if (given) ref = given.ref; else for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const c = lab(at(Math.min(W - 1, Math.max(0, px + i)), Math.min(H - 1, Math.max(0, py + j)))); ref = ref.map((v, k) => v + c[k] / 9); }
-  const close = (x, y) => { const c = lab(at(x, y)); return Math.hypot((c[0] - ref[0]) * 0.8, c[1] - ref[1], c[2] - ref[2]) < tol; };
-  const mask = new Uint8Array(W * H); for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (close(x, y)) mask[y * W + x] = 1;
-  const lbl = new Int32Array(W * H), blobs = []; let id = 0; const st = [];
-  for (let s = 0; s < W * H; s++) { if (!mask[s] || lbl[s]) continue; id++; let n = 0, sx = 0, sy = 0, x0 = W, x1 = 0, y0 = H, y1 = 0; st.push(s); lbl[s] = id;
-    while (st.length) { const q = st.pop(), x = q % W, y = (q / W) | 0; n++; sx += x; sy += y; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y);
-      for (const nq of [q - 1, q + 1, q - W, q + W]) if (nq >= 0 && nq < W * H && mask[nq] && !lbl[nq] && Math.abs((nq % W) - x) <= 1) { lbl[nq] = id; st.push(nq); } }
-    blobs[id] = { n, cx: sx / n, cy: sy / n, fill: n / ((x1 - x0 + 1) * (y1 - y0 + 1)), w: x1 - x0 + 1, h: y1 - y0 + 1 }; }
-  const ex = given ? given.ex : blobs[lbl[py * W + px]]; if (!ex) return { count: 0, items: [], example: null };
-  const items = blobs.filter(b => b && b.n >= ex.n * minF && b.n <= ex.n * maxF && b.fill > Math.min(0.35, ex.fill * 0.6) && Math.max(b.w, b.h) / Math.max(1, Math.min(b.w, b.h)) < Math.max(4, (Math.max(ex.w, ex.h) / Math.max(1, Math.min(ex.w, ex.h))) * 1.8));
-  return { count: items.length, items, example: ex, ref };
+export function findSimilar(canvas0, px0, py0, tol = 28, minF = 0.4, maxF = 2.5, given = null) {
+  // work on at most ~2,000 px across (fast enough in the browser), report positions in the original pixels
+  const k = Math.min(1, 2048 / Math.max(canvas0.width, canvas0.height)), W = Math.round(canvas0.width * k), H = Math.round(canvas0.height * k);
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d', { willReadFrequently: true }); g.drawImage(canvas0, 0, 0, W, H); const d = g.getImageData(0, 0, W, H).data, N = W * H;
+  const px = Math.min(W - 1, Math.max(0, Math.round(px0 * k))), py = Math.min(H - 1, Math.max(0, Math.round(py0 * k)));
+  const L0 = new Float32Array(N), A0 = new Float32Array(N), B0 = new Float32Array(N); for (let i = 0, q = 0; i < N; i++, q += 4) { const r = d[q], gg = d[q + 1], b = d[q + 2]; L0[i] = 0.299 * r + 0.587 * gg + 0.114 * b; A0[i] = r - gg; B0[i] = (r + gg) / 2 - b; }
+  let ref = [0, 0, 0]; if (given) ref = given.ref; else { let n = 0; for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) { const x = Math.min(W - 1, Math.max(0, px + i)), y = Math.min(H - 1, Math.max(0, py + j)), q = y * W + x; ref[0] += L0[q]; ref[1] += A0[q]; ref[2] += B0[q]; n++; } ref = ref.map(v => v / n); }
+  const mask = new Uint8Array(N), t2 = tol * tol; for (let i = 0; i < N; i++) { const a = (L0[i] - ref[0]) * 0.8, b = A0[i] - ref[1], c = B0[i] - ref[2]; if (a * a + b * b + c * c < t2) mask[i] = 1; }
+  const lbl = new Int32Array(N), blobs = [null]; let id = 0; const st = new Int32Array(N); let sp = 0;
+  for (let s0 = 0; s0 < N; s0++) { if (!mask[s0] || lbl[s0]) continue; id++; let n = 0, sx = 0, sy = 0, x0 = W, x1 = 0, y0 = H, y1 = 0; st[sp++] = s0; lbl[s0] = id;
+    while (sp) { const q = st[--sp], x = q % W, y = (q / W) | 0; n++; sx += x; sy += y; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      if (x > 0 && mask[q - 1] && !lbl[q - 1]) { lbl[q - 1] = id; st[sp++] = q - 1; } if (x < W - 1 && mask[q + 1] && !lbl[q + 1]) { lbl[q + 1] = id; st[sp++] = q + 1; }
+      if (y > 0 && mask[q - W] && !lbl[q - W]) { lbl[q - W] = id; st[sp++] = q - W; } if (y < H - 1 && mask[q + W] && !lbl[q + W]) { lbl[q + W] = id; st[sp++] = q + W; } }
+    blobs.push({ n, cx: sx / n / k, cy: sy / n / k, fill: n / ((x1 - x0 + 1) * (y1 - y0 + 1)), w: x1 - x0 + 1, h: y1 - y0 + 1 }); }
+  const ex = given ? given.ex : blobs[lbl[py * W + px]]; if (!ex || ex.n < 2) return { count: 0, items: [], example: null };
+  if (!given && ex.n > N * 0.05) return { count: 0, items: [], example: null, tooBig: true }; // tapped on a large surface (field, water), not an object
+  const exAR = Math.max(ex.w, ex.h) / Math.max(1, Math.min(ex.w, ex.h)), items = [];
+  for (let i = 1; i < blobs.length; i++) { const b = blobs[i]; if (b.n < ex.n * minF || b.n > ex.n * maxF || b.fill < Math.min(0.35, ex.fill * 0.6)) continue; if (Math.max(b.w, b.h) / Math.max(1, Math.min(b.w, b.h)) > Math.max(4, exAR * 1.8)) continue; items.push(b); }
+  return { count: items.length, items, example: { ...ex, n: ex.n / (k * k) }, ref, exK: ex };
 }
 
 /* ================= share link: area, view, notes, tactical symbols and your drawings in the URL ================= */

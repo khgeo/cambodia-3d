@@ -138,6 +138,7 @@ export const KM = {
   'Counting…': 'កំពុងរាប់…', 'Nothing found there – tap the middle of an object': 'រកមិនឃើញ – ចុចចំកណ្ដាលវត្ថុ', 'Found': 'រកឃើញ', 'similar objects': 'វត្ថុស្រដៀងគ្នា', 'across': 'ទទឹង', 'in the older image': 'ក្នុងរូបភាពចាស់',
   'Make & copy the link': 'បង្កើត និងចម្លងតំណ', 'Link copied': 'បានចម្លងតំណ', 'Copy the link below': 'ចម្លងតំណខាងក្រោម', 'The link is very long – some apps may cut it': 'តំណវែងណាស់ – កម្មវិធីខ្លះអាចកាត់វា', 'Shared work loaded: notes, symbols and drawings.': 'បានផ្ទុកការងារដែលបានចែករំលែក៖ កំណត់ចំណាំ សញ្ញា និងគំនូរ។',
   'Time-lapse of all dates': 'ចលនាតាមពេលវេលានៃគ្រប់កាលបរិច្ឆេទ', 'Stop': 'ឈប់', 'Loading': 'កំពុងផ្ទុក',
+  'That is a large surface – tap a single object': 'នោះជាផ្ទៃធំ – ចុចលើវត្ថុតែមួយ',
   'Contours': 'ខ្សែកម្ពស់', 'Grid': 'ក្រឡាចត្រង្គ', 'Your features': 'វត្ថុរបស់អ្នក', 'Survey points & parcels': 'ចំណុចវាស់ និងក្បាលដី', 'Tactical overlay': 'ស្រទាប់យុទ្ធសាស្ត្រ',
 };
 export let lang = 'en';
