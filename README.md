@@ -119,7 +119,7 @@ Builds an A4, A3 or A2 sheet (landscape or portrait) at an automatic or chosen s
 
 Download as PNG (150–300 dpi) or PDF.
 
-Legend styles (after TopoStyler): **Illustrated** (roads converging on a village with callout lines, hand-drawn land-cover parcels), **Map sheet** (description ..... symbol, dot leaders) or **Simple list**.
+The legend sits in columns under the map in the style of the national topographic sheets (description ........ symbol, ក) / ខ) pairs, national-road shields), with the scale, a declination diagram (grid, true and magnetic north at the sheet centre, WMM-2025 model, annual change), the location map and credits. Contour numbers are set in gaps cut into the lines (a mask), not on white boxes.
 
 ## Tactical (🎯)
 Adapted from the author's **Terrain Ops** and **TacMap KH** QGIS plugins (`tac/` holds the symbol SVGs, the catalogue and `mobility.json`).

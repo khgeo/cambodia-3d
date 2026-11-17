@@ -2,9 +2,9 @@
 // spot heights, water, roads by class, railways, buildings, place names and landmarks (OpenStreetMap), your own
 // features, survey points, parcels and the tactical overlay; UTM grid with edge labels, bilingual legend,
 // scale bar, north arrows with grid convergence, location map and credits. PNG or PDF.
-import { LC } from './landcover.js?v=54';
-import { utm } from './hud.js?v=54';
-import { utmInv } from './survey.js?v=54';
+import { LC } from './landcover.js?v=55';
+import { utm } from './hud.js?v=55';
+import { utmInv } from './survey.js?v=55';
 
 const PAPER = { A4: [210, 297], A3: [297, 420], A2: [420, 594] };
 const SCALES = [1000, 2000, 2500, 5000, 7500, 10000, 15000, 20000, 25000, 50000, 100000];
@@ -86,12 +86,12 @@ export async function makeTopoMap(world, o, say = () => {}) {
   await document.fonts.load(`16px "Noto Sans Khmer"`).catch(() => { });
   // --- sheet geometry (mm) ---
   const [pw, ph] = PAPER[o.paper.slice(0, 2)], land = o.paper.endsWith('L'), W = land ? ph : pw, H = land ? pw : ph, k = o.dpi / 25.4;
-  const M = 10, head = 16, side = land ? Math.max(78, W * 0.24) : 0, foot = land ? 0 : Math.max(82, H * 0.25);
-  const fw = W - 2 * M - side - (land ? 12 : 0), fh = H - 2 * M - head - foot - (land ? 0 : 6);
+  const M = 10, head = 16, side = 0, foot = land ? Math.max(66, H * 0.3) : Math.max(86, H * 0.31); // legend in columns under the map
+  const fw = W - 2 * M - 12, fh = H - 2 * M - head - foot - 8;
   let S = o.scale === 'auto' ? SCALES.find(s => D.W * 1000 / s <= fw && D.H * 1000 / s <= fh) || 100000 : +o.scale;
   const mw = D.W * 1000 / S, mhh = D.H * 1000 / S, FW = Math.min(fw, mw), FH = Math.min(fh, mhh);
   // centre map + margin as one block
-  const fx = land ? M + 3 + (W - 2 * M - 3 - (FW + 9 + side)) / 2 : M + (W - 2 * M - FW) / 2, fy = land ? M + head + (fh - FH) / 2 : M + head + (fh - FH) / 2;
+  const fx = M + (W - 2 * M - FW) / 2, fy = M + head + (fh - FH) / 2;
   const cv = document.createElement('canvas'); cv.width = Math.round(W * k); cv.height = Math.round(H * k); const g = cv.getContext('2d');
   const s = 1000 / S * k, cxm = D.X0 + D.W / 2 - FW / 2 * S / 1000, czm = D.Z0 + D.H / 2 - FH / 2 * S / 1000; // map shows the AOI centre
   const X = x => (fx + (x - cxm) * 1000 / S) * k, Y = z => (fy + (z - czm) * 1000 / S) * k, mm = v => v * k;
@@ -134,7 +134,22 @@ export async function makeTopoMap(world, o, say = () => {}) {
       const nl = Math.hypot(dzdx, dzdy, 1), sh = (-dzdx * -0.5 + -dzdy * -0.5 + 0.7) / nl / 0.97, v = Math.max(0, Math.min(1, sh)); const dark = 1 - v; im.data.set([40, 40, 60, Math.round(Math.max(0, dark - 0.25) * 170)], q * 4); }
     hg.putImageData(im, 0, 0); g.imageSmoothingEnabled = true; g.drawImage(hc, X(D.X0), Y(D.Z0), (nx - 1) * gs * s, (nz - 1) * gs * s);
   }
+  // contour numbers: place them first, then cut (mask) the contour lines under each number – no white box
+  font(1.9, 500); const cLabels = [];
+  for (const c of contours.filter(c => c.idx && c.len * 1000 / S > 25)) {
+    const every = 90 * S / 1000; let acc = every * 0.4;
+    for (let q = 1; q < c.line.length; q++) {
+      const a = c.line[q - 1], b = c.line[q], d = Math.hypot(b[0] - a[0], b[1] - a[1]); acc += d; if (acc < every) continue; acc = 0;
+      let ang = Math.atan2(Y(b[1]) - Y(a[1]), X(b[0]) - X(a[0])); if (ang > Math.PI / 2) ang -= Math.PI; if (ang < -Math.PI / 2) ang += Math.PI;
+      const txt = N(Math.round(c.L * 10) / 10), tw = g.measureText(txt).width + mm(0.9), x = X(b[0]), y = Y(b[1]);
+      if (cLabels.some(l => Math.hypot(l.x - x, l.y - y) < tw * 1.2)) continue; cLabels.push({ x, y, ang, txt, tw, th: mm(2.3) });
+    }
+  }
+  g.save(); g.beginPath(); g.rect(0, 0, cv.width, cv.height);
+  for (const l of cLabels) { const c = Math.cos(l.ang), sn = Math.sin(l.ang), hw = l.tw / 2, hh = l.th / 2; const P = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([u, v]) => [l.x + u * c - v * sn, l.y + u * sn + v * c]); g.moveTo(...P[0]); for (const q of [3, 2, 1]) g.lineTo(...P[q]); g.closePath(); }
+  g.clip('evenodd');
   for (const c of contours) { g.strokeStyle = '#a8662e'; g.lineWidth = mm(c.idx ? 0.32 : 0.14); g.beginPath(); c.line.forEach((p, q) => q ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1]))); g.stroke(); }
+  g.restore();
   // water
   say('Water, roads and buildings…');
   const path = (pts, close) => { g.beginPath(); pts.forEach((p, q) => { const x = p.x ?? p[0], z = p.z ?? p[1]; q ? g.lineTo(X(x), Y(z)) : g.moveTo(X(x), Y(z)); }); if (close) g.closePath(); };
@@ -158,18 +173,9 @@ export async function makeTopoMap(world, o, say = () => {}) {
   g.fillStyle = '#7a2a8a'; for (const f of ed.filter(f => f.type === 'building')) { path(f.coords.map(cc => [F.x(cc[0]), F.z(cc[1])]), true); g.fill(); }
   g.fillStyle = '#a9cdea'; for (const f of ed.filter(f => f.type === 'pond')) { path(f.coords.map(cc => [F.x(cc[0]), F.z(cc[1])]), true); g.fill(); g.strokeStyle = '#3f7fbf'; g.stroke(); }
   for (const f of ed.filter(f => f.type === 'tree')) { const x = X(F.x(f.coords[0][0])), y = Y(F.z(f.coords[0][1])); g.fillStyle = '#2f6b2a'; g.beginPath(); g.arc(x, y, mm(0.6), 0, 7); g.fill(); }
-  // contour labels (index contours), knocking out the line under the number
-  font(1.9, 500);
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  for (const c of contours.filter(c => c.idx && c.len * 1000 / S > 25)) {
-    const every = 90 * S / 1000; let acc = every * 0.4;
-    for (let q = 1; q < c.line.length; q++) {
-      const a = c.line[q - 1], b = c.line[q], d = Math.hypot(b[0] - a[0], b[1] - a[1]); acc += d; if (acc < every) continue; acc = 0;
-      let ang = Math.atan2(Y(b[1]) - Y(a[1]), X(b[0]) - X(a[0])); if (ang > Math.PI / 2) ang -= Math.PI; if (ang < -Math.PI / 2) ang += Math.PI;
-      const txt = N(Math.round(c.L * 10) / 10), tw = g.measureText(txt).width + mm(0.8);
-      g.save(); g.translate(X(b[0]), Y(b[1])); g.rotate(ang); g.fillStyle = '#fff'; g.fillRect(-tw / 2, -mm(1.1), tw, mm(2.2)); g.fillStyle = '#8a4a1e'; g.fillText(txt, 0, mm(0.1)); g.restore();
-    }
-  }
+  // contour numbers (in the gaps cut into the lines above)
+  font(1.9, 500); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#8a4a1e';
+  for (const l of cLabels) { g.save(); g.translate(l.x, l.y); g.rotate(l.ang); g.fillText(l.txt, 0, mm(0.1)); g.restore(); }
   // spot heights: highest point + local summits
   {
     font(1.9, 600); g.textAlign = 'left';
@@ -213,7 +219,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
     for (const p of sv.points) { g.fillStyle = '#e04020'; g.beginPath(); g.moveTo(X(p.x), Y(p.z) - mm(0.9)); g.lineTo(X(p.x) + mm(0.8), Y(p.z) + mm(0.5)); g.lineTo(X(p.x) - mm(0.8), Y(p.z) + mm(0.5)); g.closePath(); g.fill(); g.fillStyle = '#111'; g.fillText(p.id, X(p.x) + mm(1), Y(p.z)); }
   }
   if (o.tac && world.tactical) {
-    const tc = world.tactical, { symbolURL } = await import('./tactical.js?v=54');
+    const tc = world.tactical, { symbolURL } = await import('./tactical.js?v=55');
     for (const f of tc.features.filter(f => tc.inAOI(f))) {
       const col = tc.color(f.side, f.code), P = f.coords.map(c => [F.x(c[0]), F.z(c[1])]); g.strokeStyle = g.fillStyle = col; g.lineWidth = mm(0.5);
       if (f.geom === 'point') { try { const im = await loadImg(await symbolURL(f.code, col)); const sz = mm(6); g.drawImage(im, X(P[0][0]) - sz / 2, Y(P[0][1]) - sz, sz, sz); if (f.label) { font(1.8, 700); g.textAlign = 'center'; g.fillText(f.label, X(P[0][0]), Y(P[0][1]) + mm(1.5)); } } catch (e) { } }
@@ -250,71 +256,106 @@ export async function makeTopoMap(world, o, say = () => {}) {
   g.fillText(lang === 'en' ? `${titleEn.toUpperCase()}` : lang === 'km' ? titleKm : `${titleKm}${titleEn && titleKm !== titleEn ? ' - ' + titleEn.toUpperCase() : ''}`, mm(fx + FW / 2), mm(M + 5));
   font(2.3); g.fillStyle = '#333'; g.textAlign = 'left'; g.fillText(T(`Scale 1:${S.toLocaleString('en')}`, `មាត្រដ្ឋាន ១:${KD(S)}`), mm(fx), mm(M + 5));
   g.textAlign = 'right'; g.fillText(T(`Topographic map · UTM ${zone}N`, `ផែនទីសណ្ឋានដី · UTM ${KD(zone)}N`), mm(fx + FW), mm(M + 5));
-  // ===== margin: legend, scale, north, location, credits =====
-  const lx = land ? fx + FW + 9 : M, ly = land ? M + head : fy + FH + 9, lw = land ? side : W - 2 * M;
-  const cols = land ? 2 : 4, colW = lw / cols, legBottom = land ? H - M - 96 : H - M - 2; let col = 0, cy = ly, colTop = () => ly + 5;
-  const LS = o.legend || 'illus', caps = v => lang === 'km' ? v : v.toUpperCase();
-  // three legend styles (after TopoStyler): illustrated, sheet with dot leaders, simple list
-  const heading = (txt) => { if (cy + 9 > legBottom) { col++; cy = colTop(); } const x0 = lx + col * colW; g.textAlign = 'left'; g.textBaseline = 'middle';
-    if (LS === 'simple') { font(2.4, 700); g.fillStyle = '#1f3f8f'; g.fillText(txt, mm(x0), mm(cy + 1.5)); cy += 5; return; }
-    font(2.1, 700); g.fillStyle = '#222'; g.fillText(caps(txt), mm(x0), mm(cy + 1.4)); g.strokeStyle = '#222'; g.lineWidth = mm(LS === 'sheet' ? 0.25 : 0.12); g.beginPath(); g.moveTo(mm(x0), mm(cy + 3.3)); g.lineTo(mm(x0 + colW - 3), mm(cy + 3.3)); g.stroke(); cy += 5.6; };
-  const item = (draw, txt) => { const two = lang === 'both' && txt.includes(' · '), hgt = two ? 5.4 : 4.1; if (cy + hgt > legBottom) { col++; cy = colTop(); } const x0 = lx + col * colW; g.textAlign = 'left'; g.textBaseline = 'middle';
-    if (LS === 'sheet') { // "Description ........ [symbol]"
-      const sx = x0 + colW - 12, a = two ? txt.slice(0, txt.indexOf(' · ')) : txt, b = two ? txt.slice(txt.indexOf(' · ') + 3) : '';
-      draw(mm(sx), mm(cy), mm(8), mm(3)); font(1.8); g.fillStyle = '#222'; g.fillText(a, mm(x0), mm(cy + (two ? 0.6 : 1.5))); const tw = g.measureText(a).width;
-      g.fillStyle = '#777'; const dot = mm(0.9); for (let x = mm(x0) + tw + mm(1); x < mm(sx - 1); x += dot) g.fillRect(x, mm(cy + (two ? 0.6 : 1.5)) + mm(0.4), mm(0.18), mm(0.18));
-      if (b) { font(1.5); g.fillStyle = '#555'; g.fillText(b, mm(x0), mm(cy + 2.9)); } cy += hgt; return; }
-    draw(mm(x0), mm(cy), mm(8), mm(3)); g.fillStyle = '#222';
-    if (two) { const i = txt.indexOf(' · '); font(1.8); g.fillText(txt.slice(0, i), mm(x0 + 9.5), mm(cy + 0.6)); font(1.5); g.fillStyle = '#555'; g.fillText(txt.slice(i + 3), mm(x0 + 9.5), mm(cy + 2.9)); } else { font(1.8); g.fillText(txt, mm(x0 + 9.5), mm(cy + 1.5)); } cy += hgt; };
-  // hand-drawn parcel for land cover (wobbly rounded shape)
-  const wobbly = (x, y, w, h, seed) => { const P = []; const n = 10; for (let k = 0; k < n; k++) { const a = k / n * Math.PI * 2, j = 1 + 0.12 * Math.sin(seed * 7.3 + k * 2.1); P.push([x + w / 2 + Math.cos(a) * w / 2 * j * 0.98, y + h / 2 + Math.sin(a) * h / 2 * j * 0.95]); }
-    g.beginPath(); for (let k = 0; k <= n; k++) { const p0 = P[k % n], p1 = P[(k + 1) % n], m = [(p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2]; if (!k) g.moveTo(m[0], m[1]); else g.quadraticCurveTo(p0[0], p0[1], m[0], m[1]); } g.closePath(); };
-  if (LS !== 'simple') { font(3.4, 700); g.fillStyle = '#111'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(lang === 'km' ? 'សញ្ញាផែនទី' : lang === 'both' ? 'LEGEND · សញ្ញាផែនទី' : 'LEGEND', mm(lx), mm(cy + 2)); cy += 7; }
-  heading(T(LS === 'simple' ? 'Legend' : 'Roads and settlements', LS === 'simple' ? 'សញ្ញាផែនទី' : 'ផ្លូវ និងទីលំនៅ'));
+  // ===== legend in columns under the map (sheet style: description ..... symbol, ក)/ខ) pairs), then scale, declination, location, credits =====
+  const LG = o.legend || 'sheet', LX = M, LY = fy + FH + 9, LW = W - 2 * M, LB = H - M, RW = Math.max(62, LW * (land ? 0.27 : 0.33)), CA = LW - RW - 6;
+  const NC = land ? 3 : 2, CW = CA / NC; let col = 0, cy = LY + 6;
+  font(2.6, 700); g.fillStyle = '#111'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(lang === 'km' ? 'សញ្ញាផែនទី' : lang === 'both' ? 'សញ្ញាផែនទី · LEGEND' : 'LEGEND', mm(LX), mm(LY + 1.5));
+  g.strokeStyle = '#111'; g.lineWidth = mm(0.3); g.beginPath(); g.moveTo(mm(LX), mm(LY + 3.6)); g.lineTo(mm(LX + LW), mm(LY + 3.6)); g.stroke();
+  const AB = lang === 'en' ? ['a)', 'b)'] : ['ក)', 'ខ)'];
+  const L1 = (en, kmT) => lang === 'en' ? en : kmT, L2 = (en) => lang === 'both' ? en : '';
+  const next = h => { if (cy + h > LB - 1) { col++; cy = LY + 6; } return LX + col * CW; };
+  const sec = (en, kmT) => { const x0 = next(9); font(2, 700); g.fillStyle = '#1f3f8f'; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillText(lang === 'both' ? `${kmT} · ${en}` : L1(en, kmT), mm(x0), mm(cy + 1.6)); cy += 4.6; };
+  const SYW = 11, SYH = 3;
+  // one line: label ..... symbol (symbol box at the right of the column)
+  const row = (draw, en, kmT, h0) => { const sub = L2(en), hgt = h0 || (sub ? 5.4 : 4); const x0 = next(hgt), sx = x0 + CW - SYW - 3;
+    font(1.85); g.fillStyle = '#222'; g.textAlign = 'left'; g.textBaseline = 'middle'; const t1 = L1(en, kmT), ty = cy + (sub ? 1 : 1.6); g.fillText(t1, mm(x0 + 1.5), mm(ty)); const tw = g.measureText(t1).width;
+    g.fillStyle = '#888'; for (let x = mm(x0 + 1.5) + tw + mm(1); x < mm(sx - 1); x += mm(0.85)) g.fillRect(x, mm(ty) + mm(0.45), mm(0.17), mm(0.17));
+    if (sub) { font(1.45); g.fillStyle = '#666'; g.fillText(sub, mm(x0 + 1.5), mm(cy + 3.4)); }
+    g.save(); draw(mm(sx), mm(ty - SYH / 2), mm(SYW), mm(SYH)); g.restore(); cy += hgt; };
+  // pair: ក) A  ខ) B ..... ក.[A] ខ.[B]
+  const pair = (dA, dB, enA, kmA, enB, kmB) => { const sub = lang === 'both' ? `${AB[0] === 'ក)' ? 'a)' : 'a)'} ${enA}  b) ${enB}` : '', hgt = sub ? 5.4 : 4, x0 = next(hgt), sw = SYW * 0.62, sx2 = x0 + CW - sw - 3, sx1 = sx2 - sw - 4.5;
+    font(1.85); g.fillStyle = '#222'; g.textAlign = 'left'; g.textBaseline = 'middle'; const t1 = `${AB[0]} ${L1(enA, kmA)}   ${AB[1]} ${L1(enB, kmB)}`, ty = cy + (sub ? 1 : 1.6); g.fillText(t1, mm(x0 + 1.5), mm(ty)); const tw = g.measureText(t1).width;
+    g.fillStyle = '#888'; for (let x = mm(x0 + 1.5) + tw + mm(1); x < mm(sx1 - 3.2); x += mm(0.85)) g.fillRect(x, mm(ty) + mm(0.45), mm(0.17), mm(0.17));
+    font(1.5); g.fillStyle = '#333'; g.fillText(AB[0].replace(')', '.'), mm(sx1 - 2.6), mm(ty)); g.fillText(AB[1].replace(')', '.'), mm(sx2 - 2.6), mm(ty));
+    if (sub) { font(1.45); g.fillStyle = '#666'; g.fillText(sub, mm(x0 + 1.5), mm(cy + 3.4)); }
+    g.save(); dA(mm(sx1), mm(ty - SYH / 2), mm(sw), mm(SYH)); g.restore(); g.save(); dB(mm(sx2), mm(ty - SYH / 2), mm(sw), mm(SYH)); g.restore(); cy += hgt; };
+  const gap = () => { cy += 1.4; };
+  // symbol painters
+  const roadSym = (st, shield) => (x, y, w, h) => { const ym = y + h / 2; g.setLineDash([]); g.lineCap = 'butt'; if (st.o) { g.strokeStyle = st.o; g.lineWidth = mm(st.w + 0.3); g.beginPath(); g.moveTo(x, ym); g.lineTo(x + w, ym); g.stroke(); }
+    g.setLineDash(st.d ? st.d.map(mm) : []); g.strokeStyle = st.f; g.lineWidth = mm(st.w); g.beginPath(); g.moveTo(x, ym); g.lineTo(x + w, ym); g.stroke(); g.setLineDash([]);
+    if (shield) { const r = mm(1.45); g.fillStyle = '#fff'; g.strokeStyle = '#111'; g.lineWidth = mm(0.15); g.beginPath(); g.arc(x + w / 2, ym, r, 0, 7); g.fill(); g.stroke(); font(shield.length > 1 ? 1.35 : 1.6, 700); g.fillStyle = '#111'; g.textAlign = 'center'; g.fillText(N(shield), x + w / 2, ym + mm(0.05)); } };
+  const swatch = (c, kind) => (x, y, w, h) => { g.fillStyle = LC[c].topo; g.fillRect(x, y, w, h); if (kind) { g.fillStyle = g.createPattern(patCache[kind] || (patCache[kind] = pat(kind)), 'repeat'); g.fillRect(x, y, w, h); } g.strokeStyle = '#555'; g.lineWidth = mm(0.1); g.strokeRect(x, y, w, h); };
+  const has = c => D.lcPct && D.lcPct[c] > 0.002;
+  // --- roads and transport
+  sec('Roads and transport', 'បណ្ដាញផ្លូវ');
   const usedR = new Map(); for (const r of D.roads || []) { const st = RS(r.cls); usedR.set(st.k, st); }
-  const roadLine = (st, path) => { g.setLineDash([]); g.lineCap = 'round'; if (st.o) { g.strokeStyle = st.o; g.lineWidth = mm(st.w + 0.3); path(); g.stroke(); } g.setLineDash(st.d ? st.d.map(mm) : []); g.strokeStyle = st.f; g.lineWidth = mm(st.w); path(); g.stroke(); g.setLineDash([]); g.lineCap = 'butt'; };
-  if (LS === 'illus' && usedR.size) { // roads converging on a village, labelled with hairline callouts
-    const R = [...usedR.values()].slice(0, 7), sw = land ? lw - 3 : colW * 2 - 4, sh = 4 + R.length * 4.6, x0 = lx, y0 = cy, vx = x0 + sw * 0.86, vy = y0 + sh / 2;
-    g.fillStyle = '#f4f1e8'; wobbly(mm(x0 + sw * 0.5), mm(y0 + 0.5), mm(sw * 0.5), mm(sh - 1), 3); g.fill();
-    R.forEach((st, k) => { const yy = y0 + 3 + k * 4.6, sx = x0 + sw * 0.5, mxp = x0 + sw * 0.7;
-      roadLine(st, () => { g.beginPath(); g.moveTo(mm(sx), mm(yy)); g.bezierCurveTo(mm(mxp), mm(yy), mm(vx - 6), mm(vy + (yy - vy) * 0.3), mm(vx), mm(vy)); });
-      const two = lang === 'both', en = st.k, kmn = st.km; g.textAlign = 'left'; g.textBaseline = 'middle'; g.fillStyle = '#222'; font(1.7); const lab = lang === 'km' ? kmn : en; g.fillText(lab, mm(x0), mm(yy - (two ? 0.8 : 0))); let tw = g.measureText(lab).width;
-      if (two) { font(1.4); g.fillStyle = '#555'; g.fillText(kmn, mm(x0), mm(yy + 1.3)); tw = Math.max(tw, g.measureText(kmn).width); }
-      g.strokeStyle = '#555'; g.lineWidth = mm(0.08); g.beginPath(); g.moveTo(mm(x0) + tw + mm(0.8), mm(yy)); g.lineTo(mm(sx - 0.6), mm(yy)); g.stroke(); g.fillStyle = '#555'; g.beginPath(); g.arc(mm(sx - 0.6), mm(yy), mm(0.25), 0, 7); g.fill(); });
-    g.fillStyle = '#3a3a3a'; for (const [dx, dy, bw_, bh] of [[-2.4, -2, 1.4, 1.1], [-0.6, -2.6, 1.2, 1.2], [1, -1.4, 1.5, 1.1], [-1.8, 0.4, 1.2, 1.3], [0.2, 0.6, 1.4, 1], [1.8, 0.9, 1.1, 1.2], [-0.5, 2.2, 1.3, 1]]) g.fillRect(mm(vx + dx), mm(vy + dy), mm(bw_), mm(bh));
-    font(1.6, 700); g.fillStyle = '#111'; g.textAlign = 'center'; g.fillText(T('Village', 'ភូមិ'), mm(vx), mm(vy + 4.6));
-    cy = y0 + sh + 2; if (!land) { const sb = cy; colTop = () => (col < 2 ? sb : ly + 5); }
-  } else for (const st of usedR.values()) item((x, y, w, h) => { g.setLineDash([]); if (st.o) { g.strokeStyle = st.o; g.lineWidth = mm(st.w + 0.3); g.beginPath(); g.moveTo(x, y + h / 2); g.lineTo(x + w, y + h / 2); g.stroke(); } g.setLineDash(st.d ? st.d.map(mm) : []); g.strokeStyle = st.f; g.lineWidth = mm(st.w); g.beginPath(); g.moveTo(x, y + h / 2); g.lineTo(x + w, y + h / 2); g.stroke(); g.setLineDash([]); }, T(st.k, st.km));
-  if (LS !== 'simple') { cy += 1.5; heading(T('Water, buildings and relief', 'ទឹក អគារ និងទម្រង់ដី')); }
-  if ((D.rails || []).length) item((x, y, w, h) => { g.strokeStyle = '#222'; g.lineWidth = mm(0.5); g.beginPath(); g.moveTo(x, y + h / 2); g.lineTo(x + w, y + h / 2); g.stroke(); g.strokeStyle = '#fff'; g.lineWidth = mm(0.3); g.setLineDash([mm(1.2), mm(1.2)]); g.stroke(); g.setLineDash([]); }, T('Railway', 'ផ្លូវដែក'));
-  item((x, y, w, h) => { g.strokeStyle = '#3f7fbf'; g.lineWidth = mm(0.4); g.beginPath(); g.moveTo(x, y + h * 0.7); g.bezierCurveTo(x + w * 0.3, y, x + w * 0.6, y + h, x + w, y + h * 0.3); g.stroke(); }, T('River / stream / canal', 'ទន្លេ / អូរ / ប្រឡាយ'));
-  item((x, y, w, h) => { g.fillStyle = '#a9cdea'; g.strokeStyle = '#3f7fbf'; g.lineWidth = mm(0.15); g.fillRect(x, y, w, h); g.strokeRect(x, y, w, h); }, T('Lake / pond / reservoir', 'បឹង / ស្រះ / អាងទឹក'));
-  if ((D.buildings || []).length) item((x, y, w, h) => { g.fillStyle = '#3a3a3a'; g.fillRect(x + w * 0.1, y + h * 0.2, w * 0.25, h * 0.6); g.fillRect(x + w * 0.5, y + h * 0.1, w * 0.3, h * 0.7); }, T('Building (OpenStreetMap)', 'អគារ (OpenStreetMap)'));
-  if ((world.housesList || []).length) item((x, y, w, h) => { g.fillStyle = '#5a5a5a'; for (const a of [0.1, 0.45, 0.75]) g.fillRect(x + w * a, y + h * 0.3, w * 0.18, h * 0.45); }, T('House (from the image)', 'ផ្ទះ (ពីរូបភាព)'));
-  item((x, y, w, h) => { g.strokeStyle = '#a8662e'; g.lineWidth = mm(0.14); g.beginPath(); g.moveTo(x, y + h * 0.3); g.lineTo(x + w, y + h * 0.3); g.stroke(); g.lineWidth = mm(0.32); g.beginPath(); g.moveTo(x, y + h * 0.75); g.lineTo(x + w, y + h * 0.75); g.stroke(); }, T(`Contour ${CI} m, index ${CI * IDX} m`, `ខ្សែកម្ពស់ ${KD(CI)} ម, ខ្សែមេ ${KD(CI * IDX)} ម`));
-  item((x, y, w, h) => { g.fillStyle = '#222'; g.beginPath(); g.arc(x + w * 0.3, y + h / 2, mm(0.45), 0, 7); g.fill(); font(1.8, 600); g.fillText(N(124), x + w * 0.42, y + h / 2); }, T('Spot height (m)', 'ចំណុចកម្ពស់ (ម)'));
-  if (o.names) { if (LS !== 'simple') { cy += 1.5; heading(T('Places and landmarks', 'ទីកន្លែង និងទីសម្គាល់')); } item((x, y, w, h) => { g.fillStyle = '#b0302a'; g.beginPath(); g.moveTo(x + w / 2, y); g.lineTo(x + w / 2 + mm(1.1), y + h * 0.8); g.lineTo(x + w / 2 - mm(1.1), y + h * 0.8); g.closePath(); g.fill(); }, T('Pagoda / temple', 'វត្ត / ទីសក្ការៈ'));
-    item((x, y, w, h) => { g.fillStyle = '#111'; g.fillRect(x + w / 2 - mm(0.12), y, mm(0.24), h); g.fillStyle = '#2f5fbf'; g.fillRect(x + w / 2, y, mm(1.1), mm(0.7)); }, T('School', 'សាលារៀន'));
-    item((x, y, w, h) => { g.fillStyle = '#d02020'; g.fillRect(x + w / 2 - mm(0.9), y + h / 2 - mm(0.3), mm(1.8), mm(0.6)); g.fillRect(x + w / 2 - mm(0.3), y + h / 2 - mm(0.9), mm(0.6), mm(1.8)); }, T('Hospital / health centre', 'មន្ទីរពេទ្យ / មណ្ឌលសុខភាព')); }
-  cy += 2; heading(T('Land cover', 'គម្របដី'));
-  const present = Object.keys(D.lcPct || {}).map(Number).filter(v => v > 0 && v !== 13 && D.lcPct[v] > 0.002).sort((a, b) => a - b);
-  for (const c of present) item(LS === 'illus' ? (x, y, w, h) => { g.save(); wobbly(x, y - mm(0.3), w, h + mm(0.6), c); g.clip(); g.fillStyle = LC[c].topo; g.fillRect(x - 2, y - 4, w + 4, h + 8); if (LC_SYM[c]) { g.fillStyle = g.createPattern(patCache[LC_SYM[c]] || (patCache[LC_SYM[c]] = pat(LC_SYM[c])), 'repeat'); g.fillRect(x - 2, y - 4, w + 4, h + 8); } g.restore(); g.strokeStyle = '#777'; g.lineWidth = mm(0.1); wobbly(x, y - mm(0.3), w, h + mm(0.6), c); g.stroke(); } : (x, y, w, h) => { g.fillStyle = LC[c].topo; g.fillRect(x, y, w, h); if (LC_SYM[c]) { g.fillStyle = g.createPattern(patCache[LC_SYM[c]] || (patCache[LC_SYM[c]] = pat(LC_SYM[c])), 'repeat'); g.fillRect(x, y, w, h); } g.strokeStyle = '#999'; g.lineWidth = mm(0.1); g.strokeRect(x, y, w, h); }, T(LC[c].en, LC[c].km));
-  // scale bar, north arrows, location map, credits in the lower part of the margin
-  const bx = land ? lx : lx + 3 * colW + 2, byTop = land ? H - M - 92 : ly - 2; let by = byTop; const bw = land ? lw : colW - 2;
-  font(2.6, 700); g.fillStyle = '#111'; g.textAlign = 'center'; g.fillText(T(`Scale 1:${S.toLocaleString('en')}`, `មាត្រដ្ឋាន ១:${KD(S)}`), mm(bx + bw / 2), mm(by + 2)); by += 5;
-  { const unit = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000].reverse().find(u => u * 1000 / S * 4 <= bw - 8) || 10, seg = unit * 1000 / S, x0 = bx + (bw - seg * 4) / 2;
-    for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#fff' : '#111'; g.fillRect(mm(x0 + i * seg), mm(by), mm(seg), mm(1.2)); } g.strokeStyle = '#111'; g.lineWidth = mm(0.15); g.strokeRect(mm(x0), mm(by), mm(seg * 4), mm(1.2));
-    font(1.6); g.fillStyle = '#111'; for (let i = 0; i <= 4; i++) { const v = unit * i; g.fillText(N(v >= 1000 ? v / 1000 : v) + (i === 4 ? (unit * 4 >= 1000 ? (lang === 'km' ? ' គ.ម' : ' km') : (lang === 'km' ? ' ម' : ' m')) : ''), mm(x0 + i * seg), mm(by + 3)); }
-    by += 6.5; font(1.7); g.fillText(T(`Contour interval ${CI} m`, `ចន្លោះខ្សែកម្ពស់ ${KD(CI)} ម`), mm(bx + bw / 2), mm(by)); by += 5; }
-  // north arrows with grid convergence
+  const RLAB = { 'Motorway / trunk': ['National road (1 digit)', 'ផ្លូវជាតិ (១ខ្ទង់)', '5'], 'Primary road': ['National road (2 digits)', 'ផ្លូវជាតិ (២ខ្ទង់)', '53'], 'Secondary road': ['Provincial road', 'ផ្លូវខេត្ត'], 'Tertiary road': ['District road', 'ផ្លូវស្រុក'], 'Local road / street': ['Local road / street', 'ផ្លូវភូមិ / ផ្លូវតូច'], 'Track (laterite / dirt)': ['Track (laterite / dirt)', 'ផ្លូវលំ ផ្លូវក្រាលក្រួសក្រហម'], 'Path / footpath': ['Footpath', 'ផ្លូវដើរ'] };
+  for (const st of [...usedR.values()]) { const l = RLAB[st.k] || [st.k, st.km]; row(roadSym(st, l[2]), l[0], l[1]); }
+  if ((D.rails || []).length) row((x, y, w, h) => { const ym = y + h / 2; g.strokeStyle = '#222'; g.lineWidth = mm(0.3); g.beginPath(); g.moveTo(x, ym); g.lineTo(x + w, ym); g.stroke(); for (let t = x; t <= x + w; t += mm(1.2)) { g.beginPath(); g.moveTo(t, ym - mm(0.6)); g.lineTo(t, ym + mm(0.6)); g.stroke(); } }, 'Railway', 'ផ្លូវដែក');
+  if ((D.roads || []).some(r => r.flags & 2)) row((x, y, w, h) => { const ym = y + h / 2; g.strokeStyle = '#111'; g.lineWidth = mm(0.18); for (const d of [-0.9, 0.9]) { g.beginPath(); g.moveTo(x + w * 0.15, ym + mm(d) + (d < 0 ? -mm(0.5) : mm(0.5))); g.lineTo(x + w * 0.25, ym + mm(d)); g.lineTo(x + w * 0.75, ym + mm(d)); g.lineTo(x + w * 0.85, ym + mm(d) + (d < 0 ? -mm(0.5) : mm(0.5))); g.stroke(); } }, 'Bridge', 'ស្ពាន');
+  gap();
+  // --- settlements and landmarks
+  sec('Settlements and landmarks', 'ទីលំនៅ និងទីសម្គាល់');
+  pair((x, y, w, h) => { g.fillStyle = '#3a3a3a'; for (const [a, b] of [[0.1, 0.2], [0.35, 0.5], [0.6, 0.15], [0.8, 0.55], [0.2, 0.65]]) g.fillRect(x + w * a, y + h * b, mm(0.7), mm(0.6)); },
+    (x, y, w, h) => { g.fillStyle = '#5a5a5a'; g.fillRect(x + w * 0.2, y + h * 0.2, w * 0.25, h * 0.55); g.fillRect(x + w * 0.55, y + h * 0.3, w * 0.25, h * 0.45); }, 'Village', 'ភូមិ', 'Houses (from the image)', 'ផ្ទះ (ពីរូបភាព)');
+  if ((D.buildings || []).length) row((x, y, w, h) => { g.fillStyle = '#9a9a9a'; g.strokeStyle = '#333'; g.lineWidth = mm(0.15); g.fillRect(x + w * 0.3, y + h * 0.1, w * 0.4, h * 0.8); g.strokeRect(x + w * 0.3, y + h * 0.1, w * 0.4, h * 0.8); }, 'Large building (OpenStreetMap)', 'អគារធំ (OpenStreetMap)');
+  if (o.names) {
+    pair((x, y, w, h) => { const px = x + w / 2, py = y + h / 2; g.fillStyle = '#111'; g.fillRect(px - mm(0.12), py - mm(1.4), mm(0.24), mm(1.9)); g.fillStyle = '#2f5fbf'; g.fillRect(px, py - mm(1.4), mm(1.1), mm(0.7)); },
+      (x, y, w, h) => { const px = x + w / 2, py = y + h / 2; g.fillStyle = '#b0302a'; g.beginPath(); g.moveTo(px, py - mm(1.4)); g.lineTo(px + mm(1.1), py + mm(0.8)); g.lineTo(px - mm(1.1), py + mm(0.8)); g.closePath(); g.fill(); }, 'School', 'សាលារៀន', 'Pagoda / temple', 'វត្ត');
+    pair((x, y, w, h) => { const px = x + w / 2, py = y + h / 2; g.fillStyle = '#d02020'; g.fillRect(px - mm(0.9), py - mm(0.3), mm(1.8), mm(0.6)); g.fillRect(px - mm(0.3), py - mm(0.9), mm(0.6), mm(1.8)); },
+      (x, y, w, h) => { const px = x + w / 2, py = y + h / 2; g.strokeStyle = '#111'; g.lineWidth = mm(0.25); g.beginPath(); g.arc(px, py, mm(0.8), 0, 7); g.stroke(); g.fillStyle = '#111'; g.beginPath(); g.arc(px, py, mm(0.3), 0, 7); g.fill(); }, 'Health centre', 'មណ្ឌលសុខភាព', 'Office / police', 'ការិយាល័យ / ប៉ុស្ដិ៍');
+  }
+  row((x, y, w, h) => { g.fillStyle = '#222'; g.beginPath(); g.arc(x + w * 0.25, y + h / 2, mm(0.4), 0, 7); g.fill(); font(1.7, 600); g.textAlign = 'left'; g.fillText(N(124), x + w * 0.35, y + h / 2); }, 'Spot height (m)', 'កម្ពស់គិតជាម៉ែត្រ');
+  row((x, y, w, h) => { g.strokeStyle = '#a8662e'; for (const [f, lw] of [[0.15, 0.14], [0.5, 0.32], [0.85, 0.14]]) { g.lineWidth = mm(lw); g.beginPath(); g.moveTo(x, y + h * f + mm(0.4)); g.bezierCurveTo(x + w * 0.4, y + h * f - mm(0.8), x + w * 0.6, y + h * f + mm(0.8), x + w, y + h * f - mm(0.2)); g.stroke(); } font(1.2); g.fillStyle = '#8a4a1e'; g.textAlign = 'right'; g.fillText(N(CI * IDX), x + w, y + h * 0.5 - mm(0.6)); }, `Contours, interval ${CI} m (index ${CI * IDX} m)`, `ខ្សែកម្ពស់ ចន្លោះ ${KD(CI)} ម (ខ្សែមេ ${KD(CI * IDX)} ម)`, lang === 'both' ? 5.4 : 4.4);
+  gap();
+  // --- water
+  sec('Water', 'ធនធានទឹក');
+  pair((x, y, w, h) => { g.fillStyle = '#a9cdea'; g.strokeStyle = '#3f7fbf'; g.lineWidth = mm(0.15); g.beginPath(); g.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, 7); g.fill(); g.stroke(); },
+    (x, y, w, h) => { g.strokeStyle = '#3f7fbf'; g.lineWidth = mm(0.4); g.beginPath(); g.moveTo(x, y + h * 0.7); g.bezierCurveTo(x + w * 0.3, y, x + w * 0.6, y + h, x + w, y + h * 0.3); g.stroke(); }, 'Lake / pond', 'បឹង / ស្រះ', 'River / stream', 'ទន្លេ / អូរ');
+  if ((D.waterways || []).some(w => w.t >= 3)) row((x, y, w, h) => { g.strokeStyle = '#3f7fbf'; g.lineWidth = mm(0.25); g.beginPath(); g.moveTo(x, y + h / 2); g.lineTo(x + w, y + h / 2); g.stroke(); }, 'Canal / ditch', 'ប្រឡាយ');
+  gap();
+  // --- vegetation and land cover (ក/ខ pairs as on the national sheets)
+  sec('Vegetation and land cover', 'រុក្ខជាតិ និងគម្របដី');
+  const PAIRS = [[3, 4], [7, 8], [5, 9], [6, 2], [11, 10]], shown = new Set();
+  for (const [a, b] of PAIRS) { const ha = has(a), hb = has(b); if (ha && hb) { pair(swatch(a, LC_SYM[a]), swatch(b, LC_SYM[b]), LC[a].en, LC[a].km, LC[b].en, LC[b].km); shown.add(a); shown.add(b); } }
+  for (let c = 1; c <= 12; c++) if (has(c) && !shown.has(c) && c !== 1) row(swatch(c, LC_SYM[c]), LC[c].en, LC[c].km);
+
+  // ----- right block: scale, contour interval, declination diagram, location map, credits
+  const bx = LX + LW - RW, bw = RW; let by = LY + 6;
+  g.strokeStyle = '#999'; g.lineWidth = mm(0.15); g.beginPath(); g.moveTo(mm(bx - 3), mm(LY + 5)); g.lineTo(mm(bx - 3), mm(LB)); g.stroke();
+  font(2.5, 700); g.fillStyle = '#111'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(T(`Scale 1:${S.toLocaleString('en')}`, `មាត្រដ្ឋាន ១:${KD(S)}`), mm(bx + bw / 2), mm(by + 1.5)); by += 4.5;
+  { const unit = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000].reverse().find(u => u * 1000 / S * 4 <= bw - 10) || 10, seg = unit * 1000 / S, x0 = bx + (bw - seg * 4) / 2;
+    for (let i = 0; i < 4; i++) { g.fillStyle = i % 2 ? '#fff' : '#111'; g.fillRect(mm(x0 + i * seg), mm(by), mm(seg), mm(1.1)); } g.strokeStyle = '#111'; g.lineWidth = mm(0.15); g.strokeRect(mm(x0), mm(by), mm(seg * 4), mm(1.1));
+    font(1.5); g.fillStyle = '#111'; for (let i = 0; i <= 4; i++) { const v = unit * i; g.fillText(N(v >= 1000 ? v / 1000 : v) + (i === 4 ? (unit * 4 >= 1000 ? (lang === 'km' ? ' គ.ម' : ' km') : (lang === 'km' ? ' ម' : ' m')) : ''), mm(x0 + i * seg), mm(by + 2.8)); }
+    by += 5.6; font(1.6); g.fillText(T(`Contour interval ${CI} m`, `ចន្លោះខ្សែកម្ពស់ ${KD(CI)} ម`), mm(bx + bw / 2), mm(by)); by += 3.5; }
+  // declination diagram: grid north (vertical), true north (★) and magnetic north (half arrow), angles at the sheet centre (WMM-2025)
+  const by0 = by, DH = Math.min(36, (LB - by) * 0.55), dW = bw * 0.5;
   { const lat0 = (aoi.s + aoi.n) / 2, lon0 = (aoi.w + aoi.e) / 2, cm = (zone - 1) * 6 - 180 + 3, gam = Math.atan(Math.tan((lon0 - cm) * Math.PI / 180) * Math.sin(lat0 * Math.PI / 180)) * 180 / Math.PI;
-    const nx0 = bx + 10, ny0 = by + 16, Lr = 13; g.strokeStyle = '#111'; g.fillStyle = '#111'; g.lineWidth = mm(0.25);
-    g.beginPath(); g.moveTo(mm(nx0), mm(ny0)); g.lineTo(mm(nx0), mm(ny0 - Lr)); g.stroke(); g.beginPath(); g.moveTo(mm(nx0), mm(ny0 - Lr - 1.6)); g.lineTo(mm(nx0 + 0.9), mm(ny0 - Lr)); g.lineTo(mm(nx0 - 0.9), mm(ny0 - Lr)); g.fill();
-    const gr = -gam * Math.PI / 180, gx = nx0 + Math.sin(gr) * Lr * 0.85, gy = ny0 - Math.cos(gr) * Lr * 0.85; g.strokeStyle = '#1f3f8f'; g.beginPath(); g.moveTo(mm(nx0), mm(ny0)); g.lineTo(mm(gx), mm(gy)); g.stroke();
-    font(1.6, 600); g.textAlign = 'left'; g.fillStyle = '#111'; g.fillText(T('True north', 'ទិសខាងជើងពិត'), mm(nx0 + 1.5), mm(ny0 - Lr - 0.5)); g.fillStyle = '#1f3f8f'; g.fillText(T('Grid north', 'ទិសខាងជើងក្រឡា'), mm(gx + 1.5), mm(gy + 2));
-    font(1.6); g.fillStyle = '#333'; g.fillText(T(`Grid convergence ${gam >= 0 ? '' : '−'}${Math.abs(gam).toFixed(2)}°`, `មុំបង្រួមក្រឡា ${KD(Math.abs(gam).toFixed(2))}°`), mm(nx0 + 1.5), mm(ny0 + 2.5)); }
+    let dec = null, ann = 0; try { const MD = await import('./magdec.js?v=55'), r = MD.declination(lat0, lon0, new Date()); dec = r.decl; ann = r.annual; } catch (e) { }
+    const tA = -gam, mA = dec == null ? null : -gam + dec; // angles clockwise from grid north (deg)
+    // drawn angles are exaggerated (min 6°) so the lines can be told apart; the numbers are the true values
+    const ex = v => Math.sign(v || 1) * Math.max(6, Math.abs(v)), dT = ex(tA), dM = mA == null ? null : dT + ex(mA - tA);
+    const ox = bx + dW / 2, oy = by + DH - 6, Lr = DH - 12, P = a => [ox + Math.sin(a * Math.PI / 180) * Lr, oy - Math.cos(a * Math.PI / 180) * Lr];
+    const dm = v => { const a = Math.abs(v), d = Math.floor(a), m = (a - d) * 60; return `${N(d)}°${N(m.toFixed(m < 10 ? 1 : 0))}'`; };
+    g.strokeStyle = '#111'; g.fillStyle = '#111'; g.lineWidth = mm(0.2);
+    g.beginPath(); g.moveTo(mm(ox), mm(oy)); g.lineTo(mm(ox), mm(oy - Lr - 2)); g.stroke(); font(1.5, 600); g.textAlign = 'center'; g.fillText(T('Grid north', 'ខ្សែក្រឡាចត្រង្គ'), mm(ox), mm(oy - Lr - 3.6));
+    const [tx, ty] = P(dT); g.beginPath(); g.moveTo(mm(ox), mm(oy)); g.lineTo(mm(tx), mm(ty)); g.stroke();
+    { const sx = mm(tx), sy = mm(ty) - mm(0.8), R1 = mm(1.1), R2 = mm(0.45); g.beginPath(); for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? R2 : R1; k ? g.lineTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r) : g.moveTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r); } g.closePath(); g.fill(); }
+    font(1.45, 600); g.textAlign = dT < 0 ? 'right' : 'left'; g.fillText(T('True north', 'ខាងជើងពិត'), mm(tx + (dT < 0 ? -1.6 : 1.6)), mm(ty - 0.8));
+    const arc = (a0, a1, r, txt) => { const s0 = (-90 + Math.min(a0, a1)) * Math.PI / 180, s1 = (-90 + Math.max(a0, a1)) * Math.PI / 180; g.beginPath(); g.arc(mm(ox), mm(oy), mm(r), s0, s1); g.stroke(); const am = (a0 + a1) / 2, [qx, qy] = [ox + Math.sin(am * Math.PI / 180) * r, oy - Math.cos(am * Math.PI / 180) * r];
+      const side = am < 0 ? -1 : 1; g.beginPath(); g.moveTo(mm(qx), mm(qy)); g.lineTo(mm(qx + side * 4), mm(qy)); g.stroke(); font(1.45); g.textAlign = side < 0 ? 'right' : 'left'; g.fillText(txt, mm(qx + side * 4.4), mm(qy)); };
+    g.lineWidth = mm(0.12); arc(0, dT, Lr * 0.45, dm(tA));
+    if (mA != null) { const [mx, my] = P(dM); g.lineWidth = mm(0.2); g.beginPath(); g.moveTo(mm(ox), mm(oy)); g.lineTo(mm(mx), mm(my)); g.stroke(); const ang = dM * Math.PI / 180, ux = Math.sin(ang), uy = -Math.cos(ang);
+      g.beginPath(); g.moveTo(mm(mx), mm(my)); g.lineTo(mm(mx - ux * 3 - uy * 0.9), mm(my - uy * 3 + ux * 0.9)); g.lineTo(mm(mx - ux * 2.2), mm(my - uy * 2.2)); g.closePath(); g.fill();
+      font(1.45, 600); g.textAlign = dM < 0 ? 'right' : 'left'; g.fillText(T('Magnetic north', 'ទិសម៉ាញេទិច'), mm(mx + (dM < 0 ? -1.2 : 1.2)), mm(my - 1)); g.lineWidth = mm(0.12); arc(0, dM, Lr * 0.68, dm(mA)); }
+    const KM_MON = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'], dt = new Date(), mon = dt.toLocaleString('en', { month: 'long' });
+    font(1.35); g.fillStyle = '#222'; g.textAlign = 'center'; let ly2 = oy + 2.4;
+    const cap = mA == null ? [T('At the centre of the sheet', 'នៅចំកណ្ដាលសន្លឹក')] : [T('At the centre of the sheet', 'នៅចំកណ្ដាលសន្លឹក'), T(`Magnetic declination ${dm(dec)} ${dec < 0 ? 'W' : 'E'}, ${mon} ${dt.getFullYear()}`, `កម្រិតផ្លៀងម៉ាញេទិច ${dm(dec)} ${dec < 0 ? 'ខាងលិច' : 'ខាងកើត'} ខែ${KM_MON[dt.getMonth()]} ឆ្នាំ${KD(dt.getFullYear())}`),
+      T(`Annual change ${N((Math.abs(ann) * 60).toFixed(1))}' ${ann < 0 ? 'west' : 'east'} · model WMM 2025`, `ការប្រែប្រួលប្រចាំឆ្នាំ ${KD((Math.abs(ann) * 60).toFixed(1))}' ${ann < 0 ? 'ទៅខាងលិច' : 'ទៅខាងកើត'} · ម៉ូដែល WMM ២០២៥`), T('Angles not to scale', 'មុំមិនតាមមាត្រដ្ឋាន')];
+    for (const c of cap) { const words = c.split(' '); let cur = ''; for (const w_ of words) { const tst = cur ? cur + ' ' + w_ : w_; if (g.measureText(tst).width > mm(dW + 4) && cur) { g.fillText(cur, mm(ox), mm(ly2)); ly2 += 1.9; cur = w_; } else cur = tst; } if (cur) { g.fillText(cur, mm(ox), mm(ly2)); ly2 += 1.9; } }
+    by = Math.max(ly2, by + DH) + 1; }
   // location map
-  { const zx = 6, tiles = [[50, 29], [51, 29], [50, 30], [51, 30]], lmW = land ? 34 : 34, lmH = 30, lmx = bx + bw - lmW, lmy = by + (land ? 1 : 24);
+  { const zx = 6, tiles = [[50, 29], [51, 29], [50, 30], [51, 30]], lmW = Math.min(34, bw * 0.44), lmH = lmW * 0.88, lmx = bx + bw - lmW, lmy = by0 + 3;
     try { const T0 = await Promise.all(tiles.map(([x, y]) => loadImg(`https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/${zx}/${y}/${x}`)));
       const lon2x = lon => (lon + 180) / 360 * 64 * 256, lat2y = lat => (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * 64 * 256;
       const vx0 = lon2x(102.2), vx1 = lon2x(107.7), vy0 = lat2y(14.75), vy1 = lat2y(10.3), sc = Math.min(mm(lmW) / (vx1 - vx0), mm(lmH) / (vy1 - vy0));
@@ -322,7 +363,7 @@ export async function makeTopoMap(world, o, say = () => {}) {
       tiles.forEach(([x, y], i) => g.drawImage(T0[i], mm(lmx) + (x * 256 - vx0) * sc, mm(lmy) + (y * 256 - vy0) * sc, 256 * sc, 256 * sc));
       g.strokeStyle = '#e01010'; g.lineWidth = mm(0.5); const ax = mm(lmx) + (lon2x((aoi.w + aoi.e) / 2) - vx0) * sc, ay = mm(lmy) + (lat2y((aoi.s + aoi.n) / 2) - vy0) * sc; g.strokeRect(ax - mm(1.2), ay - mm(1.2), mm(2.4), mm(2.4)); g.restore();
       g.strokeStyle = '#111'; g.lineWidth = mm(0.15); g.strokeRect(mm(lmx), mm(lmy), mm(lmW), mm(lmH)); font(1.5); g.fillStyle = '#333'; g.textAlign = 'center'; g.fillText(T('Location', 'ទីតាំង'), mm(lmx + lmW / 2), mm(lmy + lmH + 2)); } catch (e) { }
-    by += land ? 36 : 58; }
+  }
   // credits
   { const lines = [
       T('Projection: Universal Transverse Mercator, zone ' + zone + 'N · Datum: WGS 84 (EPSG:326' + zone + ')', 'ប្រព័ន្ធចំណោល៖ UTM តំបន់ ' + KD(zone) + 'N · មូលដ្ឋាន៖ WGS 84'),
@@ -334,9 +375,9 @@ export async function makeTopoMap(world, o, say = () => {}) {
       T('Produced by Geoinformatics and Research Lab, RUPP · Cambodia 3D Landscape · ' + new Date().toISOString().slice(0, 10), 'ផលិតដោយ ក្រុមស្រាវជ្រាវ និងអភិវឌ្ឍន៍ព័ត៌មានភូមិសាស្ត្រ សាកលវិទ្យាល័យភូមិន្ទភ្នំពេញ · ' + KD(new Date().toISOString().slice(0, 10))),
       T('For reference only – derived from open data, not an official survey.', 'សម្រាប់ជាឯកសារយោងប៉ុណ្ណោះ – ពីទិន្នន័យបើកចំហ មិនមែនការវាស់វែងផ្លូវការទេ។'),
     ];
-    font(1.45); g.fillStyle = '#333'; g.textAlign = 'left'; g.textBaseline = 'top';
-    const tx = bx, maxW = mm(bw); let ty = land ? Math.max(by, H - M - 4 - lines.length * 2.6 * 1.6) : Math.max(by, H - M - lines.length * 2.6 * 1.6);
-    for (const ln of lines) { const words = ln.split(' '); let cur = ''; for (const w_ of words) { const tst = cur ? cur + ' ' + w_ : w_; if (g.measureText(tst).width > maxW && cur) { g.fillText(cur, mm(tx), mm(ty)); ty += 2.2; cur = w_; } else cur = tst; } if (cur) { g.fillText(cur, mm(tx), mm(ty)); ty += 2.6; } } }
+    font(1.32); g.fillStyle = '#333'; g.textAlign = 'left'; g.textBaseline = 'top';
+    const tx = bx, maxW = mm(bw); let ty = Math.max(by, LB - lines.length * 2.3 * 1.5);
+    for (const ln of lines) { const words = ln.split(' '); let cur = ''; for (const w_ of words) { const tst = cur ? cur + ' ' + w_ : w_; if (g.measureText(tst).width > maxW && cur) { g.fillText(cur, mm(tx), mm(ty)); ty += 2; cur = w_; } else cur = tst; } if (cur) { g.fillText(cur, mm(tx), mm(ty)); ty += 2.3; } } }
   say('');
   return { canvas: cv, scale: S, ci: CI, wmm: W, hmm: H };
 }
