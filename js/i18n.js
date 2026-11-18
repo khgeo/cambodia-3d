@@ -178,6 +178,14 @@ export const KM = {
   'Each theme is fetched live for the screening window, sources tried in order:': 'ប្រធានបទនីមួយៗទាញយកផ្ទាល់សម្រាប់តំបន់ត្រួតពិនិត្យ តាមលំដាប់ប្រភព៖',
   'From the EIA Screening QGIS plugin (Geoinformatics and Research Lab, RUPP). Buffer rings are screening starting points, not legal thresholds.': 'ពីកម្មវិធីជំនួយ QGIS EIA Screening (ក្រុមស្រាវជ្រាវ និងអភិវឌ្ឍន៍ព័ត៌មានភូមិសាស្ត្រ សភភ)។ រង្វង់ជាចំណុចចាប់ផ្ដើមនៃការត្រួតពិនិត្យ មិនមែនជាកម្រិតច្បាប់ទេ។',
   'Overpass busy – using the bundled OSM extract': 'Overpass រវល់ – ប្រើទិន្នន័យ OSM ដែលភ្ជាប់មកជាមួយ',
+  'Rice SOS Mapper': 'Rice SOS Mapper (ថ្ងៃដាំស្រូវ)', 'Rice SOS Mapper: planting dates from Sentinel-1': 'Rice SOS Mapper៖ ថ្ងៃដាំស្រូវពី Sentinel-1',
+  'Rice planting date (start of season) from the Sentinel-1 VH time series, RIICE style: each rice pixel gets the date its season started.': 'ថ្ងៃដាំស្រូវ (ចាប់ផ្ដើមរដូវ) ពីស៊េរីពេលវេលា Sentinel-1 VH តាមរបៀប RIICE៖ ភីកសែលស្រូវនីមួយៗទទួលបានថ្ងៃដែលរដូវរបស់វាចាប់ផ្ដើម។',
+  'Area': 'តំបន់', 'Orbit': 'គន្លង', 'Both': 'ទាំងពីរ', 'Detection rule': 'វិធានរកឃើញ', 'Pixel size (m)': 'ទំហំភីកសែល (ម)', 'Map planting dates': 'គូសផែនទីថ្ងៃដាំ',
+  'Scanning Sentinel-1 dates…': 'កំពុងស្វែងរកកាលបរិច្ឆេទ Sentinel-1…', 'Computing in Earth Engine…': 'កំពុងគណនាក្នុង Earth Engine…', 'No Sentinel-1 dates in the window with enough data after them.': 'គ្មានកាលបរិច្ឆេទ Sentinel-1 ក្នុងរយៈពេលដែលមានទិន្នន័យគ្រប់គ្រាន់បន្ទាប់ពីវា។',
+  'Rice area': 'ផ្ទៃស្រូវ', 'Show on the 3D ground': 'បង្ហាញលើដី 3D', 'Opacity': 'ភាពស្រអាប់', 'Tap a field in 3D to see its VH curve.': 'ចុចលើស្រែក្នុង 3D ដើម្បីមើលខ្សែកោង VH។',
+  'Download GeoTIFF': 'ទាញយក GeoTIFF', 'Areas CSV': 'តារាងផ្ទៃ CSV', 'No Sentinel-1 data at this point': 'គ្មានទិន្នន័យ Sentinel-1 នៅចំណុចនេះ', 'SOS': 'ថ្ងៃដាំ',
+  'Sign in with Google': 'ចូលដោយ Google', 'Sign out': 'ចាកចេញ', 'Earth Engine runs in your Google Cloud project (sign in once per session).': 'Earth Engine ដំណើរការក្នុងគម្រោង Google Cloud របស់អ្នក (ចូលម្ដងក្នុងមួយវគ្គ)។',
+  'Not rice / no planting detected': 'មិនមែនស្រូវ / រកមិនឃើញការដាំ', 'dates': 'កាលបរិច្ឆេទ', 'Total rice': 'ស្រូវសរុប', 'Loading the VH curve…': 'កំពុងផ្ទុកខ្សែកោង VH…',
   'Large area: downloading the data can take a long time. Continue?': 'តំបន់ធំ៖ ការទាញយកទិន្នន័យអាចចំណាយពេលយូរ។ បន្តទេ?',
 };
 export let lang = 'en';
@@ -212,6 +220,8 @@ export function setLang(l) {
   onLang.forEach(f => f(l));
 }
 export const onLang = [];
+// merge a plugin's Khmer table (plain JSON, English → Khmer) without overwriting the app's own wording
+export async function addKm(url) { try { const j = await (await fetch(url)).json(); for (const k in j) if (!KM[k]) KM[k] = j[k]; if (lang === 'km') setLang('km'); } catch (e) { } }
 export function initLang() {
   let l = 'en'; try { l = localStorage.getItem('cambodia3d.lang') || ((navigator.language || '').startsWith('km') ? 'km' : 'en'); } catch (e) { }
   if (!document.getElementById('kmFont')) { const k = document.createElement('link'); k.id = 'kmFont'; k.rel = 'stylesheet'; k.href = 'https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;600;700&display=swap'; document.head.appendChild(k); }
