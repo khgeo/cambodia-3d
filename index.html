@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=60">
+<link rel="stylesheet" href="css/app.css?v=61">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -65,20 +65,35 @@
     <button data-fly="env" data-tip="Time, weather and rice season">🌤️</button>
     <button data-fly="info" data-tip="Land cover and statistics">📊</button>
     <hr>
-    <button id="layersBtn" data-tip="Layers: pull apart &amp; explore">🗂️</button>
-    <button id="surveyBtn" data-tip="Survey: measure, mark &amp; go to">📐</button>
-    <button id="editBtn" data-tip="Digitize: roads, buildings, trees">✏️</button>
-    <button id="sectionBtn" data-tip="Cross-section: soil &amp; geology">✂️</button>
-    <button id="intelBtn" data-tip="Intel: notes, routes &amp; access, alerts, counting, share">🛰️</button>
-    <button id="changeBtn" data-tip="Change detection: compare with older images">🕘</button>
-    <button id="lcBtn" data-tip="Train land cover: paint what you see, the model learns">🖌️</button>
-    <button id="globeBtn" data-tip="Whole Earth: where this area is, live clouds, wind, satellites, flights">🌍</button>
-    <button id="radarBtn" data-tip="Radar: aircraft in the sky (simulated or live)">📡</button>
-    <button id="tacBtn" data-tip="Tactical: symbols, line of sight, mobility">🎯</button>
-    <button id="topoBtn" data-tip="Export: topographic map &amp; GeoPackage">🗺️</button>
+    <button class="catBtn" data-cat="explore" data-tip="Explore: layers, places, sky, Earth">🧭</button>
+    <button class="catBtn" data-cat="edit" data-tip="Survey &amp; edit: measure, digitize, train">📐</button>
+    <button class="catBtn" data-cat="intel" data-tip="Intelligence: notes, change, radar, tactical">🛰️</button>
+    <button class="catBtn" data-cat="apps" data-tip="Analysis apps: environment, agriculture, minerals, urban">🧪</button>
+    <button class="catBtn" data-cat="export" data-tip="Export: topographic map, GeoPackage, brief">🗺️</button>
+    <div id="toolDock" hidden>
+      <button id="layersBtn" data-cat="explore" data-tip="Layers: pull apart &amp; explore">🗂️</button>
+      <button id="placeBtn" data-cat="explore" data-tip="Place info: names, photos, details of any place">📍</button>
+      <button id="skyBtn" data-cat="explore" data-tip="Night sky: stars, planets &amp; star chart (StarChart)">🌌</button>
+      <button id="globeBtn" data-cat="explore" data-tip="Whole Earth: where this area is, live clouds, wind, satellites, flights">🌍</button>
+      <button id="sectionBtn" data-cat="explore" data-tip="Cross-section: soil &amp; geology">✂️</button>
+      <button id="surveyBtn" data-cat="edit" data-tip="Survey: measure, mark &amp; go to">📐</button>
+      <button id="editBtn" data-cat="edit" data-tip="Digitize: roads, buildings, trees">✏️</button>
+      <button id="lcBtn" data-cat="edit" data-tip="Train land cover: paint what you see, the model learns">🖌️</button>
+      <button id="intelBtn" data-cat="intel" data-tip="Intel: notes, routes &amp; access, alerts, counting, share">🛰️</button>
+      <button id="changeBtn" data-cat="intel" data-tip="Change detection: compare with older images">🕘</button>
+      <button id="radarBtn" data-cat="intel" data-tip="Radar: aircraft in the sky (simulated or live)">📡</button>
+      <button id="tacBtn" data-cat="intel" data-tip="Tactical: symbols, line of sight, mobility">🎯</button>
+      <button id="eiaBtn" data-cat="apps" data-soon="1" data-tip="EIA Screening: sensitive features around a project">🌿</button>
+      <button id="urbanBtn" data-cat="apps" data-soon="1" data-tip="Urban Analytics: access, greenery, heat, livability">🏙️</button>
+      <button id="riceSosBtn" data-cat="apps" data-soon="1" data-tip="Rice SOS Mapper: planting dates from Sentinel-1">🌾</button>
+      <button id="riceEcoBtn" data-cat="apps" data-soon="1" data-tip="Rice Ecosystem Mapper: rainfed, irrigated, recession rice">🌱</button>
+      <button id="mineralBtn" data-cat="apps" data-soon="1" data-tip="MineralScope: mineral mapping from satellite bands">🪨</button>
+      <button id="topoBtn" data-cat="export" data-tip="Export: topographic map, GeoPackage &amp; GEOINT brief">🗺️</button>
+    </div>
     <span class="grow"></span>
     <button class="langBtn" data-tip="ភាសាខ្មែរ / English">ខ្មែរ</button>
   </nav>
+  <div id="catMenu" hidden></div>
   <div class="panel fly" id="scenePanel">
     <div class="row top"><h1 id="flyTitle">Views</h1><button class="hideP" data-panel="scenePanel" title="Hide panel">✕</button></div>
     <div class="aoiT" id="aoiTitle">3D landscape</div>
@@ -292,6 +307,26 @@
       <div id="globeInfo" class="svhelp"></div>
     </div>
   </div>
+  <div id="skyPanel" class="rpanel" hidden>
+    <div class="row lphead"><b>🌌 Night sky</b><span id="skHint" class="hint"></span><button id="skMin" title="Hide / show">▴</button><button id="skClose" title="Close">✕</button></div>
+    <div id="skContent">
+      <canvas id="skCanvas" width="640" height="640"></canvas>
+      <div class="row"><input type="datetime-local" id="skTime" style="flex:1"><button id="skNow" style="flex:0 0 auto">🕒 Now</button></div>
+      <div class="row"><input type="range" id="skHour" min="0" max="24" step="0.25" class="wide" style="flex:1"><b id="skHourLbl" style="width:42px;text-align:right"></b></div>
+      <div class="row"><select id="skMag" style="flex:1"><option value="4">Bright stars (mag 4)</option><option value="5" selected>Naked eye (mag 5)</option><option value="6">Dark sky (mag 6)</option></select><select id="skLang" style="flex:1"><option value="both">ខ្មែរ + English</option><option value="km">ខ្មែរ</option><option value="en">English</option></select></div>
+      <div class="row"><label><input type="checkbox" id="skReal" checked> ✨ Real stars in the 3D sky at night</label></div>
+      <div id="skBodies" class="skbodies"></div>
+      <div class="row"><button id="skPng">⬇ PNG star chart</button><button id="skPlay">▶ Animate night</button></div>
+      <div class="svhelp">Stars: Yale Bright Star Catalogue via d3-celestial (BSD-3). Planet positions computed in the browser (StarChart). Centre of the sky = your area.</div>
+    </div>
+  </div>
+  <div id="placePanel" class="rpanel" hidden>
+    <div class="row lphead"><b>📍 Place info</b><span id="plHint" class="hint"></span><button id="plMin" title="Hide / show">▴</button><button id="plClose" title="Close">✕</button></div>
+    <div id="plContent">
+      <div class="row"><label><input type="checkbox" id="plNames" checked> 🏷️ Show place names in 3D</label></div>
+      <div id="plCard"><div class="svhelp">Tap any place in the 3D scene – a village, pagoda, school, market, hill or just a field – to see its name, photos and details.</div></div>
+    </div>
+  </div>
   <div id="intelPanel" class="rpanel" hidden>
     <div class="row lphead"><b>🛰️ Intel</b><span id="inHint" class="hint"></span><button id="inMin" title="Hide / show">▴</button><button id="inClose" title="Close">✕</button></div>
     <div id="inContent">
@@ -403,6 +438,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=60"></script>
+<script type="module" src="js/app.js?v=61"></script>
 </body>
 </html>

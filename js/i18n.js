@@ -141,7 +141,23 @@ export const KM = {
   'That is a large surface – tap a single object': 'នោះជាផ្ទៃធំ – ចុចលើវត្ថុតែមួយ',
   'Sensitivity': 'ភាពរសើប',
   'Add the GEOINT area brief to the PDF (extra A4 pages)': 'បន្ថែមរបាយការណ៍សង្ខេបភូមិសាស្ត្រទៅក្នុង PDF (ទំព័រ A4 បន្ថែម)', 'Preparing the brief…': 'កំពុងរៀបចំរបាយការណ៍…', 'Drawing the brief pages…': 'កំពុងគូរទំព័ររបាយការណ៍…', 'Could not make the PDF': 'មិនអាចបង្កើត PDF',
+  'Explore': 'រុករក', 'Survey & edit': 'វាស់វែង និងកែសម្រួល', 'Intelligence': 'ស៊ើបការណ៍', 'Analysis apps': 'កម្មវិធីវិភាគ', 'Export': 'នាំចេញ', 'Coming next': 'នឹងមកដល់',
+  'Explore: layers, places, sky, Earth': 'រុករក៖ ស្រទាប់ ទីកន្លែង មេឃ ផែនដី', 'Survey & edit: measure, digitize, train': 'វាស់វែង និងកែ៖ វាស់ គូរ បង្ហាត់', 'Intelligence: notes, change, radar, tactical': 'ស៊ើបការណ៍៖ កំណត់ចំណាំ ការប្រែប្រួល រ៉ាដា យុទ្ធសាស្ត្រ',
+  'Analysis apps: environment, agriculture, minerals, urban': 'កម្មវិធីវិភាគ៖ បរិស្ថាន កសិកម្ម រ៉ែ ទីក្រុង', 'Export: topographic map, GeoPackage, brief': 'នាំចេញ៖ ផែនទីសណ្ឋានដី GeoPackage របាយការណ៍',
+  'Place info: names, photos, details of any place': 'ព័ត៌មានទីកន្លែង៖ ឈ្មោះ រូបថត ព័ត៌មានលម្អិត', 'Night sky: stars, planets & star chart (StarChart)': 'មេឃពេលយប់៖ ផ្កាយ ភព និងផែនទីផ្កាយ (StarChart)',
+  'EIA Screening: sensitive features around a project': 'EIA Screening៖ ទីតាំងរសើបជុំវិញគម្រោង', 'Urban Analytics: access, greenery, heat, livability': 'Urban Analytics៖ ការធ្វើដំណើរ ពណ៌បៃតង កម្ដៅ ការរស់នៅ',
+  'Rice SOS Mapper: planting dates from Sentinel-1': 'Rice SOS Mapper៖ កាលបរិច្ឆេទដាំស្រូវពី Sentinel-1', 'Rice Ecosystem Mapper: rainfed, irrigated, recession rice': 'Rice Ecosystem Mapper៖ ស្រូវវស្សា ស្រូវប្រព័ន្ធធារាសាស្ត្រ ស្រូវទឹកស្រក',
+  'MineralScope: mineral mapping from satellite bands': 'MineralScope៖ ផែនទីរ៉ែពីរលកពន្លឺផ្កាយរណប', 'Export: topographic map, GeoPackage & GEOINT brief': 'នាំចេញ៖ ផែនទីសណ្ឋានដី GeoPackage និងរបាយការណ៍ GEOINT',
+  'Fair': 'មេឃល្អ', 'Light rain': 'ភ្លៀងតិចៗ', 'Heavy rain': 'ភ្លៀងខ្លាំង', 'Light showers': 'ភ្លៀងរលឹមតិចៗ', 'Showers': 'ភ្លៀងរលឹម', 'Heavy showers': 'ភ្លៀងធ្លាក់ខ្លាំង',
+  'Place info': 'ព័ត៌មានទីកន្លែង', 'Show place names in 3D': 'បង្ហាញឈ្មោះទីកន្លែងក្នុង 3D', 'Tap any place': 'ចុចលើទីកន្លែងណាមួយ', 'Looking up names, photos and details…': 'កំពុងស្វែងរកឈ្មោះ រូបថត និងព័ត៌មាន…',
+  'Commune': 'ឃុំ', 'District': 'ស្រុក', 'Province': 'ខេត្ត', 'This place': 'ទីកន្លែងនេះ', 'No photos of this spot yet': 'មិនទាន់មានរូបថតនៃទីកន្លែងនេះ', 'Directions': 'ផ្លូវទៅ', 'Save as note': 'រក្សាជាកំណត់ចំណាំ', 'Details': 'ព័ត៌មានលម្អិត', 'Nearby': 'នៅជិត', 'offline list': 'បញ្ជីក្រៅបណ្ដាញ',
+  'Wikipedia nearby': 'វិគីភីឌានៅជិត', 'floors': 'ជាន់', 'Saved as a note (🛰️ Intel → Notes)': 'បានរក្សាជាកំណត់ចំណាំ (🛰️ ស៊ើបការណ៍ → កំណត់ចំណាំ)',
+  'Tap any place in the 3D scene – a village, pagoda, school, market, hill or just a field – to see its name, photos and details.': 'ចុចលើទីកន្លែងណាមួយក្នុងទេសភាព 3D – ភូមិ វត្ត សាលា ផ្សារ ភ្នំ ឬវាលស្រែ – ដើម្បីមើលឈ្មោះ រូបថត និងព័ត៌មាន។',
   'Contours': 'ខ្សែកម្ពស់', 'Grid': 'ក្រឡាចត្រង្គ', 'Your features': 'វត្ថុរបស់អ្នក', 'Survey points & parcels': 'ចំណុចវាស់ និងក្បាលដី', 'Tactical overlay': 'ស្រទាប់យុទ្ធសាស្ត្រ',
+  'Night sky': 'មេឃពេលយប់', 'Now': 'ឥឡូវ', 'Bright stars (mag 4)': 'ផ្កាយភ្លឺ (កម្រិត 4)', 'Naked eye (mag 5)': 'មើលឃើញដោយភ្នែក (កម្រិត 5)', 'Dark sky (mag 6)': 'មេឃងងឹត (កម្រិត 6)',
+  'Real stars in the 3D sky at night': 'ផ្កាយពិតក្នុងមេឃ 3D ពេលយប់', 'PNG star chart': 'ផែនទីផ្កាយ PNG', 'Animate night': 'ចលនាពេលយប់', 'Stop': 'ឈប់',
+  'Body': 'វត្ថុ', 'Altitude': 'កម្ពស់', 'Direction': 'ទិស', 'below horizon': 'ក្រោមជើងមេឃ',
+  'Stars: Yale Bright Star Catalogue via d3-celestial (BSD-3). Planet positions computed in the browser (StarChart). Centre of the sky = your area.': 'ផ្កាយ៖ កាតាឡុក Yale Bright Star តាម d3-celestial (BSD-3)។ ទីតាំងភពគណនាក្នុងកម្មវិធីរុករក (StarChart)។ ចំណុចកណ្ដាលមេឃ = តំបន់របស់អ្នក។',
 };
 export let lang = 'en';
 const ICON = /^([\p{Extended_Pictographic}←-⇿⌀-⏿■-➿⬀-⯿️‍\s·•]+)(.*)$/u;

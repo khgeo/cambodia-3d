@@ -106,25 +106,28 @@ export class Globe {
   }
   // Open-Meteo, many points per request; results are cached for the hour so reopening costs nothing
   async omGrid(lats, lons, key) {
-    const hour = new Date().toISOString().slice(0, 13), ck = 'cambodia3d.om.' + key; try { const c = JSON.parse(localStorage.getItem(ck) || 'null'); if (c && c.h === hour && c.n === lats.length) return c.d; } catch (e) { }
+    // cached for 3 hours, and a daily budget so the free Open-Meteo limit (also used by live weather) is never used up
+    const slot = new Date().toISOString().slice(0, 11) + Math.floor(new Date().getUTCHours() / 3), ck = 'cambodia3d.om.' + key; try { const c = JSON.parse(localStorage.getItem(ck) || 'null'); if (c && c.h === slot && c.n === lats.length) return c.d; } catch (e) { }
+    const bk = 'cambodia3d.omBudget', day = new Date().toISOString().slice(0, 10); let bud = {}; try { bud = JSON.parse(localStorage.getItem(bk) || '{}'); } catch (e) { } if (bud.day !== day) bud = { day, n: 0 };
+    if (bud.blocked === day || bud.n + lats.length > 2500) throw new Error('daily budget'); bud.n += lats.length; try { localStorage.setItem(bk, JSON.stringify(bud)); } catch (e) { }
     const d = []; for (let s = 0; s < lats.length; s += 210) { const la = lats.slice(s, s + 210), lo = lons.slice(s, s + 210);
       const j = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${la.join(',')}&longitude=${lo.join(',')}&current=wind_speed_10m,wind_direction_10m,temperature_2m&wind_speed_unit=ms`)).json();
-      if (j.error) throw new Error(j.reason); (Array.isArray(j) ? j : [j]).forEach(r => d.push([+r.current.wind_speed_10m.toFixed(1), Math.round(r.current.wind_direction_10m), +r.current.temperature_2m.toFixed(1)])); }
-    try { localStorage.setItem(ck, JSON.stringify({ h: hour, n: lats.length, d })); } catch (e) { } return d;
+      if (j.error) { if (/limit/i.test(j.reason || '')) { bud.blocked = day; try { localStorage.setItem(bk, JSON.stringify(bud)); } catch (e) { } } throw new Error(j.reason); } (Array.isArray(j) ? j : [j]).forEach(r => d.push([+r.current.wind_speed_10m.toFixed(1), Math.round(r.current.wind_direction_10m), +r.current.temperature_2m.toFixed(1)])); }
+    try { localStorage.setItem(ck, JSON.stringify({ h: slot, n: lats.length, d })); } catch (e) { } return d;
   }
   toUV(d) { const U = new Float32Array(d.length), V = new Float32Array(d.length), T = new Float32Array(d.length); d.forEach(([sp, dr, t], i) => { U[i] = -sp * Math.sin(dr * D2R); V[i] = -sp * Math.cos(dr * D2R); T[i] = t; }); return { U, V, T }; }
   async loadWind() {
     if (this.windAt && Date.now() - this.windAt < 30 * 60e3) return; this.windAt = Date.now();
-    const lats = [], lons = []; for (let la = -80; la <= 80; la += 10) for (let lo = -180; lo < 180; lo += 10) { lats.push(la); lons.push(lo); }
-    try { const d = await this.omGrid(lats, lons, 'g10'); this.wind = { ...this.toUV(d), NX: 36, NY: 17, x0: -180, y0: -80, st: 10, wrap: true };
-      this.status.wind = 'Wind & temperature: Open-Meteo, now (10° grid; 2° near where you look)'; if (!this.windLines) this.initParticles(); this.drawTemp();
-    } catch (e) { this.status.wind = 'Wind not reachable'; this.windAt = 0; } this.onInfo && this.onInfo();
+    const lats = [], lons = []; for (let la = -75; la <= 75; la += 15) for (let lo = -180; lo < 180; lo += 15) { lats.push(la); lons.push(lo); }
+    try { const d = await this.omGrid(lats, lons, 'g15'); this.wind = { ...this.toUV(d), NX: 24, NY: 11, x0: -180, y0: -75, st: 15, wrap: true };
+      this.status.wind = 'Wind & temperature: Open-Meteo, now (15° grid; 3° near where you look)'; if (!this.windLines) this.initParticles(); this.drawTemp();
+    } catch (e) { this.status.wind = /budget|limit/.test(e.message) ? 'Wind: daily data limit reached – try again later' : 'Wind not reachable'; this.windAt = /budget|limit/.test(e.message) ? Date.now() : 0; } this.onInfo && this.onInfo();
   }
   // finer wind where the camera looks (shows the turning of storms)
   async loadDetail() {
-    if (this.detBusy || !this.wind) return; const c = this.cam.position.clone().normalize(), lat = Math.round(Math.asin(c.y) / D2R / 2) * 2, lon = Math.round(Math.atan2(-c.z, c.x) / D2R / 2) * 2;
+    if (this.detBusy || !this.wind) return; const c = this.cam.position.clone().normalize(), lat = Math.round(Math.asin(c.y) / D2R / 3) * 3, lon = Math.round(Math.atan2(-c.z, c.x) / D2R / 3) * 3;
     if (this.det && Math.abs(this.det.lat - lat) < 8 && Math.abs(((this.det.lon - lon + 540) % 360) - 180) < 8 && Date.now() - this.det.at < 3600e3) return;
-    this.detBusy = true; const N = 15, st = 2, y0 = Math.max(-84, Math.min(84 - (N - 1) * st, lat - 14)), x0 = lon - 14, lats = [], lons = [];
+    this.detBusy = true; const N = 9, st = 3, y0 = Math.max(-84, Math.min(84 - (N - 1) * st, lat - 12)), x0 = lon - 12, lats = [], lons = [];
     for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { lats.push(y0 + j * st); lons.push((((x0 + i * st) + 540) % 360) - 180); }
     try { const d = await this.omGrid(lats, lons, `d${y0}_${x0}`); this.det = { ...this.toUV(d), NX: N, NY: N, x0, y0, st, lat, lon, at: Date.now() }; } catch (e) { }
     this.detBusy = false;

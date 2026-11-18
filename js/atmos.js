@@ -1,7 +1,7 @@
 // Time of day (sun path, dusk, night with lit windows and stars), weather (clear, hazy, monsoon rain, storm with
 // lightning) and a cinematic flight around the area.
 import * as THREE from 'three';
-import { NIGHT } from './shaders.js?v=60';
+import { NIGHT } from './shaders.js?v=61';
 
 const clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp;
 export class Atmos {
@@ -11,7 +11,7 @@ export class Atmos {
     for (let i = 0; i < N; i++) { const u = Math.random() * 2 - 1, t = Math.random() * 6.283, s = Math.sqrt(1 - u * u); pos.set([s * Math.cos(t), Math.abs(u) * 0.95 + 0.05, s * Math.sin(t)], i * 3); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     this.stars = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.6, sizeAttenuation: false, transparent: true, opacity: 0, depthWrite: false, fog: false }));
-    this.stars.renderOrder = -1; this.stars.frustumCulled = false; world.scene.add(this.stars);
+    this.randGeo = g; this.stars.renderOrder = -1; this.stars.frustumCulled = false; world.scene.add(this.stars);
     // rain: short streaks in a box that follows the camera
     const R = 7000, rp = new Float32Array(R * 6); this.rainN = R; this.rainBox = 70;
     for (let i = 0; i < R; i++) { const x = (Math.random() - .5) * 140, y = Math.random() * 70, z = (Math.random() - .5) * 140; rp.set([x, y, z, x, y - 0.9, z], i * 6); }
@@ -31,7 +31,7 @@ export class Atmos {
     w.setSun(Math.max(elev, -6), env, 180 - az);
     w.sun.intensity *= wx.sun * (1 - night); w.hemi.intensity = lerp(w.hemi.intensity * (0.6 + 0.4 * wx.sun), 0.24, night);
     w.hemi.color.set(0xdfeaf5).lerp(new THREE.Color(0x3a4a78), night); w.hemi.groundColor.set(0x5a6640).lerp(new THREE.Color(0x10141c), night);
-    this.moon.intensity = 0.55 * night * (this.weather === 'clear' ? 1 : 0.3); this.moon.position.set(-0.4, 1, 0.3).multiplyScalar(1000);
+    this.moon.intensity = 0.55 * night * (this.weather === 'clear' ? 1 : 0.3) * (this.realSky && this.moonK != null ? this.moonK * 1.4 : 1); if (!this.realSky) this.moon.position.set(-0.4, 1, 0.3).multiplyScalar(1000);
     w.renderer.toneMappingExposure = 0.62 * wx.exp * lerp(1, 1.35, night);
     NIGHT.value = clamp(night * 1.2 + dusk * 0.4, 0, 1) * (elev < 10 ? 1 : 0);
     const S = w.extent || 3000; w.scene.fog.near = S * 1.2 * wx.fog * (1 - night * 0.3); w.scene.fog.far = S * 5 * wx.fog;
@@ -61,7 +61,26 @@ export class Atmos {
     }
     if (this.tour) this.tourStep(dt);
   }
-  setHour(h, env) { this.hour = h; this.apply(env); this.baseHemi = this.w.hemi.intensity; }
+  setHour(h, env) { this.hour = h; this.apply(env); this.baseHemi = this.w.hemi.intensity; if (this.realSky) this.updateRealSky(); }
+  // Real night sky (StarChart): today's stars and planets over the area at the chosen hour (Cambodia time, UTC+7)
+  async useRealSky(on) {
+    this.realSky = !!on;
+    if (!on) { this.stars.geometry = this.randGeo; this.stars.material.vertexColors = false; this.stars.material.size = 1.6; this.stars.material.needsUpdate = true; return; }
+    this.SK = this.SK || await import('./sky.js?v=61'); this.SD = this.SD || await this.SK.loadSky(); this.updateRealSky();
+  }
+  skyDate() { const n = new Date(Date.now() + 7 * 36e5); return new Date(Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate()) + (this.hour - 7) * 36e5); }
+  updateRealSky() {
+    const w = this.w, D = w.F; if (!this.SD || !D) return;
+    const sky = this.SK.skyNow(this.SD, D.lat0, D.lon0, this.skyDate()), P = [], C = [], D2R = Math.PI / 180;
+    const put = (alt, az, rgb, k) => { if (alt < -1) return; const a = alt * D2R, z = az * D2R; P.push(Math.sin(z) * Math.cos(a), Math.sin(a), -Math.cos(z) * Math.cos(a)); C.push(rgb[0] / 255 * k, rgb[1] / 255 * k, rgb[2] / 255 * k); };
+    for (const s of sky.stars) if (s.mag < 5.6) { const k = Math.min(1.6, Math.pow(10, -0.4 * (s.mag - 1.5))) * 0.8 + 0.12; put(s.alt, s.az, this.SK.bvColor(s.bv), k); }
+    for (const [n, b] of Object.entries(sky.body)) if (n !== 'Sun' && n !== 'Moon') put(b.alt, b.az, [255, 236, 200], 1.8);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+    if (this.stars.geometry !== this.randGeo) this.stars.geometry.dispose();
+    this.stars.geometry = g; this.stars.material.vertexColors = true; this.stars.material.size = 2.2; this.stars.material.needsUpdate = true;
+    const m = sky.body.Moon; this.moonInfo = m;
+    if (m) { const a = Math.max(m.alt, 2) * D2R, z = m.az * D2R; this.moon.position.set(Math.sin(z) * Math.cos(a), Math.sin(a), -Math.cos(z) * Math.cos(a)).multiplyScalar(1000); this.moonK = m.alt > 0 ? 0.25 + 0.75 * (m.phase ?? 0.5) : 0.15; }
+  }
   setWeather(k) { this.weather = k; this.apply(true); this.baseHemi = this.w.hemi.intensity; }
   /* ---- cinematic flight: a smooth closed spline around and across the area ---- */
   startTour() {
