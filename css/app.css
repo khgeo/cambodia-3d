@@ -553,7 +553,21 @@ body.nocredit #credit{display:none}
 #skyPanel.collapsed #skContent{display:none}#skyPanel.collapsed .lphead{margin-bottom:-10px;border-radius:12px}
 #skyPanel label{font-size:12px;display:flex;gap:6px;align-items:center}
 #skyPanel input,#skyPanel select{background:#1a2430;color:#e8eef5;border:1px solid #3a4858;border-radius:6px;padding:4px 6px;font:12px system-ui,"Noto Sans Khmer",sans-serif}
-#skCanvas{width:100%;height:auto;border-radius:10px;display:block;margin:0 0 8px;background:#0b1220}
 .skbodies{display:grid;grid-template-columns:1fr auto auto;gap:2px 8px;font-size:11.5px;margin:2px 0 8px;font-variant-numeric:tabular-nums}
 .skbodies .h{color:#9fb0c0;font-size:10.5px;text-transform:uppercase;letter-spacing:.04em}.skbodies .dn{color:#6f7d8b}
 @media (max-width:640px){#skyPanel{left:8px;right:8px;width:auto;top:60px}}
+
+.skgaze{width:100%;padding:10px!important;font-size:13.5px!important;margin:0 0 7px;background:linear-gradient(135deg,#243b6b,#3b2a6b)!important;color:#fff;border-radius:10px}
+.skgaze.on{background:linear-gradient(135deg,#6b3b24,#6b2a4a)!important}
+.skchips{flex-wrap:wrap;gap:4px 10px!important}.skchips label{font-size:11.5px!important}
+.skbodies .it{cursor:pointer}.skbodies .it:hover{color:#ffd88a}
+#skyInset{position:absolute;right:364px;bottom:58px;width:210px;height:210px;z-index:6;border-radius:50%;box-shadow:0 6px 26px rgba(0,0,0,.55);transition:width .25s,height .25s}
+#skyInset[hidden]{display:none}#skyInset.big{width:420px;height:420px}
+#skyInset canvas{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;cursor:crosshair}#skView{pointer-events:none}
+#skBig{position:absolute;right:4px;top:4px;width:28px;height:28px;border-radius:50%;padding:0;background:rgba(17,23,31,.85);color:#fff;border:1px solid #3a4858}
+.skcap{position:absolute;left:0;right:0;bottom:-18px;text-align:center;font-size:10.5px;color:#cfd8e2;text-shadow:0 1px 3px #000}
+.skyLabels{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+.skyLabels .sl{position:absolute;left:0;top:0;white-space:nowrap;font:11px system-ui,"Noto Sans Khmer",sans-serif;color:rgba(215,228,255,.8);text-shadow:0 0 4px #000}
+.skyLabels .planet{font-weight:700;font-size:12.5px}.skyLabels .moon{color:#f4f1e6;font-weight:700;font-size:12.5px}
+.skyLabels .con{color:rgba(130,170,240,.75);font-style:italic;letter-spacing:.04em}.skyLabels .zod{color:rgba(255,206,110,.9);font-weight:600;font-size:12px}
+@media (max-width:640px){#skyInset{left:auto;right:8px;bottom:120px;width:150px;height:150px}#skyInset.big{width:300px;height:300px}}

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=61">
+<link rel="stylesheet" href="css/app.css?v=62">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -310,16 +310,17 @@
   <div id="skyPanel" class="rpanel" hidden>
     <div class="row lphead"><b>🌌 Night sky</b><span id="skHint" class="hint"></span><button id="skMin" title="Hide / show">▴</button><button id="skClose" title="Close">✕</button></div>
     <div id="skContent">
-      <canvas id="skCanvas" width="640" height="640"></canvas>
+      <button id="skGaze" class="primary skgaze">🔭 Stand here and look up</button>
+      <div class="svhelp" id="skHelp">Stand on the ground in your area and look around: real stars, planets and the Moon for the time below. Drag (or move the mouse) to look, W A S D to walk, tap the inset chart to turn there.</div>
       <div class="row"><input type="datetime-local" id="skTime" style="flex:1"><button id="skNow" style="flex:0 0 auto">🕒 Now</button></div>
-      <div class="row"><input type="range" id="skHour" min="0" max="24" step="0.25" class="wide" style="flex:1"><b id="skHourLbl" style="width:42px;text-align:right"></b></div>
-      <div class="row"><select id="skMag" style="flex:1"><option value="4">Bright stars (mag 4)</option><option value="5" selected>Naked eye (mag 5)</option><option value="6">Dark sky (mag 6)</option></select><select id="skLang" style="flex:1"><option value="both">ខ្មែរ + English</option><option value="km">ខ្មែរ</option><option value="en">English</option></select></div>
-      <div class="row"><label><input type="checkbox" id="skReal" checked> ✨ Real stars in the 3D sky at night</label></div>
+      <div class="row"><input type="range" id="skHour" min="0" max="24" step="0.25" style="flex:1"><b id="skHourLbl" style="width:42px;text-align:right"></b><button id="skPlay" style="flex:0 0 auto" title="Let the night pass">▶</button></div>
+      <div class="row skchips"><label><input type="checkbox" id="skLines" checked> Constellation lines</label><label><input type="checkbox" id="skNames" checked> Names</label><label><input type="checkbox" id="skInsetOn" checked> Sky chart inset</label></div>
       <div id="skBodies" class="skbodies"></div>
-      <div class="row"><button id="skPng">⬇ PNG star chart</button><button id="skPlay">▶ Animate night</button></div>
-      <div class="svhelp">Stars: Yale Bright Star Catalogue via d3-celestial (BSD-3). Planet positions computed in the browser (StarChart). Centre of the sky = your area.</div>
+      <div class="row"><select id="skLang" style="flex:1" title="Chart language"><option value="both">ខ្មែរ + English</option><option value="km">ខ្មែរ</option><option value="en">English</option></select><button id="skPng">⬇ Star chart PNG</button></div>
+      <div class="svhelp">Stars: Yale Bright Star Catalogue via d3-celestial (BSD-3). Planets and Moon computed in the browser (StarChart).</div>
     </div>
   </div>
+  <div id="skyInset" hidden><canvas id="skCanvas" width="440" height="440"></canvas><canvas id="skView" width="440" height="440"></canvas><button id="skBig" title="Bigger / smaller">⤢</button><div class="skcap">Tap the chart to look there</div></div>
   <div id="placePanel" class="rpanel" hidden>
     <div class="row lphead"><b>📍 Place info</b><span id="plHint" class="hint"></span><button id="plMin" title="Hide / show">▴</button><button id="plClose" title="Close">✕</button></div>
     <div id="plContent">
@@ -438,6 +439,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=61"></script>
+<script type="module" src="js/app.js?v=62"></script>
 </body>
 </html>

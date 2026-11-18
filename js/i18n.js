@@ -158,6 +158,11 @@ export const KM = {
   'Real stars in the 3D sky at night': 'ផ្កាយពិតក្នុងមេឃ 3D ពេលយប់', 'PNG star chart': 'ផែនទីផ្កាយ PNG', 'Animate night': 'ចលនាពេលយប់', 'Stop': 'ឈប់',
   'Body': 'វត្ថុ', 'Altitude': 'កម្ពស់', 'Direction': 'ទិស', 'below horizon': 'ក្រោមជើងមេឃ',
   'Stars: Yale Bright Star Catalogue via d3-celestial (BSD-3). Planet positions computed in the browser (StarChart). Centre of the sky = your area.': 'ផ្កាយ៖ កាតាឡុក Yale Bright Star តាម d3-celestial (BSD-3)។ ទីតាំងភពគណនាក្នុងកម្មវិធីរុករក (StarChart)។ ចំណុចកណ្ដាលមេឃ = តំបន់របស់អ្នក។',
+  'Stand here and look up': 'ឈរនៅទីនេះ ហើយមើលមេឃ', 'Back to the overview': 'ត្រឡប់ទៅទិដ្ឋភាពរួម', 'Up now': 'នៅលើមេឃឥឡូវ', 'No planets above the horizon now': 'ឥឡូវគ្មានភពនៅលើជើងមេឃទេ',
+  'Daytime – stars hidden': 'ពេលថ្ងៃ – មើលមិនឃើញផ្កាយ', 'Twilight': 'ពេលព្រលប់', 'Constellation lines': 'ខ្សែក្រុមតារា', 'Names': 'ឈ្មោះ', 'Sky chart inset': 'ផែនទីមេឃតូច',
+  'Star chart PNG': 'ផែនទីផ្កាយ PNG', 'Tap the chart to look there': 'ចុចលើផែនទីដើម្បីមើលទៅទីនោះ', 'Bigger / smaller': 'ធំ / តូច', 'Let the night pass': 'ឲ្យពេលយប់កន្លងទៅ', 'Chart language': 'ភាសាផែនទី',
+  'Stand on the ground in your area and look around: real stars, planets and the Moon for the time below. Drag (or move the mouse) to look, W A S D to walk, tap the inset chart to turn there.': 'ឈរលើដីក្នុងតំបន់របស់អ្នក ហើយមើលជុំវិញ៖ ផ្កាយ ភព និងព្រះច័ន្ទពិតប្រាកដតាមពេលវេលាខាងក្រោម។ អូស (ឬរំកិលកណ្ដុរ) ដើម្បីមើល W A S D ដើម្បីដើរ ចុចលើផែនទីតូចដើម្បីបែរមើល។',
+  'Stars: Yale Bright Star Catalogue via d3-celestial (BSD-3). Planets and Moon computed in the browser (StarChart).': 'ផ្កាយ៖ កាតាឡុក Yale Bright Star តាម d3-celestial (BSD-3)។ ភព និងព្រះច័ន្ទគណនាក្នុងកម្មវិធីរុករក (StarChart)។',
 };
 export let lang = 'en';
 const ICON = /^([\p{Extended_Pictographic}←-⇿⌀-⏿■-➿⬀-⯿️‍\s·•]+)(.*)$/u;
