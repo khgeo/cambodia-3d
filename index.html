@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=62">
+<link rel="stylesheet" href="css/app.css?v=63">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -83,7 +83,7 @@
       <button id="changeBtn" data-cat="intel" data-tip="Change detection: compare with older images">🕘</button>
       <button id="radarBtn" data-cat="intel" data-tip="Radar: aircraft in the sky (simulated or live)">📡</button>
       <button id="tacBtn" data-cat="intel" data-tip="Tactical: symbols, line of sight, mobility">🎯</button>
-      <button id="eiaBtn" data-cat="apps" data-soon="1" data-tip="EIA Screening: sensitive features around a project">🌿</button>
+      <button id="eiaBtn" data-cat="apps" data-tip="EIA Screening: sensitive features around a project">🌿</button>
       <button id="urbanBtn" data-cat="apps" data-soon="1" data-tip="Urban Analytics: access, greenery, heat, livability">🏙️</button>
       <button id="riceSosBtn" data-cat="apps" data-soon="1" data-tip="Rice SOS Mapper: planting dates from Sentinel-1">🌾</button>
       <button id="riceEcoBtn" data-cat="apps" data-soon="1" data-tip="Rice Ecosystem Mapper: rainfed, irrigated, recession rice">🌱</button>
@@ -321,6 +321,34 @@
     </div>
   </div>
   <div id="skyInset" hidden><canvas id="skCanvas" width="440" height="440"></canvas><canvas id="skView" width="440" height="440"></canvas><button id="skBig" title="Bigger / smaller">⤢</button><div class="skcap">Tap the chart to look there</div></div>
+  <div id="eiaPanel" class="rpanel" hidden>
+    <div class="row lphead"><b>🌿 EIA Screening</b><span id="eiHint" class="hint"></span><button id="eiMin" title="Hide / show">▴</button><button id="eiClose" title="Close">✕</button></div>
+    <div id="eiContent">
+      <div class="row svtabs eitabs"><button data-et="proj" class="on">① Project</button><button data-et="res">② Results</button><button data-et="data">Data</button></div>
+      <div data-ep="proj">
+        <div class="row"><input id="eiName" placeholder="Project name" style="flex:1"></div>
+        <div class="row"><select id="eiType" style="flex:1"></select></div>
+        <div class="row eirings"><span>Rings (km)</span><input id="eiR1" type="number" step="0.05" min="0.05"><input id="eiR2" type="number" step="0.1" min="0.1"><input id="eiR3" type="number" step="0.5" min="0.2"></div>
+        <div class="eisec">Footprint</div>
+        <div class="row eifp"><button id="eiDrawPoly">✏️ Draw area</button><button id="eiDrawLine">〰️ Draw line</button><button id="eiWhole">⬜ Whole 3D area</button></div>
+        <div class="row" id="eiLineRow" hidden><span>Half-width (m)</span><input id="eiHalf" type="number" value="50" min="1" style="width:70px"></div>
+        <div class="row"><select id="eiAdmin" style="flex:1"><option value="">🏘️ Or use an administrative area…</option></select></div>
+        <div class="row" id="eiDrawRow" hidden><button id="eiUndo">↶ Undo</button><button id="eiFinish" class="primary" style="margin:0">✓ Finish</button></div>
+        <div id="eiFpInfo" class="svhelp">Tap points on the ground to draw the project area, or pick an option above.</div>
+        <button id="eiRun" class="primary eirun" disabled>▶ Run screening</button>
+        <div id="eiLog" class="eilog"></div>
+        <details class="eiadv"><summary>Settings</summary><div class="row"><span>People per building</span><input id="eiPpb" type="number" value="4.3" step="0.1" min="1" style="width:70px"></div></details>
+      </div>
+      <div data-ep="res" hidden>
+        <div id="eiRes"><div class="svhelp">Run the screening to see the results here.</div></div>
+      </div>
+      <div data-ep="data" hidden>
+        <div class="svhelp">Each theme is fetched live for the screening window, sources tried in order:</div>
+        <table class="eisrc"><tr><td>🌳 Protected areas</td><td>Open Development Cambodia → OpenStreetMap</td></tr><tr><td>⛏️ Concessions</td><td>Open Development Cambodia (ELC + mining)</td></tr><tr><td>💧 Lakes, wetlands · 〰️ rivers · 🏘️ villages</td><td>OpenStreetMap</td></tr><tr><td>🛕 Pagodas, schools, health</td><td>Open Development Cambodia + OpenStreetMap</td></tr><tr><td>🗺️ Land cover</td><td>Esri | Impact Observatory 10 m</td></tr><tr><td>🪓 Forest loss</td><td>Hansen GFC 2001–2024</td></tr><tr><td>⛰️ Slope</td><td>Terrarium elevation tiles</td></tr><tr><td>👥 People</td><td>OpenStreetMap buildings × people per building</td></tr></table>
+        <div class="svhelp">From the EIA Screening QGIS plugin (Geoinformatics and Research Lab, RUPP). Buffer rings are screening starting points, not legal thresholds.</div>
+      </div>
+    </div>
+  </div>
   <div id="placePanel" class="rpanel" hidden>
     <div class="row lphead"><b>📍 Place info</b><span id="plHint" class="hint"></span><button id="plMin" title="Hide / show">▴</button><button id="plClose" title="Close">✕</button></div>
     <div id="plContent">
@@ -439,6 +467,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=62"></script>
+<script type="module" src="js/app.js?v=63"></script>
 </body>
 </html>

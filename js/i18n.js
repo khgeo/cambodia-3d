@@ -163,6 +163,22 @@ export const KM = {
   'Star chart PNG': 'ផែនទីផ្កាយ PNG', 'Tap the chart to look there': 'ចុចលើផែនទីដើម្បីមើលទៅទីនោះ', 'Bigger / smaller': 'ធំ / តូច', 'Let the night pass': 'ឲ្យពេលយប់កន្លងទៅ', 'Chart language': 'ភាសាផែនទី',
   'Stand on the ground in your area and look around: real stars, planets and the Moon for the time below. Drag (or move the mouse) to look, W A S D to walk, tap the inset chart to turn there.': 'ឈរលើដីក្នុងតំបន់របស់អ្នក ហើយមើលជុំវិញ៖ ផ្កាយ ភព និងព្រះច័ន្ទពិតប្រាកដតាមពេលវេលាខាងក្រោម។ អូស (ឬរំកិលកណ្ដុរ) ដើម្បីមើល W A S D ដើម្បីដើរ ចុចលើផែនទីតូចដើម្បីបែរមើល។',
   'Stars: Yale Bright Star Catalogue via d3-celestial (BSD-3). Planets and Moon computed in the browser (StarChart).': 'ផ្កាយ៖ កាតាឡុក Yale Bright Star តាម d3-celestial (BSD-3)។ ភព និងព្រះច័ន្ទគណនាក្នុងកម្មវិធីរុករក (StarChart)។',
+  // EIA Screening (most strings come from the plugin's data/eia_km.json)
+  'EIA Screening': 'ការត្រួតពិនិត្យ EIA', 'EIA Screening: sensitive features around a project': 'ការត្រួតពិនិត្យ EIA៖ ធាតុងាយរងផលប៉ះពាល់ជុំវិញគម្រោង',
+  'Tap points on the ground to draw the project area, or pick an option above.': 'ចុចលើដីដើម្បីគូសផ្ទៃគម្រោង ឬជ្រើសជម្រើសខាងលើ។', 'Line footprint': 'ផ្ទៃគម្រោងតាមខ្សែ', 'Drawn area': 'ផ្ទៃដែលបានគូស', 'Whole 3D area': 'តំបន់ 3D ទាំងមូល',
+  'Tap the line points, then Finish': 'ចុចចំណុចខ្សែ រួចចុច បញ្ចប់', 'Tap the corners, then Finish': 'ចុចជ្រុងនីមួយៗ រួចចុច បញ្ចប់', 'Open the big map': 'បើកផែនទីធំ', 'drag a weight to re-score': 'អូសទម្ងន់ដើម្បីគណនាពិន្ទុឡើងវិញ',
+  'PDF report': 'របាយការណ៍ PDF', 'Drawing the map…': 'កំពុងគូរផែនទី…', 'Drawing the pages…': 'កំពុងរៀបចំទំព័រ…', 'Saving the PDF…': 'កំពុងរក្សាទុក PDF…', 'Could not make the report: ': 'មិនអាចបង្កើតរបាយការណ៍បាន៖ ',
+  'Screening…': 'កំពុងត្រួតពិនិត្យ…', 'Forest loss': 'ការបាត់បង់ព្រៃឈើ', 'Slope': 'ជម្រាល', 'People (estimate)': 'ប្រជាជន (ប៉ាន់ស្មាន)', 'not available': 'មិនមាន', '%s buildings × %s people': 'អគារ %s × មនុស្ស %s',
+  'OpenStreetMap…': 'OpenStreetMap…', 'Zone area': 'ផ្ទៃតំបន់', 'Forest loss 2001–2024': 'ការបាត់បង់ព្រៃឈើ ២០០១–២០២៤', 'Map': 'ផែនទី', 'Why': 'មូលហេតុ', 'Score': 'ពិន្ទុ', 'Total': 'សរុប',
+  'Environmental screening': 'ការត្រួតពិនិត្យបរិស្ថាន', 'Rings': 'រង្វង់', 'Rings (km)': 'រង្វង់ (គ.ម)', 'Draw area': 'គូសផ្ទៃ', 'Draw line': 'គូសខ្សែ', 'Half-width (m)': 'ពាក់កណ្ដាលទទឹង (ម)',
+  'Or use an administrative area…': 'ឬប្រើតំបន់រដ្ឋបាល…', 'Settings': 'ការកំណត់', 'People per building': 'មនុស្សក្នុងមួយអគារ', 'Run the screening to see the results here.': 'ដំណើរការការត្រួតពិនិត្យ ដើម្បីមើលលទ្ធផលនៅទីនេះ។',
+  'Results': 'លទ្ធផល', 'Data': 'ទិន្នន័យ', 'pagoda': 'វត្ត', 'school': 'សាលារៀន', 'health': 'មណ្ឌលសុខភាព', 'heritage': 'បេតិកភណ្ឌ', 'river': 'ទន្លេ', 'stream': 'ស្ទឹង/អូរ', 'canal': 'ប្រឡាយ', 'hamlet': 'ភូមិតូច',
+  'People are estimated from OpenStreetMap buildings × %s people per building; OSM coverage varies.': 'ចំនួនប្រជាជនប៉ាន់ស្មានពីអគារក្នុង OpenStreetMap × មនុស្ស %s ក្នុងមួយអគារ។ ភាពពេញលេញរបស់ OSM ខុសគ្នាតាមតំបន់។',
+  'Prepared with Cambodia 3D – EIA Screening': 'រៀបចំដោយ Cambodia 3D – ការត្រួតពិនិត្យ EIA',
+  'Each theme is fetched live for the screening window, sources tried in order:': 'ប្រធានបទនីមួយៗទាញយកផ្ទាល់សម្រាប់តំបន់ត្រួតពិនិត្យ តាមលំដាប់ប្រភព៖',
+  'From the EIA Screening QGIS plugin (Geoinformatics and Research Lab, RUPP). Buffer rings are screening starting points, not legal thresholds.': 'ពីកម្មវិធីជំនួយ QGIS EIA Screening (ក្រុមស្រាវជ្រាវ និងអភិវឌ្ឍន៍ព័ត៌មានភូមិសាស្ត្រ សភភ)។ រង្វង់ជាចំណុចចាប់ផ្ដើមនៃការត្រួតពិនិត្យ មិនមែនជាកម្រិតច្បាប់ទេ។',
+  'Overpass busy – using the bundled OSM extract': 'Overpass រវល់ – ប្រើទិន្នន័យ OSM ដែលភ្ជាប់មកជាមួយ',
+  'Large area: downloading the data can take a long time. Continue?': 'តំបន់ធំ៖ ការទាញយកទិន្នន័យអាចចំណាយពេលយូរ។ បន្តទេ?',
 };
 export let lang = 'en';
 const ICON = /^([\p{Extended_Pictographic}←-⇿⌀-⏿■-➿⬀-⯿️‍\s·•]+)(.*)$/u;

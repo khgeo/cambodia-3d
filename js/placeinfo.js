@@ -83,3 +83,5 @@ export function placeLabels(world, list, lang) {
   }
   return g;
 }
+// every commune with its geometry (for whole commune / district / province footprints)
+export async function adminList() { return (await admin()).map(a => ({ p: a.p, g: { type: 'MultiPolygon', coordinates: a.P } })); }
