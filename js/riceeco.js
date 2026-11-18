@@ -1,7 +1,7 @@
 // Rice Ecosystem Mapper (port of the Rice Ecosystem Mapper 0.6.5 QGIS plugin, rule-based method): Cambodia's rice
 // ecosystems for one crop year (1 April → 31 March) from Sentinel-1 VH/VV and Sentinel-2 NDVI time series in
 // Google Earth Engine. Same rules and defaults as the plugin's scripts/rice_ecosystem_gee.js.
-import { evaluate } from './gee.js?v=65';
+import { evaluate } from './gee.js?v=66';
 
 export const DEFAULTS = { step: 12, orbit: 'BOTH', orbit_norm: true, smooth: true, flood_vh: -19, rise_db: 4, peak_vh: -18, grow_days: 100, min_gap: 80,
   use_flood_vv: true, flood_vv: -15, dry_ndvi: 0.45, early_start: 0, sos_method: 'rise', slope_days: 36, reject_overflood: true, pre_days: 24, pre_margin: 1.5,
