@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=64">
+<link rel="stylesheet" href="css/app.css?v=65">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -86,8 +86,8 @@
       <button id="eiaBtn" data-cat="apps" data-tip="EIA Screening: sensitive features around a project">🌿</button>
       <button id="urbanBtn" data-cat="apps" data-soon="1" data-tip="Urban Analytics: access, greenery, heat, livability">🏙️</button>
       <button id="riceSosBtn" data-cat="apps" data-tip="Rice SOS Mapper: planting dates from Sentinel-1">🌾</button>
-      <button id="riceEcoBtn" data-cat="apps" data-soon="1" data-tip="Rice Ecosystem Mapper: rainfed, irrigated, recession rice">🌱</button>
-      <button id="mineralBtn" data-cat="apps" data-soon="1" data-tip="MineralScope: mineral mapping from satellite bands">🪨</button>
+      <button id="riceEcoBtn" data-cat="apps" data-tip="Rice Ecosystem Mapper: rainfed, irrigated, recession rice">🌱</button>
+      <button id="mineralBtn" data-cat="apps" data-tip="MineralScope: mineral mapping from satellite bands">🪨</button>
       <button id="topoBtn" data-cat="export" data-tip="Export: topographic map, GeoPackage &amp; GEOINT brief">🗺️</button>
     </div>
     <span class="grow"></span>
@@ -373,6 +373,45 @@
       <div id="rsRes"></div>
     </div>
   </div>
+  <div id="riceEcoPanel" class="rpanel gpanel" hidden>
+    <div class="row lphead"><b>🌱 Rice Ecosystem Mapper</b><span id="reHint" class="hint"></span><button id="reMin" title="Hide / show">▴</button><button id="reClose" title="Close">✕</button></div>
+    <div>
+      <div id="reGee"></div>
+      <div class="svhelp">Rice ecosystems for one crop year (1 April → 31 March) from Sentinel-1 VH/VV and Sentinel-2 NDVI time series: rainfed, wet-season double, irrigated, dry-season, flood-recession, deepwater and upland rice.</div>
+      <div class="row"><span>Area</span><select id="reArea" style="flex:1"><option value="aoi">⬜ 3D area</option></select></div>
+      <div class="row"><span>Crop year</span><select id="reYear" style="flex:1"></select><span>Orbit</span><select id="reOrbit" style="flex:1"><option value="BOTH">Both</option><option value="DESCENDING">Descending</option><option value="ASCENDING">Ascending</option></select></div>
+      <details class="eiadv"><summary>Rules</summary>
+        <div class="gpgrid">
+          <label>Flooded if VH below (dB)<input id="re_flood_vh" type="number" step="0.5"></label><label>VH rise to canopy (dB)<input id="re_rise_db" type="number" step="0.5"></label>
+          <label>Canopy peak VH (dB)<input id="re_peak_vh" type="number" step="0.5"></label><label>Days between crops<input id="re_min_gap" type="number"></label>
+          <label>Dry crop NDVI ≥<input id="re_dry_ndvi" type="number" step="0.05"></label><label>Recession flood share<input id="re_recess_flood" type="number" step="0.05"></label>
+        </div>
+        <label><input type="checkbox" id="re_upland_on"> Map upland rice (candidate)</label>
+        <label><input type="checkbox" id="re_crop_mask"> Only WorldCover crop / grass / wetland</label>
+      </details>
+      <button id="reRun" class="primary eirun">▶ Map rice ecosystems</button>
+      <div id="reStatus" class="svhelp"></div>
+      <div id="reRes"></div>
+    </div>
+  </div>
+  <div id="mineralPanel" class="rpanel gpanel" hidden>
+    <div class="row lphead"><b>🪨 MineralScope</b><span id="mnHint" class="hint"></span><button id="mnMin" title="Hide / show">▴</button><button id="mnClose" title="Close">✕</button></div>
+    <div>
+      <div id="mnGee"></div>
+      <div class="svhelp">Mineral prospectivity from free satellite data: dry-season Sentinel-2, Landsat 8/9 and ASTER band ratios, Crósta PCA and DEM lineaments, with masks for vegetation, fields, villages and water.</div>
+      <div class="row"><span>Area</span><select id="mnArea" style="flex:1"><option value="aoi">⬜ 3D area</option></select></div>
+      <div class="row"><span>Model</span><select id="mnModel" style="flex:1"></select></div>
+      <details class="eiadv"><summary>Data &amp; masks</summary>
+        <div class="row skchips"><label><input type="checkbox" data-mn="s2" checked> Sentinel-2</label><label><input type="checkbox" data-mn="ls" checked> Landsat 8/9</label><label><input type="checkbox" data-mn="ast" checked> ASTER SWIR</label><label><input type="checkbox" data-mn="tir" checked> ASTER TIR</label><label><input type="checkbox" data-mn="dem" checked> DEM structure</label></div>
+        <div class="row"><span>Dry seasons</span><input id="mnSeasons" type="number" value="3" min="1" max="8" style="width:56px"><span>NDVI &lt;</span><input id="mnNdvi" type="number" value="0.35" step="0.05" style="width:64px"></div>
+        <div class="row skchips"><label><input type="checkbox" id="mn_mask_cropland" checked> Cropland</label><label><input type="checkbox" id="mn_mask_builtup" checked> Built-up</label><label><input type="checkbox" id="mn_mask_water" checked> Water</label><label><input type="checkbox" id="mn_mask_cultivated" checked> Cultivated fields</label><label><input type="checkbox" id="mn_mask_clearing" checked> Forest clearing</label><label><input type="checkbox" id="mn_slope_weight" checked> Slope weighting</label><label><input type="checkbox" id="mn_coherence" checked> Spatial coherence</label><label><input type="checkbox" id="mn_crosta" checked> Crósta PCA</label></div>
+      </details>
+      <button id="mnRun" class="primary eirun">▶ Run MineralScope</button>
+      <div id="mnStatus" class="svhelp"></div>
+      <div id="mnRes"></div>
+      <div id="mnLog" class="mnlog"></div>
+    </div>
+  </div>
   <div id="placePanel" class="rpanel" hidden>
     <div class="row lphead"><b>📍 Place info</b><span id="plHint" class="hint"></span><button id="plMin" title="Hide / show">▴</button><button id="plClose" title="Close">✕</button></div>
     <div id="plContent">
@@ -491,6 +530,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=64"></script>
+<script type="module" src="js/app.js?v=65"></script>
 </body>
 </html>
