@@ -1,6 +1,7 @@
 // English / ខ្មែរ. Strings are written in English in the page and code; this table translates them.
 // A leading icon (emoji or arrow) is kept and the rest is looked up. New text is translated as it appears.
 export const KM = {
+  'Owner house': 'ផ្ទះម្ចាស់ដី',
   'lot in this area': 'ក្បាលដីក្នុងតំបន់នេះ',
   'Owner type': 'ប្រភេទម្ចាស់',
   'Marital status': 'ស្ថានភាពគ្រួសារ',
