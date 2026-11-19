@@ -2,8 +2,8 @@
 // image houses, contours, spot heights, place names, survey points and parcels, your digitized features, the
 // tactical overlay) in EPSG:4326, the satellite image and the 13-class land cover as raster tiles (EPSG:3857),
 // and a QGIS style for each layer saved as its default (layer_styles), so the layers open styled.
-import { LC } from './landcover.js?v=69';
-import { terrainData } from './topomap.js?v=69';
+import { LC } from './landcover.js?v=70';
+import { terrainData } from './topomap.js?v=70';
 
 let SQL = null;
 async function sqljs() {
@@ -47,7 +47,7 @@ const grp = c => c <= 4 ? 'motorway' : c <= 6 ? 'primary' : c <= 8 ? 'secondary'
 const HW = ['', 'motorway', 'motorway_link', 'trunk', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'tertiary_link', 'unclassified', 'residential', 'living_street', 'service', 'pedestrian', 'track', 'footway', 'path', 'cycleway', 'steps', 'construction'];
 const roadStyle = () => qml(categorized('grp', 'line', ROADG.map(([v, l, f, w, o, d]) => ({ v, l, layers: (o ? line(o, w + 0.3) : '') + line(f, w, d ? { use_custom_dash: 1, customdash: d, customdash_unit: 'MM' } : {}) }))));
 
-export async function exportGeoPackage(world, say = () => {}) {
+export async function exportGeoPackage(world, say = () => {}, opts = {}) {
   say('Loading SQLite…'); const S = await sqljs(), db = new S.Database();
   const D = world.D, F = world.F, aoi = D.aoi, ll = (x, z) => [+F.lon(x).toFixed(7), +F.lat(z).toFixed(7)], now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   db.run('PRAGMA application_id = 1196444487; PRAGMA user_version = 10300;');
@@ -77,6 +77,14 @@ export async function exportGeoPackage(world, say = () => {}) {
   };
   const ring = r => { const o = r.map(([x, z]) => ll(x, z)); if (o.length && (o[0][0] !== o[o.length - 1][0] || o[0][1] !== o[o.length - 1][1])) o.push(o[0]); return o; };
   const cnt = {};
+  // field boundaries (Field Boundaries app, model + your edits)
+  const fieldLayer = () => { const F = world.fields || []; if (!F.length) return 0;
+    const cls = a => a < 1000 ? '< 1,000 m²' : a < 2500 ? '1,000–2,500 m²' : a < 5000 ? '2,500–5,000 m²' : a < 10000 ? '5,000–10,000 m²' : '≥ 10,000 m²';
+    return layer('field_boundaries', 'Field boundaries (AgriMapper)', 3, [['field_id', 'INTEGER'], ['area_m2', 'REAL'], ['area_ha', 'REAL'], ['perimeter_m', 'REAL'], ['size_class', 'TEXT'], ['confidence', 'REAL'], ['source', 'TEXT']],
+      F.map((f, i) => ({ g: [[...f.ring, f.ring[0]].map(([x, y]) => [+x.toFixed(7), +y.toFixed(7)])], field_id: i + 1, area_m2: +f.area_m2.toFixed(1), area_ha: +(f.area_m2 / 1e4).toFixed(4), perimeter_m: f.perim_m ? +f.perim_m.toFixed(1) : null, size_class: cls(f.area_m2), confidence: f.conf != null ? +(+f.conf).toFixed(3) : null, source: f.src || 'model' })),
+      qml(single('fill', fill('#ffe14a', '#ffd000', 0.5, { alpha: 40 })), labels('field_id', 7, '#222222', 1))); };
+  if (opts.fieldsOnly) { cnt.fields = fieldLayer(); const data = db.export(); db.close(); return { blob: new Blob([data], { type: 'application/geopackage+sqlite3' }), counts: cnt }; }
+  cnt.fields = fieldLayer();
   say('Vector layers…');
   cnt.aoi = layer('area_of_interest', 'Area of interest', 3, [['name', 'TEXT'], ['width_m', 'REAL'], ['height_m', 'REAL']], [{ g: [[[aoi.w, aoi.s], [aoi.e, aoi.s], [aoi.e, aoi.n], [aoi.w, aoi.n], [aoi.w, aoi.s]]], name: 'AOI', width_m: D.W, height_m: D.H }],
     qml(single('fill', fill('#000000', '#e01010', 0.6, { alpha: 0 }))));
@@ -127,7 +135,7 @@ export async function exportGeoPackage(world, say = () => {}) {
   // tactical overlay: TacMap symbols (SVG with param() colours) coloured by side
   const tc = world.tactical;
   if (tc && tc.features.length) {
-    const { CAT } = await (await import('./tactical.js?v=69')).loadCatalog(), feats = tc.features.filter(q => tc.inAOI(q)), base = q => ({ code: q.code, side: q.side, label: q.label || '', name_en: CAT.catalog[q.code].en, name_km: CAT.catalog[q.code].km, color: tc.color(q.side, q.code) });
+    const { CAT } = await (await import('./tactical.js?v=70')).loadCatalog(), feats = tc.features.filter(q => tc.inAOI(q)), base = q => ({ code: q.code, side: q.side, label: q.label || '', name_en: CAT.catalog[q.code].en, name_km: CAT.catalog[q.code].km, color: tc.color(q.side, q.code) });
     const svgs = {}; for (const q of feats.filter(q => q.geom === 'point')) if (!svgs[q.code]) { try { svgs[q.code] = btoa(unescape(encodeURIComponent(await (await fetch('tac/svg/' + CAT.catalog[q.code].svg)).text()))); } catch (e) { } }
     const svgSym = c => `<layer class="SvgMarker" enabled="1" pass="0" locked="0">${opt({ name: 'base64:' + svgs[c], size: 7, size_unit: 'MM', color: '255,255,255,255', outline_color: '232,23,61,255', outline_width: 0.6, outline_width_unit: 'MM', vertical_anchor_point: '2' })}${ddColor('outlineColor', 'color')}</layer>`;
     cnt.tacP = layer('tactical_points', 'Tactical symbols', 1, [['code', 'TEXT'], ['side', 'TEXT'], ['label', 'TEXT'], ['name_en', 'TEXT'], ['name_km', 'TEXT'], ['color', 'TEXT'], ['rings_m', 'TEXT'], ['direction_deg', 'REAL']],

@@ -225,6 +225,15 @@ export const KM = {
   'Cut tree canopy out of fields (Agri trees model, ×2 time)': 'កាត់ម្លប់ឈើចេញពីស្រែ (ម៉ូដែលដើមឈើ Agri, ពេល ×2)',
   'Road-aware Agri model (v3)': 'ម៉ូដែល Agri ដឹងពីផ្លូវ (v3)', 'v3 fields + v1 boundaries': 'ស្រែ v3 + ព្រំ v1', 'Original Agri model (v1)': 'ម៉ូដែល Agri ដើម (v1)', 'Road-aware v2 only': 'តែ v2 ដឹងពីផ្លូវ',
   'Drop forest and orchard patches (dark green)': 'ដកព្រៃ និងចម្ការឈើចេញ (ពណ៌បៃតងចាស់)',
+  'edited': 'បានកែ', 'digitized': 'បានគូសដោយដៃ', 'model': 'ម៉ូដែល', 'Tap a field to select it.': 'ចុចលើស្រែដើម្បីជ្រើសរើស។', 'perimeter': 'បរិមាត្រ', 'ready to merge': 'រួចរាល់សម្រាប់បញ្ចូល',
+  'Tap a field to select it. Drag its white corners to move them, drag a blue mid-point to add a corner, right-click a corner to delete it. Shift + tap a second field to merge.': 'ចុចលើស្រែដើម្បីជ្រើស។ អូសជ្រុងពណ៌សដើម្បីផ្លាស់ទី អូសចំណុចកណ្ដាលពណ៌ខៀវដើម្បីបន្ថែមជ្រុង ចុចកណ្ដុរស្ដាំលើជ្រុងដើម្បីលុប។ Shift + ចុចស្រែទីពីរដើម្បីបញ្ចូលគ្នា។',
+  'Tap the corners of a new field; right-click or Finish to close it. Corners snap to nearby fields.': 'ចុចជ្រុងនៃស្រែថ្មី ចុចកណ្ដុរស្ដាំ ឬ បញ្ចប់ ដើម្បីបិទ។ ជ្រុងនឹងភ្ជាប់ទៅស្រែក្បែរ។',
+  'Select a field, then tap two points of a straight line across it.': 'ជ្រើសស្រែ រួចចុចពីរចំណុចនៃបន្ទាត់ត្រង់កាត់វា។', 'Select a field, then Shift + tap the neighbour to merge with.': 'ជ្រើសស្រែ រួច Shift + ចុចស្រែជាប់គ្នាដើម្បីបញ្ចូល។',
+  'Edit fields': 'កែស្រែ', 'Select': 'ជ្រើស', 'Draw': 'គូស', 'Split': 'បំបែក', 'Merge': 'បញ្ចូល', 'Delete': 'លុប', 'Cancel': 'បោះបង់', 'Export': 'នាំចេញ', 'IDs': 'លេខ', 'Map layout': 'ប្លង់ផែនទី', 'Report': 'របាយការណ៍',
+  'Field boundaries': 'ព្រំស្រែ', 'Legend': 'សញ្ញាសម្គាល់', 'Statistics': 'ស្ថិតិ', 'Location': 'ទីតាំង', 'Fields': 'ស្រែ', 'Total area': 'ផ្ទៃសរុប', 'Median size': 'ទំហំមធ្យមភាគ', 'Mean size': 'ទំហំមធ្យម', 'Date': 'កាលបរិច្ឆេទ',
+  'Field from the model': 'ស្រែពីម៉ូដែល', 'Edited by hand': 'កែដោយដៃ', 'Digitized by hand': 'គូសដោយដៃ', 'Field boundary report': 'របាយការណ៍ព្រំស្រែ', 'Field sizes': 'ទំហំស្រែ', 'Size class': 'ថ្នាក់ទំហំ', 'Sources': 'ប្រភព', 'Method': 'វិធីសាស្ត្រ',
+  'Field list': 'បញ្ជីស្រែ', 'Source': 'ប្រភព', '+ %d more fields in the GeoPackage / CSV': '+ ស្រែ %d ទៀតក្នុង GeoPackage / CSV', 'pages': 'ទំព័រ',
+  'Fields were detected from zoom-18 satellite imagery (about 0.6 m) with the Agri ONNX field-boundary model running in the browser: marker watershed on the boundary map, merging of weak edges, shared straightened edges and a 2 m bund gap. OpenStreetMap roads, water and buildings were cut out, dark-green forest patches dropped, and the result was checked and edited by hand.': 'ស្រែត្រូវបានរកឃើញពីរូបភាពផ្កាយរណបកម្រិត zoom 18 (ប្រហែល ០.៦ ម) ដោយម៉ូដែលព្រំស្រែ Agri ONNX ក្នុងកម្មវិធីរុករក៖ marker watershed លើផែនទីព្រំ ការបញ្ចូលគែមខ្សោយ គែមរួមតម្រង់ និងគម្លាតភ្លឺ ២ ម។ ផ្លូវ ទឹក និងអគារពី OpenStreetMap ត្រូវបានកាត់ចេញ តំបន់ព្រៃបៃតងចាស់ត្រូវបានដកចេញ ហើយលទ្ធផលត្រូវបានពិនិត្យ និងកែដោយដៃ។',
   'Large area: downloading the data can take a long time. Continue?': 'តំបន់ធំ៖ ការទាញយកទិន្នន័យអាចចំណាយពេលយូរ។ បន្តទេ?',
 };
 export let lang = 'en';
