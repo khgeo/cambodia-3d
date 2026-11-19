@@ -896,7 +896,7 @@ let FB = null; // { M, fields, im }
 const FB_KEYS = ['extent_thr', 'boundary_thr', 'merge_thr', 'gap_m', 'min_area_m2', 'min_rect', 'regularise_m', 'min_width_m'];
 function fbFill() { // fields filled by size class on the ground, with their outlines
   const D = world.D, c = document.createElement('canvas'); c.width = D.img.width; c.height = D.img.height; const g = c.getContext('2d'), cls = a => a < 1000 ? '#fde725' : a < 2500 ? '#5ec962' : a < 5000 ? '#21918c' : a < 10000 ? '#3b528b' : '#440154';
-  for (const f of FB.fields) { g.beginPath(); f.ring.forEach(([lo, la], k) => k ? g.lineTo(D.pxX(lo), D.pxY(la)) : g.moveTo(D.pxX(lo), D.pxY(la))); g.closePath(); if ($('fbFill').checked) { g.globalAlpha = 0.42; g.fillStyle = cls(f.area_m2); g.fill(); } g.globalAlpha = 1; g.strokeStyle = '#ffe14a'; g.lineWidth = 2; g.stroke(); }
+  for (const f of FB.fields) { g.beginPath(); f.ring.forEach(([lo, la], k) => k ? g.lineTo(D.pxX(lo), D.pxY(la)) : g.moveTo(D.pxX(lo), D.pxY(la))); g.closePath(); if ($('fbFill').checked) { g.globalAlpha = 0.42; g.fillStyle = cls(f.area_m2); g.fill(); } g.globalAlpha = 1; g.strokeStyle = '#ffe14a'; g.lineWidth = 1.5; g.stroke(); }
   world.setCompare({ mode: 'changes', diff: c, before: null });
 }
 function fbRender() {
@@ -926,7 +926,7 @@ async function fbRun() {
     let cut = o.osm_cut ? M.osmCut(world, im) : null;
     if (o.trees) { const T = await M.predict(im, { ...o, tta: false }, s => st.textContent = '⏳ 🌳 ' + s, 'cambodia_trees'); cut = cut || new Uint8Array(im.W * im.H); let k = 0; for (let q = 0; q < cut.length; q++) if (T.extent[q] > 0.5) { cut[q] = 1; k++; } FB.treePct = 100 * k / cut.length; }
     say('Fields from the model…'); const seg = await M.segment(im, P, o, cut, say);
-    const { turf } = await import('./eia.js?v=67'); FB.fields = await M.bundGap(seg.fields, o.gap_m, turf); FB.seg = { m: seg.m, n: seg.fields.length };
+    const { turf } = await import('./eia.js?v=67'); FB.fields = await M.bundGap(seg.fields, o.gap_m, turf); FB.seg = { m: seg.m, n: seg.fields.length }; FB.seg = { m: seg.m, n: seg.fields.length };
     fbRender(); st.textContent = `✅ ${FB.fields.length} ${tr('fields')} · ${im.W}×${im.H} px (${im.mpp.toFixed(2)} m) · ${Math.round((performance.now() - t0) / 1000)} s`;
   } catch (e) { console.error(e); st.textContent = '⚠️ ' + e.message; } finally { b.disabled = false; }
 }

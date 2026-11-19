@@ -105,6 +105,57 @@ function dp(pts, tol) { // Douglas–Peucker on a closed ring
   const rec = (a, b) => { let md = 0, mi = -1; const [ax, ay] = pts[a], [bx, by] = pts[b], L = Math.hypot(bx - ax, by - ay) || 1; for (let i = a + 1; i < b; i++) { const d = Math.abs((bx - ax) * (ay - pts[i][1]) - (ax - pts[i][0]) * (by - ay)) / L; if (d > md) { md = d; mi = i; } } if (md > tol) { keep[mi] = 1; rec(a, mi); rec(mi, b); } };
   rec(0, far); rec(far, pts.length - 1); return pts.filter((_, i) => keep[i]);
 }
+
+// topology-preserving smoothing of the label partition (as smooth_labels): each label's indicator blurred in its box
+function smoothLabels(lab, W, H, m, sigma = 2) {
+  if (sigma <= 0) return lab; const r = Math.ceil(3 * sigma), k = Array.from({ length: 2 * r + 1 }, (_, i) => Math.exp(-((i - r) ** 2) / (2 * sigma * sigma))), ks = k.reduce((a, b) => a + b, 0); k.forEach((v, i) => k[i] = v / ks);
+  const bb = Array.from({ length: m + 1 }, () => [1e9, 1e9, -1, -1]); for (let p = 0; p < W * H; p++) { const L = lab[p]; if (!L) continue; const x = p % W, y = (p / W) | 0, b = bb[L]; if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x > b[2]) b[2] = x; if (y > b[3]) b[3] = y; }
+  const best = new Float32Array(W * H).fill(-1), out = new Int32Array(W * H);
+  for (let L = 1; L <= m; L++) { const b = bb[L]; if (b[2] < 0) continue; const x0 = Math.max(0, b[0] - r), y0 = Math.max(0, b[1] - r), x1 = Math.min(W - 1, b[2] + r), y1 = Math.min(H - 1, b[3] + r), w = x1 - x0 + 1, h = y1 - y0 + 1, a = new Float32Array(w * h), t = new Float32Array(w * h);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) a[y * w + x] = lab[(y + y0) * W + x + x0] === L ? 1 : 0;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let v = 0; for (let i = -r; i <= r; i++) { const xx = x + i; if (xx >= 0 && xx < w) v += a[y * w + xx] * k[i + r]; } t[y * w + x] = v; }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let v = 0; for (let i = -r; i <= r; i++) { const yy = y + i; if (yy >= 0 && yy < h) v += t[yy * w + x] * k[i + r]; } const q = (y + y0) * W + x + x0; if (v > best[q]) { best[q] = v; out[q] = L; } } }
+  for (let p = 0; p < W * H; p++) if (!lab[p]) out[p] = 0; return out;
+}
+// polygons with SHARED, straightened edges (as regularise_partition): the crack-edge network between labels is cut
+// into arcs at junctions, each arc is simplified once, and every field is rebuilt from its arcs, so neighbours get
+// the identical straight edge – with the bund gap applied afterwards, neighbouring edges stay parallel
+function partitionPolygons(lab, W, H, tol) {
+  const L = (x, y) => x < 0 || y < 0 || x >= W || y >= H ? 0 : lab[y * W + x], CW = W + 1, cid = (x, y) => y * CW + x;
+  const hDiff = (x, y) => L(x, y - 1) !== L(x, y), vDiff = (x, y) => L(x - 1, y) !== L(x, y); // edge (x,y)->(x+1,y) / (x,y)->(x,y+1)
+  const deg = (x, y) => (y > 0 && vDiff(x, y - 1) ? 1 : 0) + (y < H && vDiff(x, y) ? 1 : 0) + (x > 0 && hDiff(x - 1, y) ? 1 : 0) + (x < W && hDiff(x, y) ? 1 : 0);
+  const isNode = (x, y) => { const d = deg(x, y); if (d >= 3) return true; if (d === 2) { const a = L(x - 1, y - 1), b = L(x, y - 1), c = L(x - 1, y), e = L(x, y); return a === e && b === c && a !== b; } return false; }; // pinch
+  const hv = new Uint8Array(CW * (H + 1)), vv = new Uint8Array(CW * (H + 1)), arcs = [];
+  // neighbours of a corner along crack edges: [nx, ny, kind, ex, ey]
+  const nbr = (x, y) => { const o = []; if (x < W && hDiff(x, y)) o.push([x + 1, y, 'h', x, y]); if (x > 0 && hDiff(x - 1, y)) o.push([x - 1, y, 'h', x - 1, y]); if (y < H && vDiff(x, y)) o.push([x, y + 1, 'v', x, y]); if (y > 0 && vDiff(x, y - 1)) o.push([x, y - 1, 'v', x, y - 1]); return o; };
+  const seen = (k, ex, ey) => (k === 'h' ? hv : vv)[cid(ex, ey)], mark = (k, ex, ey) => (k === 'h' ? hv : vv)[cid(ex, ey)] = 1;
+  const labelsOf = (k, ex, ey) => k === 'h' ? [L(ex, ey - 1), L(ex, ey)] : [L(ex - 1, ey), L(ex, ey)];
+  const walk = (x, y, first) => { const pts = [[x, y]], lbl = labelsOf(first[2], first[3], first[4]); let cur = first, guard = 0;
+    for (;;) { mark(cur[2], cur[3], cur[4]); const [nx, ny] = cur; pts.push([nx, ny]); if (isNode(nx, ny) || (nx === x && ny === y) || ++guard > 4 * W * H) break;
+      const nxt = nbr(nx, ny).find(e => !seen(e[2], e[3], e[4])); if (!nxt) break; cur = nxt; }
+    arcs.push({ pts, a: lbl[0], b: lbl[1] }); };
+  for (let y = 0; y <= H; y++) for (let x = 0; x <= W; x++) if (isNode(x, y)) for (const e of nbr(x, y)) if (!seen(e[2], e[3], e[4])) walk(x, y, e);
+  for (let y = 0; y <= H; y++) for (let x = 0; x <= W; x++) for (const e of nbr(x, y)) if (!seen(e[2], e[3], e[4])) walk(x, y, e); // closed loops without junctions
+  // simplify each arc once (end points fixed; closed loops split at the farthest point)
+  const simp = pts => { if (pts.length <= 2) return pts; const closed = pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1];
+    if (closed) { let far = 1, fd = -1; for (let i = 1; i < pts.length - 1; i++) { const d = Math.hypot(pts[i][0] - pts[0][0], pts[i][1] - pts[0][1]); if (d > fd) { fd = d; far = i; } } const A = dpOpen(pts.slice(0, far + 1), tol), B = dpOpen(pts.slice(far), tol); return A.concat(B.slice(1)); }
+    return dpOpen(pts, tol); };
+  for (const a of arcs) a.s = simp(a.pts);
+  // rings per label, chaining its arcs end to end
+  const byLabel = new Map(); arcs.forEach((a, i) => { for (const l of [a.a, a.b]) if (l > 0 && a.a !== a.b) { if (!byLabel.has(l)) byLabel.set(l, []); byLabel.get(l).push(i); } });
+  const rings = new Map(), key = p => p[0] + ',' + p[1];
+  for (const [l, ids] of byLabel) { const left = new Set(ids), out = [];
+    while (left.size) { const i0 = left.values().next().value; left.delete(i0); let ring = arcs[i0].s.slice(); let guard = 0;
+      while (key(ring[0]) !== key(ring[ring.length - 1]) && guard++ < ids.length + 2) { const end = key(ring[ring.length - 1]); let nxt = null, rev = false;
+        for (const j of left) { const s = arcs[j].s; if (key(s[0]) === end) { nxt = j; break; } if (key(s[s.length - 1]) === end) { nxt = j; rev = true; break; } }
+        if (nxt == null) break; left.delete(nxt); const s = rev ? arcs[nxt].s.slice().reverse() : arcs[nxt].s; ring = ring.concat(s.slice(1)); }
+      if (ring.length >= 4) out.push(ring.slice(0, -1)); }
+    rings.set(l, out.sort((p, q) => ringArea(q) - ringArea(p))[0]); }
+  return rings;
+}
+function dpOpen(pts, tol) { if (pts.length <= 2) return pts; const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
+  const rec = (a, b) => { let md = 0, mi = -1; const [ax, ay] = pts[a], [bx, by] = pts[b], Ln = Math.hypot(bx - ax, by - ay); for (let i = a + 1; i < b; i++) { const d = Ln ? Math.abs((bx - ax) * (ay - pts[i][1]) - (ax - pts[i][0]) * (by - ay)) / Ln : Math.hypot(pts[i][0] - ax, pts[i][1] - ay); if (d > md) { md = d; mi = i; } } if (md > tol) { keep[mi] = 1; rec(a, mi); rec(mi, b); } };
+  rec(0, pts.length - 1); return pts.filter((_, i) => keep[i]); }
 const ringArea = r => { let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += r[j][0] * r[i][1] - r[i][0] * r[j][1]; return Math.abs(a / 2); };
 const perim = r => r.reduce((s, p, i) => s + Math.hypot(p[0] - r[(i + 1) % r.length][0], p[1] - r[(i + 1) % r.length][1]), 0);
 function hull(pts) { const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = []; for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); } for (const q of p.reverse()) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); } return lo.slice(0, -1).concat(up.slice(0, -1)); }
@@ -121,16 +172,16 @@ export async function segment(im, P, o, cut, say) {
   const minCore = Math.round(o.min_core_px * (0.6 * 0.6) / px2); for (let p = 0; p < N; p++) if (mk[p] && sz[mk[p]] < minCore) mk[p] = 0;
   say && say('Watershed…'); await new Promise(r => setTimeout(r, 0));
   let lab = watershed(P.boundary, mk, field, W, H); let m; [lab, m] = mergeWeak(lab, P.boundary, W, H, o.merge_thr);
-  // per-field bounding boxes, mean extent (confidence)
-  const bb = Array.from({ length: m + 1 }, () => [1e9, 1e9, -1, -1]), cs = new Float64Array(m + 1), cn = new Int32Array(m + 1);
-  for (let p = 0; p < N; p++) { const L = lab[p]; if (!L) continue; const x = p % W, y = (p / W) | 0, b = bb[L]; if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x > b[2]) b[2] = x; if (y > b[3]) b[3] = y; cs[L] += P.extent[p]; cn[L]++; }
+  lab = smoothLabels(lab, W, H, m, 2);
+  for (let p = 0; p < N; p++) if (lab[p] && !field[p]) lab[p] = 0;
+  const cs = new Float64Array(m + 1), cn = new Int32Array(m + 1); for (let p = 0; p < N; p++) { const L = lab[p]; if (L) { cs[L] += P.extent[p]; cn[L]++; } }
   say && say('Polygons…'); await new Promise(r => setTimeout(r, 0));
-  const tol = o.regularise_m / im.mpp, out = [];
-  for (let L = 1; L <= m; L++) { if (cn[L] * px2 < o.min_area_m2 * 0.8) continue; const r0 = trace(lab, W, L, bb[L]); if (!r0 || r0.length < 4) continue; const r = dp(r0, tol); if (r.length < 3) continue;
+  const rings = partitionPolygons(lab, W, H, o.regularise_m / im.mpp), out = [];
+  for (const [L, r] of rings) { if (!r || r.length < 3) continue;
     const A = ringArea(r) * px2; if (A < o.min_area_m2 || A > o.max_area_m2) continue;
     const rect = A / (minRectArea(r) * px2 || 1); if (o.min_rect > 0 && rect < o.min_rect) continue;
     const width = 2 * A / (perim(r) * im.mpp); if (o.min_width_m > 0 && width < o.min_width_m) continue; // ≈ mean width (2·area / perimeter)
-    out.push({ ring: r.map(([x, y]) => [im.lon(x), im.lat(y)]), area_m2: A, conf: cs[L] / cn[L], rect, label: L }); }
+    out.push({ ring: r.map(([x, y]) => [im.lon(x), im.lat(y)]), area_m2: A, conf: cs[L] / Math.max(1, cn[L]), rect, label: L }); }
   return { fields: out, lab, m };
 }
 // a 2 m bund gap: shrink every field by half the gap (turf negative buffer)
