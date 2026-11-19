@@ -3,7 +3,7 @@
 // line of sight with profile, viewshed, GO / SLOW-GO / NO-GO mobility, range rings, own ↔ enemy measurement.
 // For planning and training from open data – confirm on the ground.
 import * as THREE from 'three';
-import { TO_SAT2TOPO } from './landcover.js?v=78';
+import { TO_SAT2TOPO } from './landcover.js?v=79';
 
 const KEY = 'cambodia3d.tac.v1';
 let CAT = null, MOB = null;

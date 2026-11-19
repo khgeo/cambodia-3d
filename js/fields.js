@@ -4,7 +4,8 @@
 // filling, rectangularity / width / area filters, 2 m bund gap) plus a road / water / building cut from the
 // scene's OpenStreetMap masks, which removes the road confusion of the model.
 import * as THREE from 'three';
-import * as G from './geo.js?v=78';
+import * as G from './geo.js?v=79';
+import { bundGeometry } from './ricefield.js?v=79';
 
 const ORT = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
 let ort = null, provider_ = ''; const sessions = {};
@@ -231,16 +232,8 @@ export function dropDarkGreen(fields, im, exg = 10, bright = 85) {
 }
 
 /* ---------------- 3D: raised bunds along every field edge ---------------- */
-export function show3D(world, fields, color = 0xffe14a) {
-  hide3D(world); const F = world.F, D = world.D, pos = [], inside = (x, z) => x > D.X0 && x < D.X0 + D.W && z > D.Z0 && z < D.Z0 + D.H, h = 0.35, wd = 0.45;
-  for (const f of fields) { const R = f.ring.map(([lo, la]) => [F.x(lo), F.z(la)]);
-    for (let i = 0; i < R.length; i++) { const a = R[i], b = R[(i + 1) % R.length], L = Math.hypot(b[0] - a[0], b[1] - a[1]), n = Math.max(1, Math.ceil(L / 6));
-      for (let k = 0; k < n; k++) { const p = [a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n], q = [a[0] + (b[0] - a[0]) * (k + 1) / n, a[1] + (b[1] - a[1]) * (k + 1) / n]; if (!inside(p[0], p[1]) || !inside(q[0], q[1])) continue;
-        const nx = -(q[1] - p[1]) / (L / n) * wd / 2, nz = (q[0] - p[0]) / (L / n) * wd / 2, yp = world.groundAt(p[0], p[1]) + 0.05, yq = world.groundAt(q[0], q[1]) + 0.05;
-        const A = [p[0] + nx, yp, p[1] + nz], B = [q[0] + nx, yq, q[1] + nz], C = [q[0] - nx, yq, q[1] - nz], E = [p[0] - nx, yp, p[1] - nz], A2 = [A[0], yp + h, A[2]], B2 = [B[0], yq + h, B[2]], C2 = [C[0], yq + h, C[2]], E2 = [E[0], yp + h, E[2]];
-        pos.push(...A2, ...B2, ...C2, ...A2, ...C2, ...E2, ...A, ...B, ...B2, ...A, ...B2, ...A2, ...E, ...C2, ...C, ...E, ...E2, ...C2); } } }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
-  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, emissive: color, emissiveIntensity: 0.25, side: THREE.DoubleSide })); m.renderOrder = 5; world.scene.add(m); world.fieldMesh = m;
+export function show3D(world, fields) { // earth bunds between the fields (low ridges, grass on top)
+  hide3D(world); const m = bundGeometry(world, fields); if (!m) return; world.scene.add(m); world.fieldMesh = m; if (world.farmUpdate) world.farmUpdate(fields);
 }
 export function hide3D(world) { if (world.fieldMesh) { world.scene.remove(world.fieldMesh); world.fieldMesh.geometry.dispose(); world.fieldMesh.material.dispose(); world.fieldMesh = null; } }
 // fill every field with the most common colour of an overlay image (lon/lat-linear over the AOI): a per-field map

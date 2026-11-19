@@ -1,10 +1,11 @@
 // Trees (leafy species, sugar & coconut palms, bushes) placed from imagery canopy, and a near-camera
 // field of grass, rice and forest understory that follows the viewer.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=78';
-import { mulberry32 } from './geo.js?v=78';
-import { makeGrassMaterial } from './shaders.js?v=78';
-import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=78';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=79';
+import { mulberry32 } from './geo.js?v=79';
+import { makeGrassMaterial } from './shaders.js?v=79';
+import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=79';
+import { FARM, riceHill } from './ricefield.js?v=79';
 
 let TEX = null;
 const texs = () => TEX || (TEX = foliageTextures());
@@ -113,7 +114,7 @@ function bladeTuft(nBlades, h, w, bend, seed, base, tip) {
   return g;
 }
 const RICE = new THREE.Color(0x9cc25a), GRASS = new THREE.Color(0xa8b870), WHITE = new THREE.Color(1, 1, 1);
-export const SEASON = { col: null, h: 1 }; // rice stage set from the scene panel
+export const SEASON = { col: null, h: 1, kind: 'image' }; // rice stage set from the scene panel
 
 export class GrassField {
   constructor(ctx, uTime, mobile) {
@@ -121,7 +122,7 @@ export class GrassField {
     const mat = makeGrassMaterial({ uTime });
     this.N = mobile ? 14000 : 42000;
     this.grass = new THREE.InstancedMesh(bladeTuft(9, 0.34, 0.022, 0.45, 1, 0x5f7f36, 0xd0e092), mat, this.N);
-    this.rice = new THREE.InstancedMesh(bladeTuft(11, 0.5, 0.016, 0.22, 2, 0x5e8a36, 0xd2e88c), mat, this.N);
+    this.riceMat = mat; this.riceKind = 'vegetative'; this.rice = new THREE.InstancedMesh(riceHill('vegetative', 3), mat, this.N); // real rice hills (from Terrain to Blender)
     for (const m of [this.grass, this.rice]) { m.count = 0; m.frustumCulled = false; m.receiveShadow = true; this.group.add(m); }
     // forest understory pools
     const T = texs(), U = understoryKit(), sc = mobile ? 0.5 : 1;
@@ -148,18 +149,24 @@ export class GrassField {
     const cellK = (x, z) => cls[Math.min(gh - 1, Math.max(0, ((z - Z0) / C) | 0)) * gw + Math.min(gw - 1, Math.max(0, ((x - X0) / C) | 0))];
     const masked = (x, z) => mask[Math.min(mh - 1, ((z - Z0) / MR) | 0) * mw + Math.min(mw - 1, ((x - X0) / MR) | 0)];
     const inside = (x, z) => x > X0 && z > Z0 && x < X0 + W && z < Z0 + H;
-    let ng = 0, nr = 0;
+    let ng = 0, nr = 0; const FM = FARM.mask, kind = SEASON.kind === 'image' ? 'vegetative' : SEASON.kind;
+    if (kind !== this.riceKind) { this.riceKind = kind; const g = this.rice.geometry; this.rice.geometry = riceHill(kind, 3); g.dispose(); }
+    // rice hills in rows, 25 cm apart, inside the mapped fields (or the rice cells of the land cover)
+    { const sr = 0.25, Rr = Math.min(R, Math.sqrt(this.N * sr * sr / Math.PI)), tint = SEASON.kind !== 'image';
+      for (let j = Math.floor((target.z - Rr) / sr); j <= Math.ceil((target.z + Rr) / sr) && nr < this.N; j++) for (let i = Math.floor((target.x - Rr) / sr); i <= Math.ceil((target.x + Rr) / sr) && nr < this.N; i++) {
+        const rx = i * sr, rz = j * sr, dd = (rx - target.x) ** 2 + (rz - target.z) ** 2; if (dd > Rr * Rr || !inside(rx, rz) || masked(rx, rz)) continue;
+        if (FM) { if (!FM.at(rx, rz)) continue; } else { const ci = Math.min(gw - 1, ((rx - X0) / C) | 0), cj = ((rz - Z0) / C) | 0; if (!(cls[cj * gw + ci] === 3 && splatRice[cj * gw + ci] > 0)) continue; }
+        const hs = hash(i, j), fade = 1 - Math.sqrt(dd) / Rr, x = rx + (hs - .5) * 0.05, z = rz + (hash(j, i) - .5) * 0.05, sc = (0.85 + hs * 0.3) * (0.7 + 0.3 * fade);
+        d.position.set(x, hAt(x, z) - (SEASON.kind === 'seedling' ? 0 : 0.02), z); d.rotation.set(0, hs * 6.28, 0); d.scale.set(sc, sc * (0.9 + hash(i + 1, j) * 0.2), sc); d.updateMatrix(); this.rice.setMatrixAt(nr, d.matrix);
+        if (tint) col.setScalar(0.85 + hash(i, j + 3) * 0.3); else { const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(2.6).lerp(WHITE, 0.35); }
+        this.rice.setColorAt(nr, col); nr++; } }
     const sp = 0.42, i0 = Math.floor((target.x - R) / sp), i1 = Math.ceil((target.x + R) / sp), j0 = Math.floor((target.z - R) / sp), j1 = Math.ceil((target.z + R) / sp);
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       if (ng >= this.N && nr >= this.N) break;
       const rx = i * sp, rz = j * sp, dd = (rx - target.x) ** 2 + (rz - target.z) ** 2; if (dd > R * R || !inside(rx, rz) || masked(rx, rz)) continue;
       const ci = Math.min(gw - 1, ((rx - X0) / C) | 0), cj = ((rz - Z0) / C) | 0, k = cls[cj * gw + ci], hs = hash(i, j), fade = 1 - Math.sqrt(dd) / R;
-      if (k === 3 && splatRice[cj * gw + ci] > 0) {
-        if (nr >= this.N) continue;
-        const x = rx + (hs - .5) * 0.04, z = rz + (hash(j, i) - .5) * 0.04;
-        d.position.set(x, hAt(x, z) - 0.02, z); d.rotation.set(0, hs * 6.28, 0); d.scale.set((0.8 + hs * 0.35) * (0.6 + 0.4 * fade), (0.8 + hs * 0.35) * (0.6 + 0.4 * fade) * SEASON.h, (0.8 + hs * 0.35) * (0.6 + 0.4 * fade)); d.updateMatrix(); this.rice.setMatrixAt(nr, d.matrix);
-        const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(2.2).lerp(RICE, 0.35); if (SEASON.col) col.lerp(SEASON.col, 0.75); this.rice.setColorAt(nr, col); nr++;
-      } else {
+      if (FM ? FM.at(rx, rz) : (k === 3 && splatRice[cj * gw + ci] > 0)) continue; // rice is placed above
+      {
         const dens = k === 3 ? 0.95 : k === 2 ? 0.45 : k === 4 ? 0.15 : k === 5 ? 0.12 : 0.3;
         if (hs > dens || ng >= this.N) continue;
         const x = rx + (hash(i + 7, j) - .5) * sp, z = rz + (hash(i, j + 7) - .5) * sp;

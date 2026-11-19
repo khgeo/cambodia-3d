@@ -2,8 +2,8 @@
 // Above-ground layers (water, roads, plants, buildings, traffic) rise; derived map layers (land cover,
 // elevation, soil, geology) sink below the imagery surface. A level bar picks / isolates a layer.
 import * as THREE from 'three';
-import { UNITS, SOIL_CLASSES, geologyAt, soilAt } from './section.js?v=78';
-import { LC } from './landcover.js?v=78';
+import { UNITS, SOIL_CLASSES, geologyAt, soilAt } from './section.js?v=79';
+import { LC } from './landcover.js?v=79';
 
 export const LAYERS = [
   { id: 'traffic', short: 'Traffic & people', name: 'Traffic & people', c: '#ff8a3d', side: 1, on: true },

@@ -1,6 +1,18 @@
 // English / ខ្មែរ. Strings are written in English in the page and code; this table translates them.
 // A leading icon (emoji or arrow) is kept and the rest is looked up. New text is translated as it appears.
 export const KM = {
+  'next junction: left': 'ផ្លូវបំបែកបន្ទាប់៖ ឆ្វេង',
+  'next junction: right': 'ផ្លូវបំបែកបន្ទាប់៖ ស្ដាំ',
+  'next junction: straight': 'ផ្លូវបំបែកបន្ទាប់៖ ត្រង់',
+  'Turn left at the next junction': 'បត់ឆ្វេងនៅផ្លូវបំបែកបន្ទាប់',
+  'Turn right at the next junction': 'បត់ស្ដាំនៅផ្លូវបំបែកបន្ទាប់',
+  'Go': 'ទៅ',
+  'Brake': 'ហ្វ្រាំង',
+  'Virtual GPS: drive it yourself': 'GPS និម្មិត៖ បើកបរដោយខ្លួនឯង',
+  'Voice language': 'ភាសាសំឡេង',
+  'You are not in this 3D area – switching to a virtual GPS: you drive here with the on-screen pedals.': 'អ្នកមិននៅក្នុងតំបន់ 3D នេះទេ – ប្ដូរទៅ GPS និម្មិត៖ អ្នកបើកបរដោយប្រើប៊ូតុងលើអេក្រង់។',
+  'GPS is not available on this device – switching to a virtual GPS: you drive with the on-screen pedals.': 'ឧបករណ៍នេះគ្មាន GPS – ប្ដូរទៅ GPS និម្មិត៖ អ្នកបើកបរដោយប្រើប៊ូតុងលើអេក្រង់។',
+  '🚨 You drove through a red light!': '🚨 អ្នកបើកបុកភ្លើងក្រហម!',
   'Loading the 3D model…': 'កំពុងផ្ទុកម៉ូដែល 3D…',
   'Illustrative model': 'ម៉ូដែលឧទាហរណ៍',
   'Back to the globe': 'ត្រឡប់ទៅភពផែនដី',

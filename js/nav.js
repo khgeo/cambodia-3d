@@ -2,7 +2,7 @@
 // turn-by-turn guidance with lane advice, traffic lights with countdowns (simulated timings), voice prompts,
 // a follow camera, live GPS or a simulated drive, trip summary and GPX export.
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=78';
+import { t, lang } from './i18n.js?v=79';
 
 const KMH = 1 / 3.6;
 // travel speeds by OSM class (km/h): 1 motorway … 12 residential, 13 living street, 14 service, 16 track
@@ -149,9 +149,9 @@ export class Nav {
   /* ---------------- trip ---------------- */
   start(sim) {
     const R = this.routes[this.sel]; if (!R) return; this.stop(true);
-    this.trip = { R, sim, clock: Date.now() / 1000, s: 0, v: 0, t0: performance.now(), driven: 0, waited: 0, stops: 0, said: new Set(), mi: 0, gpsOff: 0, hist: [], max: 0, last: null };
+    this.trip = { R, sim: sim === true, manual: sim === 'manual', clock: Date.now() / 1000, s: 0, v: 0, t0: performance.now(), driven: 0, waited: 0, stops: 0, said: new Set(), mi: 0, gpsOff: 0, hist: [], max: 0, last: null };
     this.follow = true; this.camMode = '3d'; this.makeCar(); this.draw(); this.renderHud(); this.o.onTrip && this.o.onTrip(true);
-    if (!sim) this.gpsStart(); this.speak(this.sentence(R.M[0], R.M[0].s, true));
+    if (sim === 'manual') this.manualStart(); else if (!sim) this.gpsStart(); this.announce(R.M[0], R.M[0].s, true);
   }
   stop(silent) {
     if (this.watch != null) { navigator.geolocation.clearWatch(this.watch); this.watch = null; }
@@ -159,19 +159,44 @@ export class Nav {
     try { window.speechSynthesis && speechSynthesis.cancel(); } catch (e) { }
   }
   gpsStart() {
-    if (!navigator.geolocation) { this.toast('GPS is not available on this device – switching to a simulated drive.'); this.trip.sim = true; return; }
+    if (!navigator.geolocation) { this.toast('GPS is not available on this device – switching to a virtual GPS: you drive with the on-screen pedals.'); this.manualStart(); return; }
     this.watch = navigator.geolocation.watchPosition(p => this.gpsFix(p), e => { this.toast(t('GPS: ') + e.message); }, { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
   }
   gpsFix(p) {
     const T = this.trip; if (!T || T.sim) return; const F = this.w.F, D = this.w.D, x = F.x(p.coords.longitude), z = F.z(p.coords.latitude);
-    if (x < D.X0 - 80 || x > D.X0 + D.W + 80 || z < D.Z0 - 80 || z > D.Z0 + D.H + 80) { T.outside = true; this.toast('You are outside this 3D area. Build the area around you, or use 🎬 Simulate.'); return; }
+    if (x < D.X0 - 80 || x > D.X0 + D.W + 80 || z < D.Z0 - 80 || z > D.Z0 + D.H + 80) { if (!T.manual) { this.toast('You are not in this 3D area – switching to a virtual GPS: you drive here with the on-screen pedals.'); navigator.geolocation.clearWatch(this.watch); this.watch = null; this.manualStart(); } return; }
     T.outside = false; const R = T.R; let bk = 0, bd = Infinity; const s0 = T.s; for (let k = 0; k < R.P.length; k++) { const q = R.P[k]; if (q.s < s0 - 60 || q.s > s0 + 400) continue; const d = Math.hypot(q.x - x, q.z - z); if (d < bd) { bd = d; bk = k; } }
     T.fix = { x, z, acc: p.coords.accuracy, at: performance.now() }; if (p.coords.speed != null && p.coords.speed >= 0) T.gpsV = p.coords.speed;
     if (bd > Math.max(35, (p.coords.accuracy || 10) * 1.5)) { T.gpsOff++; if (T.gpsOff >= 4) { T.gpsOff = 0; this.reroute(x, z); } return; }
     T.gpsOff = 0; T.target = R.P[bk].s;
   }
   reroute(x, z) { const T = this.trip; if (!T) return; this.from = { x, z, node: this.nodeNear(x, z), label: t('Current position') }; const e = this.search(this.from.node, this.to.node); if (!e) return;
-    const R = { edges: e, kind: 'Fastest' }; this.prepare(R); this.routes = [R]; this.sel = 0; T.R = R; T.s = 0; T.target = 0; T.said = new Set(); T.mi = 0; this.draw(); this.speak(t('Route recalculated.')); this.toast('Route recalculated.'); }
+    const R = { edges: e, kind: 'Fastest' }; this.prepare(R); this.routes = [R]; this.sel = 0; T.R = R; T.s = 0; T.target = 0; T.said = new Set(); T.mi = 0; this.draw(); this.event('reroute', 'Route recalculated.'); this.toast('Route recalculated.'); }
+  /* ---------------- virtual GPS: you drive on the road network with pedals; wrong turns re-route ---------------- */
+  indexRoute(R) { R.kOf = new Map(); R.P.forEach((p, k) => { if (!R.kOf.has(p.n)) R.kOf.set(p.n, k); }); R.next = new Map(); R.edges.forEach(ei => R.next.set(this.G.E[ei].a, ei)); }
+  manualStart() { const T = this.trip; if (!T) return; T.manual = true; T.sim = false; T.ce = T.R.edges[0]; T.off = 0; T.v = 0; this.indexRoute(T.R); this.pedal = {}; this.renderHud(); }
+  edgeHd(e) { const G = this.G; return Math.atan2(G.X[e.b] - G.X[e.a], -(G.Z[e.b] - G.Z[e.a])) * 180 / Math.PI; }
+  nextEdge(T, e) {
+    const G = this.G, node = e.b; let C = G.out[node].filter(i => G.E[i].b !== e.a && this.speedOf(G.E[i])); if (!C.length) C = G.out[node].filter(i => this.speedOf(G.E[i])); if (!C.length) return null;
+    let pick; const rn = T.R.next && T.R.next.get(node), turn = i => norm(this.edgeHd(G.E[i]) - this.edgeHd(e));
+    if (C.length === 1) pick = C[0];
+    else if (T.intent) { const want = T.intent === 'left' ? -90 : T.intent === 'right' ? 90 : 0; pick = C.reduce((b, i) => Math.abs(turn(i) - want) < Math.abs(turn(b) - want) ? i : b, C[0]); T.intent = null; this.showIntent(); }
+    else if (rn != null && C.includes(rn)) pick = rn; else pick = C.reduce((b, i) => Math.abs(turn(i)) < Math.abs(turn(b)) ? i : b, C[0]);
+    const onR = T.R.kOf && (T.R.kOf.has(node)); if (onR && pick !== rn && !T.arrived) this.manualReroute(T, pick);
+    return pick; }
+  manualReroute(T, ei) { const e = this.G.E[ei], r = this.search(e.b, this.to.node); if (!r) return; const R = { edges: r, kind: 'Fastest' }; this.prepare(R); this.indexRoute(R); this.routes = [R]; this.sel = 0; T.R = R; T.s = -e.L; T.mi = 0; T.said = new Set(); T.drawnMi = -1; this.draw(); this.event('reroute', 'Route recalculated.'); this.toast('Route recalculated.'); }
+  manualStep(T, dt) {
+    const G = this.G, P = this.pedal || {}; let e = G.E[T.ce]; const lim = limitOf(e.cls, e.urban, this.prof) || 40, vmax = Math.max(lim * KMH * 1.3, 6);
+    if (P.gas) T.v = Math.min(vmax, T.v + 2.6 * dt); else if (P.brake) T.v = Math.max(0, T.v - 6.5 * dt); else T.v = Math.max(0, T.v - 0.35 * dt); if (T.arrived) T.v = 0;
+    T.overT = !!lim && T.v * 3.6 > lim + 5; let move = T.v * dt;
+    while (move > 0) { const rem = e.L - T.off; if (move < rem) { T.off += move; move = 0; } else { move -= rem; const nx = this.nextEdge(T, e); if (nx == null) { T.off = e.L; T.v = 0; break; } T.ce = nx; e = G.E[nx]; T.off = 0; } }
+    const f = T.off / e.L, dx = G.X[e.b] - G.X[e.a], dz = G.Z[e.b] - G.Z[e.a], L = Math.hypot(dx, dz) || 1, o = this.prof === 'walk' || e.oneway ? 0 : Math.min(e.hw * 0.5, 3.2);
+    T.mx = G.X[e.a] + dx * f - dz / L * o; T.mz = G.Z[e.a] + dz * f + dx / L * o; T.my = G.Y[e.a] + (G.Y[e.b] - G.Y[e.a]) * f; T.mhd = Math.atan2(dx, dz);
+    const R = T.R, ka = R.kOf.get(e.a), kb = R.kOf.get(e.b); if (ka != null && kb === ka + 1) T.s = R.P[ka].s + (R.P[kb].s - R.P[ka].s) * f; else if (kb === 0) T.s = -(e.L - T.off);
+    // red lights: stopping counts, running one is noticed
+    const nl = R.lights.find(l => l.stop > T.s - 2); T.redStop = false; if (nl && this.prof !== 'walk') { const [st] = this.light(nl), d = nl.stop - T.s; if (st === 'red' && d < 15 && d > -1) T.redStop = true; if (st === 'red' && d < 0 && d > -2 && T.v > 2 && T.ranL !== nl) { T.ranL = nl; this.toast('🚨 You drove through a red light!'); } }
+  }
+  showIntent() { const b = this.el('nvIntent'); if (b) { const T = this.trip; b.textContent = T && T.intent ? (T.intent === 'left' ? '⬅ ' + t('next junction: left') : T.intent === 'right' ? '➡ ' + t('next junction: right') : '⬆ ' + t('next junction: straight')) : ''; b.hidden = !(T && T.intent); } }
   // the position along the route
   posAt(R, s) { const P = R.P; s = THREE.MathUtils.clamp(s, 0, R.L); let lo = 0, hi = P.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (P[m].s <= s) lo = m; else hi = m; }
     const a = P[lo], b = P[hi], f = b.s > a.s ? (s - a.s) / (b.s - a.s) : 0; return { x: a.x + (b.x - a.x) * f, z: a.z + (b.z - a.z) * f, y: a.y + (b.y - a.y) * f, k: lo, e: R.E[Math.min(a.e, R.E.length - 1)] }; }
@@ -179,7 +204,8 @@ export class Nav {
     const w = this.w, T = this.trip; this.time.value += dt;
     if (!T) { w.controls.update(); this.updateLights3D(null); if (this.ribbonMat) this.ribbonMat.uniforms.uHalf.value = Math.max(2.6, w.camera.position.distanceTo(w.controls.target) / 110); return w.controls.target; }
     const R = T.R, ddt = dt * (T.sim ? this.mult : 1); T.clock += ddt; const here = this.posAt(R, T.s), e = here.e, lim = limitOf(e.cls, e.urban, this.prof), cruise = this.speedOf(e) || 1;
-    if (T.sim) { // simulated driver: road speed, slows for turns, stops at red lights
+    if (T.manual) this.manualStep(T, dt);
+    else if (T.sim) { // simulated driver: road speed, slows for turns, stops at red lights
       let vmax = Math.min(cruise, (lim || 99) * KMH) * 0.97; const m = R.M[T.mi];
       if (m && m.type !== 'straight') { const vt = { arrive: 0, uturn: 3, sharp_left: 4, sharp_right: 4, left: 6, right: 6, slight_left: 10, slight_right: 10 }[m.type] ?? vmax; vmax = Math.min(vmax, Math.sqrt(vt * vt + 2 * 2.2 * Math.max(0, m.s - T.s - 4))); }
       const nl = R.lights.find(l => l.stop > T.s - 0.5); T.redStop = false;
@@ -188,10 +214,10 @@ export class Nav {
       T.s = Math.min(R.L, T.s + T.v * ddt);
     } else if (T.target != null) { const ds = T.target - T.s; T.s += ds * Math.min(1, dt * 1.5); T.v = T.gpsV != null ? T.gpsV : Math.max(0, ds) * 1.5; }
     if (T.v < 0.3 && T.redStop) { if (!T.waiting) { T.waiting = true; T.stops++; } T.waited += ddt; } else T.waiting = false;
-    T.driven = T.s; T.max = Math.max(T.max, T.v); T.el = (T.el || 0) + ddt;
+    T.driven = T.manual ? (T.driven || 0) + T.v * dt : T.s; T.max = Math.max(T.max, T.v); T.el = (T.el || 0) + ddt;
     while (T.mi < R.M.length - 1 && R.M[T.mi].s < T.s - 3) T.mi++;
     // car
-    const p = this.posAt(R, T.s), q = this.posAt(R, Math.min(R.L, T.s + 4)), b = this.posAt(R, Math.max(0, T.s - 4)), hd = Math.atan2(q.x - b.x, q.z - b.z);
+    const p = T.manual ? { x: T.mx, z: T.mz, y: T.my } : this.posAt(R, T.s), q = this.posAt(R, Math.min(R.L, T.s + 4)), b = this.posAt(R, Math.max(0, T.s - 4)), hd = T.manual ? T.mhd : Math.atan2(q.x - b.x, q.z - b.z);
     T.hd = T.hd == null ? hd : T.hd + norm((hd - T.hd) * 180 / Math.PI) * Math.PI / 180 * Math.min(1, dt * 6);
     const gy = Math.max(p.y, w.groundAt(p.x, p.z)); if (this.car) { this.car.position.set(p.x, gy, p.z); this.car.rotation.y = T.hd; this.ring.position.set(p.x, gy + 0.15, p.z); }
     this.time.prog = T.s; if (this.ribbonMat) this.ribbonMat.uniforms.uProg.value = T.s;
@@ -210,7 +236,7 @@ export class Nav {
     if (T.s >= R.L - 1 && !T.arrived) this.arrive(T);
     return p;
   }
-  arrive(T) { T.arrived = true; T.v = 0; this.speak(this.sentence({ type: 'arrive' }, 0)); this.renderArrival(T); }
+  arrive(T) { T.arrived = true; T.v = 0; this.announce({ type: 'arrive' }, 0); this.renderArrival(T); }
   bounds(R) { let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity, y = 0; for (const p of R.P) { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z); y += p.y; } return { cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, r: Math.max(80, Math.hypot(x1 - x0, z1 - z0) / 2), y: y / R.P.length }; }
   frameRoute() { const R = this.routes[this.sel]; if (!R) return; const B = this.bounds(R); this.w.flight = { t: 0, p0: this.w.camera.position.clone(), q0: this.w.controls.target.clone(), p1: new THREE.Vector3(B.cx, B.y + B.r * 1.6, B.cz + B.r * 0.9), q1: new THREE.Vector3(B.cx, B.y, B.cz) }; }
 
@@ -223,12 +249,23 @@ export class Nav {
     if (m.type === 'arrive') return d < 30 ? 'You have arrived.' : `${first ? 'Head off. ' : ''}The destination is in ${v} ${U}.`;
     return `${first ? 'Head off. ' : ''}${d < 30 ? '' : `In ${v} ${U}, `}${w.toLowerCase()}${onto}.`.replace(/^./, c => c.toUpperCase());
   }
+  // Khmer voice: the phone's Khmer voice if it has one, otherwise recorded Khmer prompts (audio/km, Meta MMS-TTS)
+  vLang() { return this.voiceLang || (lang === 'km' ? 'km' : 'en'); }
+  clips(keys) { if (!this.voice || !keys.length) return; this._cq = keys.slice(); const a = this._au || (this._au = new Audio()); // one element, first played from a tap, so phones keep allowing it
+    try { speechSynthesis.cancel(); } catch (e) { } const next = () => { const k = this._cq.shift(); if (!k) return; a.src = 'audio/km/' + k + '.mp3'; a.play().catch(() => { }); }; a.onended = next; a.onerror = next; a.pause(); next(); }
+  kmKeys(m, d, first) { const K = []; if (first) K.push('depart'); if (!m) return K;
+    if (m.type === 'arrive') { K.push(d < 30 ? 'arrive' : 'arrive_ahead'); return K; }
+    if (d < 30) K.push('now'); else { const opts = [50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1500, 2000, 3000, 5000]; let b = opts[0]; for (const o of opts) if (Math.abs(o - d) < Math.abs(b - d)) b = o; K.push('d' + b); }
+    K.push(m.type in TURN_KM ? m.type : 'straight'); return K; }
+  announce(m, d, first) { if (this.vLang() === 'km') { const kv = this.kmVoice(); if (kv) this.speak(this.sentence(m, d, first, true), true); else this.clips(this.kmKeys(m, d, first)); } else this.speak(this.sentence(m, d, first, false), false); }
+  event(key, en) { if (this.vLang() === 'km') { if (this.kmVoice()) this.speak({ red: 'ភ្លើងក្រហមនៅខាងមុខ សូមបន្ថយល្បឿន', reroute: 'កំពុងគណនាផ្លូវថ្មី', speeding: 'អ្នកកំពុងបើកលើសល្បឿនកំណត់', green: 'ភ្លើងបៃតងហើយ' }[key] || en, true); else this.clips([key]); } else this.speak(en, false); }
   kmVoice() { try { return speechSynthesis.getVoices().find(v => /^km/i.test(v.lang)); } catch (e) { return null; } }
-  speak(s) { if (!this.voice || !s || !window.speechSynthesis) return; try { const u = new SpeechSynthesisUtterance(s), kv = lang === 'km' && this.kmVoice(); if (kv) { u.voice = kv; u.lang = kv.lang; } else u.lang = 'en-US'; u.rate = 1.02; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { } }
+  speak(s, km) { if (!this.voice || !s || !window.speechSynthesis) return; try { if (this._au) this._au.pause(); const u = new SpeechSynthesisUtterance(s), kv = km && this.kmVoice(); if (kv) { u.voice = kv; u.lang = kv.lang; } else u.lang = 'en-US'; u.rate = 1.02; speechSynthesis.cancel(); speechSynthesis.speak(u); } catch (e) { } }
   prompts(T) {
     const R = T.R, m = R.M[T.mi]; if (!m) return; const d = m.s - T.s, v = Math.max(T.v, 5), far = Math.max(350, v * 22), near = Math.max(90, v * 7);
-    for (const [k, th] of [['f', far], ['n', near], ['x', 25]]) { const id = T.mi + k; if (d < th && d > (k === 'x' ? 0 : th * 0.55) && !T.said.has(id)) { T.said.add(id); if (k === 'f' && d < near) continue; this.speak(this.sentence(m, d, false)); break; } }
-    const nl = R.lights.find(l => l.stop > T.s), id = nl && 'L' + nl.s; if (nl && this.prof !== 'walk' && !T.said.has(id) && nl.stop - T.s < 160) { const [st, r] = this.light(nl); if (st === 'red' && r > 5) { T.said.add(id); this.speak(lang === 'km' && this.kmVoice() ? `ភ្លើងក្រហមខាងមុខ ${Math.round(r)} វិនាទី` : `Red light ahead, ${Math.round(r)} seconds.`); } }
+    for (const [k, th] of [['f', far], ['n', near], ['x', 25]]) { const id = T.mi + k; if (d < th && d > (k === 'x' ? 0 : th * 0.55) && !T.said.has(id)) { T.said.add(id); if (k === 'f' && d < near) continue; this.announce(m, d, false); break; } }
+    const nl = R.lights.find(l => l.stop > T.s), id = nl && 'L' + nl.s; if (nl && this.prof !== 'walk' && !T.said.has(id) && nl.stop - T.s < 160) { const [st, r] = this.light(nl); if (st === 'red' && r > 5) { T.said.add(id); this.event('red', `Red light ahead, ${Math.round(r)} seconds.`); } }
+    if (T.manual && T.overT && performance.now() - (T.spT || 0) > 20000) { T.spT = performance.now(); this.event('speeding', 'You are over the speed limit.'); }
   }
 
   /* ---------------- 3D ---------------- */
@@ -339,7 +376,7 @@ export class Nav {
     if (this.msg) h += `<div class="svhelp">⚠️ ${esc(this.msg)}</div>`;
     if (R.length) { h += `<div class="nvroutes">${R.map((r, i) => `<div class="nvroute ${i === this.sel ? 'on' : ''}" data-rt="${i}"><div class="nvrk">${t(r.kind)}${i && R[0] ? ` <span class="${r.T > R[0].T ? 'slow' : 'fast'}">${r.T > R[0].T ? '+' + this.fmtT(r.T - R[0].T) : ''}</span>` : ''}</div><div class="nvrt">${this.fmtT(r.T)}</div><div class="nvrd">${this.fmtD(r.L)} · 🚦 ${r.lights.length}</div><div class="nvvia">${t('via')} ${r.via.map(esc).join(', ')}</div></div>`).join('')}</div>`;
       const r = R[this.sel]; h += `<div class="nvsteps">${r.M.map((m, i) => `<div data-step="${i}">${svg(m.type, 20)}<span>${esc(lang === 'km' ? TURN_KM[m.type] : t(TURN_WORD[m.type]))}${m.onto && m.type !== 'arrive' ? ' → ' + esc(m.onto) : ''}</span><em>${this.fmtD(m.s)}</em></div>`).join('')}</div>`;
-      h += `<div class="row"><button id="nvGo" class="primary" style="margin:0">▶ ${t('Start (GPS)')}</button><button id="nvSim" class="primary" style="margin:0;background:#1f9d6c">🎬 ${t('Simulate drive')}</button></div>
+      h += `<div class="row"><button id="nvGo" class="primary" style="margin:0">▶ ${t('Start (GPS)')}</button><button id="nvSim" class="primary" style="margin:0;background:#1f9d6c">🎬 ${t('Simulate drive')}</button></div><div class="row"><button id="nvMan" class="primary" style="margin:0;background:#8a4fd0">🎮 ${t('Virtual GPS: drive it yourself')}</button></div><div class="row"><span>🔊 ${t('Voice language')}</span><select id="nvVL"><option value="km" ${this.vLang() === 'km' ? 'selected' : ''}>ខ្មែរ</option><option value="en" ${this.vLang() === 'en' ? 'selected' : ''}>English</option></select></div>
         <div class="row"><label><input type="checkbox" id="nvVoice" ${this.voice ? 'checked' : ''}> 🔊 ${t('Voice')}</label><label><input type="checkbox" id="nvTracks" ${this.avoidTracks ? 'checked' : ''}> ${t('Avoid dirt tracks')}</label><button id="nvGpx">📤 GPX</button></div>
         <div class="svhelp">${this.signals && this.signals.length ? '🚦 ' + t('Traffic lights from OpenStreetMap.') : '🚦 ' + t('Traffic lights estimated at big junctions (none mapped in OpenStreetMap here).')} ${t('Light timings and countdowns are simulated – Cambodia has no live signal feed.')}${this.osmOk === false ? ' ' + t('Street names could not be loaded (OpenStreetMap busy).') : ''}</div>`; }
     else h += `<div class="svhelp">${t('Set a start and a destination. Routes use the roads of this 3D area (one-way streets respected).')}</div>`;
@@ -352,7 +389,7 @@ export class Nav {
     P.querySelectorAll('[data-rec]').forEach(d => d.onclick = () => { const r = this.recent[+d.dataset.rec]; this.setPoint('to', F.x(r.lon), F.z(r.lat), r.label); });
     P.querySelectorAll('[data-rt]').forEach(d => d.onclick = () => { this.sel = +d.dataset.rt; this.renderPanel(); this.draw(); });
     P.querySelectorAll('[data-step]').forEach(d => d.onclick = () => { const r = R[this.sel], m = r.M[+d.dataset.step], p = this.posAt(r, m.s); this.w.teleport(p.x, p.z, 'orbit'); });
-    if (R.length) { this.el('nvGo').onclick = () => this.start(false); this.el('nvSim').onclick = () => this.start(true); this.el('nvVoice').onchange = e => { this.voice = e.target.checked; };
+    if (R.length) { this.el('nvGo').onclick = () => this.start(false); this.el('nvSim').onclick = () => this.start(true); this.el('nvMan').onclick = () => this.start('manual'); this.el('nvVL').onchange = e => { this.voiceLang = e.target.value; this.clips([]); if (this.voice) this.announce(this.routes[this.sel].M[0], this.routes[this.sel].M[0].s, true); }; this.el('nvVoice').onchange = e => { this.voice = e.target.checked; };
       this.el('nvTracks').onchange = e => { this.avoidTracks = e.target.checked; this.plan(); }; this.el('nvGpx').onclick = () => this.gpx(); }
     this.msg = '';
   }
@@ -373,7 +410,7 @@ export class Nav {
       <div class="nvSpeed"><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" class="bg"/><circle cx="50" cy="50" r="44" class="fg" id="nvRing"/></svg><b id="nvV">0</b><small>km/h</small><span class="nvLimit" id="nvLim"></span></div>
       <div class="nvSig" id="nvSig" hidden></div>
       <div class="nvSide"><button id="nvMode" title="${t('Camera: 3D follow / 2D north-up / whole route')}">🧭<br><small id="nvModeL"></small></button><button id="nvVoiceB">${this.voice ? '🔊' : '🔇'}</button>${this.trip.sim ? `<button id="nvMult">×${this.mult}</button><button id="nvPause">⏸</button>` : ''}</div>
-      <button class="nvRecenter" id="nvRecenter" hidden>⌖ ${t('Re-centre')}</button><div class="nvToast" id="nvToast" hidden></div>
+      ${this.trip.manual ? `<div class="nvPedals"><button data-p="left" title="${t('Turn left at the next junction')}">◀</button><button data-p="gas" class="gas">▲<small>${t('Go')}</small></button><button data-p="brake" class="brake">▼<small>${t('Brake')}</small></button><button data-p="right" title="${t('Turn right at the next junction')}">▶</button></div><div class="nvIntent" id="nvIntent" hidden></div>` : ''}<button class="nvRecenter" id="nvRecenter" hidden>⌖ ${t('Re-centre')}</button><div class="nvToast" id="nvToast" hidden></div>
       <div class="nvBottom"><div class="nvProg"><i id="nvProg"></i></div><div class="nvBRow"><div><b id="nvRem"></b><div id="nvEta"></div></div><button id="nvExit">✕<br><small>${t('Exit')}</small></button></div></div>`;
     document.body.appendChild(d); document.body.classList.add('nav-on');
     const modes = ['3d', '2d', 'all'], ML = { '3d': '3D', '2d': '2D', all: t('Route') };
@@ -383,6 +420,12 @@ export class Nav {
     if (this.trip.sim) { this.el('nvMult').onclick = e => { this.mult = this.mult >= 8 ? 1 : this.mult * 2; e.target.textContent = '×' + this.mult; }; this.el('nvPause').onclick = e => { this._m = this._m || this.mult; if (this.mult) { this._m = this.mult; this.mult = 0; e.target.textContent = '▶'; } else { this.mult = this._m || 1; e.target.textContent = '⏸'; } }; }
     this.el('nvRecenter').onclick = () => { this.follow = true; this.showRecenter(false); };
     this.el('nvExit').onclick = () => this.stop();
+    d.querySelectorAll('[data-p]').forEach(b => { const k = b.dataset.p; const on = e => { e.preventDefault(); if (k === 'left' || k === 'right') { this.trip.intent = this.trip.intent === k ? null : k; this.showIntent(); } else this.pedal[k] = 1; }, off = () => { if (this.pedal) this.pedal[k] = 0; };
+      b.addEventListener('pointerdown', on); b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off); b.addEventListener('pointercancel', off); });
+    if (!this._keys) { this._keys = e => { const T = this.trip; if (!T || !T.manual || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return; const dn = e.type === 'keydown', k = e.key;
+      if (k === 'ArrowUp' || k === 'w' || k === 'W') { this.pedal.gas = dn; e.preventDefault(); } else if (k === 'ArrowDown' || k === 's' || k === 'S') { this.pedal.brake = dn; e.preventDefault(); }
+      else if (dn && (k === 'ArrowLeft' || k === 'a' || k === 'A')) { T.intent = 'left'; this.showIntent(); } else if (dn && (k === 'ArrowRight' || k === 'd' || k === 'D')) { T.intent = 'right'; this.showIntent(); } };
+      addEventListener('keydown', this._keys); addEventListener('keyup', this._keys); }
   }
   removeHud() { const d = this.el('navHud'); if (d) d.remove(); document.body.classList.remove('nav-on'); }
   showRecenter(on) { const b = this.el('nvRecenter'); if (b) b.hidden = !on; }
