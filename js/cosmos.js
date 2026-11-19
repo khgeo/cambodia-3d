@@ -5,7 +5,7 @@
 // directions and distances. The Milky Way, the other galaxies' shapes and the cosmic web are illustrations.
 // Frame: equatorial J2000 with y = celestial north (the globe's frame turned by the sidereal time).
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=77';
+import { t, lang } from './i18n.js?v=78';
 
 const D2R = Math.PI / 180, AU = 1.495978707e8, LY = 9.4607e12, ER = 6371, OBL = 23.43928 * D2R;
 const rev = x => ((x % 360) + 360) % 360;
@@ -185,6 +185,7 @@ export class Cosmos {
     for (const o of this.items) if (!o.body) P[o.id] = o.gal ? this.galC : o.fixed;
     return P;
   }
+  sunEcef(ms = Date.now()) { const P = this.positions(ms), s = new THREE.Vector3(P.Sun[0] - P.Earth[0], P.Sun[1] - P.Earth[1], P.Sun[2] - P.Earth[2]).normalize(); return s.applyAxisAngle(new THREE.Vector3(0, 1, 0), -gmstDeg(ms) * D2R); }
   /* ---------------- camera & render ---------------- */
   item(id) { return this.items.find(o => o.id === id); }
   camAbs() { const f = this.focusPos(), ce = Math.cos(this.el); return [f[0] + this.dist * ce * Math.sin(this.az), f[1] + this.dist * Math.sin(this.el), f[2] + this.dist * ce * Math.cos(this.az)]; }
@@ -269,7 +270,7 @@ export class Cosmos {
     el.addEventListener('pointermove', e => { if (!pts.has(e.pointerId)) return; const [px, py] = pts.get(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); if (down) down.m += Math.hypot(e.clientX - px, e.clientY - py); if (!this.active) return;
       if (pts.size === 2) { const [a, b] = [...pts.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) this.zoom(pinch / d); pinch = d; return; }
       this.az -= (e.clientX - px) * 0.005; this.el = Math.max(-1.55, Math.min(1.55, this.el + (e.clientY - py) * 0.005)); });
-    const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = 0; this.drag = pts.size > 0; if (!down || !this.g.on) return; const click = down.m < 6 && performance.now() - down.t < 500; down = null; if (!click) return;
+    const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = 0; this.drag = pts.size > 0; if (!down || !this.g.on || (this.g.sv && this.g.sv.active)) { down = null; return; } const click = down.m < 6 && performance.now() - down.t < 500; down = null; if (!click) return;
       const o = this.pick(e, !this.active); if (!o) return; if (this.active) this.goTo(o.id); else if (!this.g.anim) { this.enterFromGlobe(this.g.cam, o.id); } };
     el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
   }

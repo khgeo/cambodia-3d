@@ -4,7 +4,7 @@
 // or (with your proxy) OpenSky.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { t } from './i18n.js?v=77';
+import { t } from './i18n.js?v=78';
 
 const R_KM = 6371, D2R = Math.PI / 180;
 const GIBS = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=EPSG:4326&BBOX=-90,-180,90,180&FORMAT=';
@@ -26,7 +26,7 @@ export class Globe {
     this.cam = new THREE.PerspectiveCamera(40, 1, 0.001, 200);
     this.ctl = new OrbitControls(this.cam, world.renderer.domElement); this.ctl.addEventListener('start', () => { this.followSat = null; }); this.ctl.enabled = false; this.ctl.enablePan = false; this.ctl.minDistance = 1.0003; this.ctl.maxDistance = 9; this.ctl.enableZoom = false; this.ctl.enableDamping = true; this.ctl.dampingFactor = 0.08;
     // zoom by height above the ground, so you can go from space down to a few km smoothly
-    world.renderer.domElement.addEventListener('wheel', e => { if (!this.on || this.anim || (this.cos && this.cos.active)) return; e.preventDefault();
+    world.renderer.domElement.addEventListener('wheel', e => { if (!this.on || this.anim || (this.cos && this.cos.active) || (this.sv && this.sv.active)) return; e.preventDefault();
       const d = this.cam.position.length(), alt0 = d - 1;
       if (alt0 >= 7.9 && e.deltaY > 0 && this.cos) { this.followSat = null; this.cos.enterFromGlobe(this.cam); return; } // keep zooming out: into space
       const alt = Math.min(8, Math.max(0.0003, alt0 * Math.exp(e.deltaY * 0.0012)));
@@ -79,7 +79,7 @@ export class Globe {
     if (this.on) return; const w = this.w; this.on = true; w.controls.enabled = false; this.ctl.enabled = true; this.placePlate();
     const p = xyz(this.lat, this.lon, 1); this.cam.position.copy(p.clone().multiplyScalar(1.002)); this.ctl.target.set(0, 0, 0); this.ctl.update();
     this.anim = { t: 0, from: 1.002, to: 3.4, dir: p.clone().normalize() }; this.onToggle && this.onToggle(true);
-    if (!this.loaded) { this.loaded = true; this.loadBase(); import('./cosmos.js?v=77').then(M => { this.cos = new M.Cosmos(this); }).catch(e => console.warn('cosmos', e)); this.satEvents(); }
+    if (!this.loaded) { this.loaded = true; this.loadBase(); import('./cosmos.js?v=78').then(M => { this.cos = new M.Cosmos(this); }).catch(e => console.warn('cosmos', e)); this.satEvents(); }
     this.refresh(); clearInterval(this.timer); this.timer = setInterval(() => this.refresh(), 60000);
   }
   leave() {
@@ -87,7 +87,7 @@ export class Globe {
     if (!this.on || (this.anim && this.anim.out)) return; const p = xyz(this.lat, this.lon, 1).normalize(), d = this.cam.position.length();
     this.anim = { t: 0, from: d, to: 1.0012, dir: p, start: this.cam.position.clone().normalize(), out: true };
   }
-  finishLeave() { const w = this.w; if (this.cos) this.cos.hideLabels(); this.followSat = null; this.satCard(null); this.on = false; this.ctl.enabled = false; w.controls.enabled = true; clearInterval(this.timer); w.clock.getDelta(); this.onToggle && this.onToggle(false); }
+  finishLeave() { const w = this.w; if (this.sv && this.sv.active) this.sv.close(); if (this.cos) this.cos.hideLabels(); this.followSat = null; this.satCard(null); this.on = false; this.ctl.enabled = false; w.controls.enabled = true; clearInterval(this.timer); w.clock.getDelta(); this.onToggle && this.onToggle(false); }
   /* ---------- data ---------- */
   async loadBase() {
     const W = 4096, H = 2048;
@@ -373,6 +373,7 @@ export class Globe {
   /* ---------- per frame ---------- */
   frame(dt) {
     const w = this.w, el = w.renderer.domElement, asp = el.clientWidth / Math.max(1, el.clientHeight); if (this.cam.aspect !== asp) { this.cam.aspect = asp; this.cam.updateProjectionMatrix(); }
+    if (this.sv && this.sv.active) { this.sv.frame(dt); return; }
     if (this.cos && this.cos.active) { this.cos.frame(dt); return; }
     if (this.followSat && !this.anim) { const p = this.satPos(this.followSat.rec, new Date()); if (p) { const d = this.cam.position.length(); this.cam.position.lerp(p.clone().setLength(d), Math.min(1, dt * 2)); this.satCardUpd(); } }
     if (this.anim) { const A = this.anim; A.t = Math.min(1, A.t + dt / 2.2); const e = A.t * A.t * (3 - 2 * A.t), d = A.from + (A.to - A.from) * e;
@@ -394,7 +395,7 @@ export class Globe {
   satEvents() {
     const el = this.w.renderer.domElement; let down = null;
     el.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY, performance.now()]; });
-    el.addEventListener('pointerup', e => { if (!this.on || !down || (this.cos && this.cos.active) || this.anim) return; const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6 || performance.now() - down[2] > 500; down = null; if (moved) return;
+    el.addEventListener('pointerup', e => { if (!this.on || !down || (this.cos && this.cos.active) || (this.sv && this.sv.active) || this.anim) return; const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6 || performance.now() - down[2] > 500; down = null; if (moved) return;
       if (this.cos && this.cos.pick(e, true)) return; const s = this.pickSat(e); if (s) { this.followSat = s; this.satCard(s); const p = this.satPos(s.rec, new Date()); if (p) { const alt = p.length() - 1; this.anim = { t: 0, from: this.cam.position.length(), to: 1 + Math.max(alt * 2.2, alt + 0.25), dir: p.clone().normalize() }; } } });
   }
   pickSat(e) { const hidden = (c, p) => { const d = p.clone().sub(c), a = d.lengthSq(), b = 2 * c.dot(d), cc = c.lengthSq() - 1, disc = b * b - 4 * a * cc; if (disc < 0) return false; const t1 = (-b - Math.sqrt(disc)) / (2 * a); return t1 > 0 && t1 < 1; }; const r = this.w.renderer.domElement.getBoundingClientRect(), d = new Date(), v = new THREE.Vector3(), camD = this.cam.position.length(); let best = null, bd = 14;
@@ -406,8 +407,9 @@ export class Globe {
   satCardUpd() { const s = this.followSat, c = document.getElementById('satCard'); if (!s || !c || c.hidden) return; const now = performance.now(); if (this._scT && now - this._scT < 900) return; this._scT = now;
     const SJ = this.SJ, d = new Date(), pv = SJ.propagate(s.rec, d); if (!pv || !pv.position) return; const gd = SJ.eciToGeodetic(pv.position, SJ.gstime(d)), v = pv.velocity, sp = Math.hypot(v.x, v.y, v.z), per = 2 * Math.PI / s.rec.no;
     c.innerHTML = `<div class="cosCh"><b style="color:${SAT_GROUPS[s.grp] ? SAT_GROUPS[s.grp][1] : '#fff'}">🛰️ ${s.sp ? s.sp.label : s.name}</b><button id="satX">✕</button></div><div class="cosK">${SAT_GROUPS[s.grp] ? SAT_GROUPS[s.grp][0] : ''}${s.sp && s.sp.label !== s.name ? ' · ' + s.name : ''}</div>
-      <div>⬆️ ${Math.round(gd.height).toLocaleString()} km · 💨 ${sp.toFixed(2)} km/s (${Math.round(sp * 3600).toLocaleString()} km/h)</div><div>🔄 ${per.toFixed(1)} min · ∠ ${(s.rec.inclo / D2R).toFixed(1)}° · 📍 ${(gd.latitude / D2R).toFixed(2)}°, ${(gd.longitude / D2R).toFixed(2)}°</div><div class="cosInfo">${t('The view follows it. Drag or tap ✕ to stop.')}</div>`;
-    c.querySelector('#satX').onclick = () => { this.followSat = null; this.satCard(null); }; }
+      <div>⬆️ ${Math.round(gd.height).toLocaleString()} km · 💨 ${sp.toFixed(2)} km/s (${Math.round(sp * 3600).toLocaleString()} km/h)</div><div>🔄 ${per.toFixed(1)} min · ∠ ${(s.rec.inclo / D2R).toFixed(1)}° · 📍 ${(gd.latitude / D2R).toFixed(2)}°, ${(gd.longitude / D2R).toFixed(2)}°</div><div class="cosInfo">${t('The view follows it. Drag or tap ✕ to stop.')}</div><div class="row" style="margin-top:6px"><button id="satClose" class="primary" style="margin:0">🔭 ${t('3D close-up')}${/ISS/.test(s.name) ? ' · ' + t('go inside') : ''}</button></div>`;
+    c.querySelector('#satX').onclick = () => { this.followSat = null; this.satCard(null); };
+    c.querySelector('#satClose').onclick = async () => { if (!this.sv) { const M = await import('./satview.js?v=78'); this.sv = new M.SatView(this); } this.satCard(null); this.sv.onClose = () => { if (this.followSat) this.satCard(this.followSat); }; this.sv.open(s); }; }
   info() { const d = new Date(); return { utc: d.toISOString().slice(11, 16), ...this.status, radar: this.w.radar && this.w.radar.placed ? `Radar: ${this.w.radar.range} km, ${this.w.radar.list().length} aircraft detected` : '', sats: Object.entries(this.sats).filter(([g]) => this.opt.sats[g]).map(([g, v]) => `${SAT_GROUPS[g][0]} ${v.list.length}`).join(' · '), flights: this.status.flights || (this.nFlights ? `Aircraft: ${this.nFlights} from the radar` : '') }; }
 }
 export { SAT_GROUPS };

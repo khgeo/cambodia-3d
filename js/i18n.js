@@ -1,6 +1,19 @@
 // English / ខ្មែរ. Strings are written in English in the page and code; this table translates them.
 // A leading icon (emoji or arrow) is kept and the rest is looked up. New text is translated as it appears.
 export const KM = {
+  'Loading the 3D model…': 'កំពុងផ្ទុកម៉ូដែល 3D…',
+  'Illustrative model': 'ម៉ូដែលឧទាហរណ៍',
+  'Back to the globe': 'ត្រឡប់ទៅភពផែនដី',
+  'Go inside the ISS': 'ចូលក្នុងស្ថានីយ ISS',
+  'Back outside': 'ត្រឡប់ទៅខាងក្រៅ',
+  'Over': 'នៅលើ',
+  "in the Earth's shadow": 'ក្នុងស្រមោលផែនដី',
+  'in sunlight': 'ក្នុងពន្លឺថ្ងៃ',
+  'Drag to look around, ▲ ▼ (or W/S) to float, ⤒ ⤓ (Q/E) up and down. The Cupola windows show the real Earth below the station now.': 'អូសដើម្បីមើលជុំវិញ ▲ ▼ (ឬ W/S) ដើម្បីអណ្ដែត ⤒ ⤓ (Q/E) ឡើងចុះ។ បង្អួច Cupola បង្ហាញផែនដីពិតនៅក្រោមស្ថានីយឥឡូវនេះ។',
+  'Drag to turn around it, wheel or pinch to zoom. The Earth below is where it is right now.': 'អូសដើម្បីបង្វិលជុំវិញ កង់កណ្ដុរ ឬច្បិចដើម្បីពង្រីក។ ផែនដីខាងក្រោមគឺទីតាំងពិតរបស់វាឥឡូវនេះ។',
+  'Interior: illustration of the US segment and Zarya.': 'ខាងក្នុង៖ រូបភាពឧទាហរណ៍នៃផ្នែកអាមេរិក និង Zarya។',
+  '3D close-up': 'មើល 3D ជិត',
+  'go inside': 'ចូលខាងក្នុង',
   'Surface maps: Solar System Scope (CC BY 4.0), from NASA data.': 'ផែនទីផ្ទៃ៖ Solar System Scope (CC BY 4.0) ពីទិន្នន័យ NASA។',
   'light-years': 'ឆ្នាំពន្លឺ',
   'million light-years': 'លានឆ្នាំពន្លឺ',
