@@ -2,8 +2,8 @@
 // image houses, contours, spot heights, place names, survey points and parcels, your digitized features, the
 // tactical overlay) in EPSG:4326, the satellite image and the 13-class land cover as raster tiles (EPSG:3857),
 // and a QGIS style for each layer saved as its default (layer_styles), so the layers open styled.
-import { LC } from './landcover.js?v=72';
-import { terrainData } from './topomap.js?v=72';
+import { LC } from './landcover.js?v=73';
+import { terrainData } from './topomap.js?v=73';
 
 let SQL = null;
 async function sqljs() {
@@ -80,15 +80,15 @@ export async function exportGeoPackage(world, say = () => {}, opts = {}) {
   // field boundaries (Field Boundaries app, model + your edits)
   const fieldLayer = () => { const F = world.fields || []; if (!F.length) return 0;
     const cls = a => a < 1000 ? '< 1,000 m²' : a < 2500 ? '1,000–2,500 m²' : a < 5000 ? '2,500–5,000 m²' : a < 10000 ? '5,000–10,000 m²' : '≥ 10,000 m²';
-    return layer('field_boundaries', 'Field boundaries (AgriMapper)', 3, [['field_id', 'INTEGER'], ['area_m2', 'REAL'], ['area_ha', 'REAL'], ['perimeter_m', 'REAL'], ['size_class', 'TEXT'], ['confidence', 'REAL'], ['source', 'TEXT'], ['parcel_no', 'TEXT'], ['land_use', 'TEXT'], ['owner_id', 'INTEGER'], ['owner_name', 'TEXT'], ['note', 'TEXT']],
-      F.map((f, i) => ({ g: [[...f.ring, f.ring[0]].map(([x, y]) => [+x.toFixed(7), +y.toFixed(7)])], field_id: i + 1, area_m2: +f.area_m2.toFixed(1), area_ha: +(f.area_m2 / 1e4).toFixed(4), perimeter_m: f.perim_m ? +f.perim_m.toFixed(1) : null, size_class: cls(f.area_m2), confidence: f.conf != null ? +(+f.conf).toFixed(3) : null, source: f.src || 'model', parcel_no: f.parcel_no || null, land_use: f.land_use || null, owner_id: f.owner_id || null, owner_name: (O.find(o => o.id === f.owner_id) || {}).name || null, note: f.note || null })),
+    return layer('field_boundaries', 'Field boundaries (AgriMapper)', 3, [['field_id', 'INTEGER'], ['area_m2', 'REAL'], ['area_ha', 'REAL'], ['perimeter_m', 'REAL'], ['size_class', 'TEXT'], ['confidence', 'REAL'], ['source', 'TEXT'], ['parcel_no', 'TEXT'], ['land_use', 'TEXT'], ['title', 'TEXT'], ['acquired', 'TEXT'], ['year', 'TEXT'], ['farmed_by', 'TEXT'], ['tenant', 'TEXT'], ['owner_id', 'INTEGER'], ['owner_name', 'TEXT'], ['note', 'TEXT']],
+      F.map((f, i) => ({ g: [[...f.ring, f.ring[0]].map(([x, y]) => [+x.toFixed(7), +y.toFixed(7)])], field_id: i + 1, area_m2: +f.area_m2.toFixed(1), area_ha: +(f.area_m2 / 1e4).toFixed(4), perimeter_m: f.perim_m ? +f.perim_m.toFixed(1) : null, size_class: cls(f.area_m2), confidence: f.conf != null ? +(+f.conf).toFixed(3) : null, source: f.src || 'model', parcel_no: f.parcel_no || null, land_use: f.land_use || null, title: f.title || null, acquired: f.acquired || null, year: f.year || null, farmed_by: f.farmed || null, tenant: f.tenant || null, owner_id: f.owner_id || null, owner_name: (O.find(o => o.id === f.owner_id) || {}).name || null, note: f.note || null })),
       qml(single('fill', fill('#ffe14a', '#ffd000', 0.5, { alpha: 40 })), labels('field_id', 7, '#222222', 1))); };
   // land owners: house points (one per owner) and links from each house to the owner's lots
   const O = world.fieldOwners || [];
   const ownerLayers = () => { const F = world.fields || [], cen = f => [f.ring.reduce((s, p) => s + p[0], 0) / f.ring.length, f.ring.reduce((s, p) => s + p[1], 0) / f.ring.length];
     const lots = o => F.filter(f => f.owner_id === o.id);
-    cnt.owners = layer('owners', 'Land owners (houses)', 1, [['owner_id', 'INTEGER'], ['name', 'TEXT'], ['village', 'TEXT'], ['phone', 'TEXT'], ['note', 'TEXT'], ['lots', 'INTEGER'], ['total_ha', 'REAL']],
-      O.filter(o => o.house).map(o => ({ g: o.house, owner_id: o.id, name: o.name, village: o.village || null, phone: o.phone || null, note: o.note || null, lots: lots(o).length, total_ha: +(lots(o).reduce((s, f) => s + f.area_m2, 0) / 1e4).toFixed(4) })),
+    cnt.owners = layer('owners', 'Land owners (houses)', 1, [['owner_id', 'INTEGER'], ['name', 'TEXT'], ['owner_type', 'TEXT'], ['marital', 'TEXT'], ['husband', 'TEXT'], ['wife', 'TEXT'], ['sex', 'TEXT'], ['village', 'TEXT'], ['commune', 'TEXT'], ['phone', 'TEXT'], ['heirs', 'TEXT'], ['note', 'TEXT'], ['lots', 'INTEGER'], ['total_ha', 'REAL']],
+      O.filter(o => o.house).map(o => ({ g: o.house, owner_id: o.id, name: o.name, owner_type: o.type || null, marital: o.marital || null, husband: o.husband || null, wife: o.wife || null, sex: o.sex || null, commune: o.commune || null, heirs: o.heirs || null, village: o.village || null, phone: o.phone || null, note: o.note || null, lots: lots(o).length, total_ha: +(lots(o).reduce((s, f) => s + f.area_m2, 0) / 1e4).toFixed(4) })),
       qml(single('marker', marker('square', '#ff7a00', 3.2)), labels('name', 8, '#222222', 1)));
     cnt.owner_links = layer('owner_links', 'Owner house – lot links', 2, [['owner_id', 'INTEGER'], ['owner_name', 'TEXT'], ['field_id', 'INTEGER'], ['length_m', 'REAL']],
       O.filter(o => o.house).flatMap(o => F.map((f, i) => [f, i]).filter(([f]) => f.owner_id === o.id).map(([f, i]) => { const c = cen(f), k = Math.cos(c[1] * Math.PI / 180); return { g: [o.house, c], owner_id: o.id, owner_name: o.name, field_id: i + 1, length_m: +(Math.hypot((c[0] - o.house[0]) * k, c[1] - o.house[1]) * 111320).toFixed(0) }; })),
@@ -145,7 +145,7 @@ export async function exportGeoPackage(world, say = () => {}, opts = {}) {
   // tactical overlay: TacMap symbols (SVG with param() colours) coloured by side
   const tc = world.tactical;
   if (tc && tc.features.length) {
-    const { CAT } = await (await import('./tactical.js?v=72')).loadCatalog(), feats = tc.features.filter(q => tc.inAOI(q)), base = q => ({ code: q.code, side: q.side, label: q.label || '', name_en: CAT.catalog[q.code].en, name_km: CAT.catalog[q.code].km, color: tc.color(q.side, q.code) });
+    const { CAT } = await (await import('./tactical.js?v=73')).loadCatalog(), feats = tc.features.filter(q => tc.inAOI(q)), base = q => ({ code: q.code, side: q.side, label: q.label || '', name_en: CAT.catalog[q.code].en, name_km: CAT.catalog[q.code].km, color: tc.color(q.side, q.code) });
     const svgs = {}; for (const q of feats.filter(q => q.geom === 'point')) if (!svgs[q.code]) { try { svgs[q.code] = btoa(unescape(encodeURIComponent(await (await fetch('tac/svg/' + CAT.catalog[q.code].svg)).text()))); } catch (e) { } }
     const svgSym = c => `<layer class="SvgMarker" enabled="1" pass="0" locked="0">${opt({ name: 'base64:' + svgs[c], size: 7, size_unit: 'MM', color: '255,255,255,255', outline_color: '232,23,61,255', outline_width: 0.6, outline_width_unit: 'MM', vertical_anchor_point: '2' })}${ddColor('outlineColor', 'color')}</layer>`;
     cnt.tacP = layer('tactical_points', 'Tactical symbols', 1, [['code', 'TEXT'], ['side', 'TEXT'], ['label', 'TEXT'], ['name_en', 'TEXT'], ['name_km', 'TEXT'], ['color', 'TEXT'], ['rings_m', 'TEXT'], ['direction_deg', 'REAL']],

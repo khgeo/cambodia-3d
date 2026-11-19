@@ -622,3 +622,8 @@ body.nocredit #credit{display:none}
 #resultList .rlrow{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #222c38}#resultList .rlrow label{flex:1;display:flex;align-items:center;gap:6px;min-width:0;cursor:pointer}
 #resultList .rlrow i{width:10px;height:10px;border-radius:2px;flex:none}#resultList .rlrow span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px}
 #resultList .rlrow input[type=range]{width:70px}#resultList .rlrow button{padding:1px 6px;font-size:11px}
+.ownbadge{font-size:10.5px;background:#ff7a0033;color:#ffb36b;border-radius:10px;padding:1px 7px;white-space:nowrap}.owncard .mntg div.on{background:#ff7a0026}
+#fbOwnForm{background:#16202b;border:1px solid #2f3b49;border-radius:6px;padding:6px 8px;margin:6px 0}#fbOwnForm input,#fbOwnForm select,#fbOwnFind{background:#141b24;color:#e6edf3;border:1px solid #2f3b49;border-radius:4px;padding:3px 5px;font:inherit;min-width:0}
+#fbVtxRow button{flex:1;font-size:11.5px}#fbVtxRow button:disabled{opacity:.45}
+#fbOwner .ownsel{flex:1 1 auto;min-width:0;width:auto}#fbOwner .ownnew{flex:0 0 auto!important;width:auto!important;margin:0!important;white-space:nowrap}
+#fbOwner .gpgrid input,#fbOwner .gpgrid select,#fbOwnForm .gpgrid input,#fbOwnForm .gpgrid select{width:100%;box-sizing:border-box}#fbOwner .gpgrid,#fbOwnForm .gpgrid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}

@@ -3,13 +3,20 @@
 // computer unless exported), and exported with the fields to GeoPackage / CSV / report.
 import * as THREE from 'three';
 
+export const OWNER_TYPES = [['person', 'Person'], ['family', 'Family / heirs'], ['org', 'Organisation / company'], ['state', 'State / public land']];
+export const MARITAL = [['married', 'Married'], ['single', 'Single'], ['widowed', 'Widowed'], ['divorced', 'Divorced / separated']];
+export const TITLES = [['hard', 'Hard title (ownership certificate)'], ['soft', 'Soft title (commune / district paper)'], ['reg', 'In systematic registration'], ['none', 'Possession only, no paper'], ['unknown', 'Unknown']];
+export const ACQUIRED = [['inherited', 'Inherited'], ['bought', 'Bought'], ['gift', 'Gift'], ['allocated', 'Allocated (social land concession)'], ['cleared', 'Cleared / first occupied'], ['other', 'Other']];
+export const FARMED = [['owner', 'Farmed by the owner'], ['rented', 'Rented out'], ['share', 'Sharecropped'], ['lent', 'Lent free'], ['idle', 'Not farmed']];
+// the name shown everywhere: a married couple is "husband & wife"
+export function displayName(o) { if (!o) return ''; if (o.type === 'person' && o.marital === 'married' && (o.husband || o.wife)) return [o.husband, o.wife].filter(Boolean).join(' & '); return o.name || o.husband || o.wife || ''; }
 export const LAND_USE = ['Wet-season rice', 'Dry-season rice', 'Rice, two seasons', 'Cassava', 'Vegetables', 'Fruit trees / orchard', 'Cashew', 'Fallow', 'Pond', 'Other'];
 const key = aoi => 'cambodia3d.fields.' + [aoi.w, aoi.s, aoi.e, aoi.n].map(v => v.toFixed(4)).join(',');
 export function save(aoi, fields, owners) { try { localStorage.setItem(key(aoi), JSON.stringify({ date: new Date().toISOString(), fields, owners })); return true; } catch (e) { console.warn('save', e); return false; } }
 export function load(aoi) { try { const s = localStorage.getItem(key(aoi)); return s ? JSON.parse(s) : null; } catch (e) { return null; } }
 export function forget(aoi) { try { localStorage.removeItem(key(aoi)); } catch (e) { } }
 export const centroid = f => { const r = f.ring; return [r.reduce((s, p) => s + p[0], 0) / r.length, r.reduce((s, p) => s + p[1], 0) / r.length]; };
-export function newOwner(owners, o) { const id = (owners.reduce((m, x) => Math.max(m, x.id), 0) || 0) + 1; const ow = { id, name: o.name || '', village: o.village || '', phone: o.phone || '', note: o.note || '', house: null }; owners.push(ow); return ow; }
+export function newOwner(owners, o) { const id = (owners.reduce((m, x) => Math.max(m, x.id), 0) || 0) + 1; const ow = { id, type: 'person', marital: 'married', name: '', husband: '', wife: '', sex: '', village: '', commune: '', phone: '', note: '', house: null, ...o }; ow.name = displayName(ow); owners.push(ow); return ow; }
 export function lotsOf(fields, id) { return fields.map((f, i) => [f, i]).filter(([f]) => f.owner_id === id); }
 
 // a text label as a sprite (names in Khmer or English)
