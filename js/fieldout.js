@@ -17,7 +17,7 @@ export function fieldMap(im, F, W, H, o = {}) {
   const P = ([lo, la]) => [ox + im.px(lo) * k, oy + im.py(la) * k], lw = Math.max(1, W / 1400);
   F.forEach((f, i) => { const R = f.ring.map(P); g.beginPath(); R.forEach(([x, y], j) => j ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath();
     if (o.fill !== false) { g.globalAlpha = 0.38; g.fillStyle = SIZE[Math.max(0, sizeClass(f.area_m2))][2]; g.fill(); g.globalAlpha = 1; }
-    g.strokeStyle = f.src === 'digitized' ? '#ff3df2' : f.src === 'edited' ? '#00e5ff' : '#ffe14a'; g.lineWidth = 1.6 * lw; g.stroke(); });
+    g.strokeStyle = '#ffe14a'; g.lineWidth = 1.6 * lw; g.stroke(); });
   if (o.ids) { g.font = `600 ${Math.round(9 * lw)}px system-ui`; g.textAlign = 'center'; g.textBaseline = 'middle';
     F.forEach((f, i) => { const R = f.ring.map(P); let x = 0, y = 0; R.forEach(p => { x += p[0]; y += p[1]; }); x /= R.length; y /= R.length; const side = Math.sqrt(f.area_m2) / im.mpp * k; if (side < 18 * lw) return; g.lineWidth = 3 * lw; g.strokeStyle = 'rgba(0,0,0,.65)'; g.strokeText(i + 1, x, y); g.fillStyle = '#fff'; g.fillText(i + 1, x, y); }); }
   return { canvas: c, k, ox, oy };
@@ -46,7 +46,7 @@ export async function layout(im, F, meta, paper = 'A3') {
   g.textAlign = 'left'; g.fillText(`1:${n0(Math.round(mpp / 0.000254 / 1000) * 1000)} (${paper})`, bx, by + 11 * S); y += 26 * S;
   head(meta.L.legend); g.font = `${3.4 * S}px ${kh}system-ui`;
   const st = stats(F); SIZE.forEach(([lo, hi, col, lab], i) => { g.globalAlpha = 0.6; g.fillStyle = col; g.fillRect(sx, y, 7 * S, 4.5 * S); g.globalAlpha = 1; g.strokeStyle = '#ffd000'; g.lineWidth = 0.4 * S; g.strokeRect(sx, y, 7 * S, 4.5 * S); g.fillStyle = '#222'; g.fillText(`${lab}  ·  ${st.cls[i].n} (${st.cls[i].ha.toFixed(1)} ha)`, sx + 10 * S, y + 3.6 * S); y += 6.3 * S; });
-  for (const [col, lab] of [['#ffe14a', meta.L.model], ['#00e5ff', meta.L.edited], ['#ff3df2', meta.L.digitized]]) { g.strokeStyle = col; g.lineWidth = 0.8 * S; g.strokeRect(sx + 0.5 * S, y + 0.5 * S, 6 * S, 3.5 * S); g.fillStyle = '#222'; g.fillText(lab, sx + 10 * S, y + 3.6 * S); y += 6 * S; }
+  g.strokeStyle = '#ffe14a'; g.lineWidth = 0.8 * S; g.strokeRect(sx + 0.5 * S, y + 0.5 * S, 6 * S, 3.5 * S); g.fillStyle = '#222'; g.fillText(meta.L.boundary || 'Field boundary', sx + 10 * S, y + 3.6 * S); y += 6 * S;
   y += 4 * S; head(meta.L.stats); g.font = `${3.4 * S}px ${kh}system-ui`;
   for (const [l, v] of [[meta.L.fields, n0(st.n)], [meta.L.total, st.ha.toFixed(1) + ' ha'], [meta.L.median, n0(st.median) + ' m²'], [meta.L.mean, n0(st.mean) + ' m²'], ['P10 – P90', `${n0(st.p10)} – ${n0(st.p90)} m²`]]) { g.fillStyle = '#4a5a6a'; g.fillText(l, sx, y + 3.5 * S); g.fillStyle = '#111'; g.textAlign = 'right'; g.fillText(v, sx + side, y + 3.5 * S); g.textAlign = 'left'; y += 5.6 * S; }
   // location inset (Cambodia, Esri imagery z6)
@@ -72,6 +72,7 @@ table{border-collapse:collapse;width:100%;font-size:11px}td,th{border-bottom:1px
 <h2>${esc(L.map)}</h2><img src="${mapUrl}">
 <h2>${esc(L.sizes)}</h2>${bars}<table><tr><th>${esc(L.cls)}</th><th class=r>${esc(L.fields)}</th><th class=r>ha</th><th class=r>%</th></tr>${st.cls.map((c, i) => `<tr><td>${esc(SIZE[i][3])}</td><td class=r>${c.n}</td><td class=r>${c.ha.toFixed(2)}</td><td class=r>${st.ha ? (100 * c.ha / st.ha).toFixed(1) : 0}</td></tr>`).join('')}</table>
 <p class=sub>P10 ${n0(st.p10)} m² · P90 ${n0(st.p90)} m² · min ${n0(st.min)} m² · max ${n0(st.max)} m² · ${esc(L.sources)}: ${Object.entries(st.src).map(([k, v]) => `${esc(L[k] || k)} ${v}`).join(', ')}</p>
+${(meta.owners || []).length ? `<h2>${esc(L.owners || 'Land owners')}</h2><table><tr><th>${esc(L.owner || 'Owner')}</th><th>${esc(L.village || 'Village')}</th><th class=r>${esc(L.lots || 'Lots')}</th><th class=r>ha</th><th>${esc(L.house || 'House')}</th></tr>${meta.owners.map(o => { const lf = F.filter(f => f.owner_id === o.id); return `<tr><td>${esc(o.name)}</td><td>${esc(o.village || '')}</td><td class=r>${lf.length}</td><td class=r>${(lf.reduce((a, f) => a + f.area_m2, 0) / 1e4).toFixed(2)}</td><td>${o.house ? o.house[1].toFixed(5) + ', ' + o.house[0].toFixed(5) : '—'}</td></tr>`; }).join('')}</table><p class=sub>${esc(L.ownerNote || '')}</p>` : ''}
 <h2>${esc(L.method)}</h2><p>${esc(L.methodText)}</p>
 <h2>${esc(L.list)}</h2><div class=cols><table><tr><th>ID</th><th class=r>m²</th><th class=r>ha</th><th class=r>${esc(L.perim)}</th><th>${esc(L.src)}</th></tr>${rows.map(([i, f]) => `<tr><td>${i}</td><td class=r>${n0(f.area_m2)}</td><td class=r>${(f.area_m2 / 1e4).toFixed(3)}</td><td class=r>${f.perim_m ? n0(f.perim_m) : '–'}</td><td>${esc(L[f.src || 'model'] || f.src || '')}</td></tr>`).join('')}</table></div>
 ${F.length > 400 ? `<p class=sub>${esc(L.more.replace('%d', F.length - 400))}</p>` : ''}

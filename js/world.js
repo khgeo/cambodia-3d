@@ -5,26 +5,26 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=70';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=70';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=70';
-import { buildTrees, GrassField } from './vegetation.js?v=70';
-import { RoadNet, Driver, Walker } from './modes.js?v=70';
-import { vehicleKit } from './vehicles.js?v=70';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=70';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=70';
-import { LayerStack } from './layers.js?v=70';
-import { Survey } from './survey.js?v=70';
-import { Editor } from './editor.js?v=70';
-import { Atmos } from './atmos.js?v=70';
-import { NightLights } from './lights.js?v=70';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=70';
-import { Tactical, loadCatalog } from './tactical.js?v=70';
-import { LcTrainer } from './lctrain.js?v=70';
-import { Radar } from './radar.js?v=70';
-import { Globe } from './globe.js?v=70';
-import { SEASON } from './vegetation.js?v=70';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=70';
+import * as G from './geo.js?v=71';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=71';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=71';
+import { buildTrees, GrassField } from './vegetation.js?v=71';
+import { RoadNet, Driver, Walker } from './modes.js?v=71';
+import { vehicleKit } from './vehicles.js?v=71';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=71';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=71';
+import { LayerStack } from './layers.js?v=71';
+import { Survey } from './survey.js?v=71';
+import { Editor } from './editor.js?v=71';
+import { Atmos } from './atmos.js?v=71';
+import { NightLights } from './lights.js?v=71';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=71';
+import { Tactical, loadCatalog } from './tactical.js?v=71';
+import { LcTrainer } from './lctrain.js?v=71';
+import { Radar } from './radar.js?v=71';
+import { Globe } from './globe.js?v=71';
+import { SEASON } from './vegetation.js?v=71';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=71';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -1049,7 +1049,7 @@ export class World {
       cw.timer -= dt; if (cw.timer <= 0) { cw.moving = Math.random() < 0.35 ? 0.35 : 0; cw.timer = 3 + Math.random() * 8; cw.head += (Math.random() - .5) * 1.5; }
       if (cw.moving) {
         const nx = cw.pos.x + Math.sin(cw.head) * cw.moving * dt, nz = cw.pos.z + Math.cos(cw.head) * cw.moving * dt;
-        const D = this.D, ok = !D.exclude[Math.min(D.mh - 1, Math.max(0, ((nz - D.Z0) / D.MR) | 0)) * D.mw + Math.min(D.mw - 1, Math.max(0, ((nx - D.X0) / D.MR) | 0))];
+        const D = this.D, ok = D.exclude && !D.exclude[Math.min(D.mh - 1, Math.max(0, ((nz - D.Z0) / D.MR) | 0)) * D.mw + Math.min(D.mw - 1, Math.max(0, ((nx - D.X0) / D.MR) | 0))];
         if (ok && Math.hypot(nx - cw.home.x, nz - cw.home.z) < 18) { cw.pos.x = nx; cw.pos.z = nz; cw.pos.y = this.hAt(nx, nz); } else cw.head += Math.PI * (0.5 + Math.random() * 0.5);
       }
       d.position.copy(cw.pos); d.rotation.set(0, cw.head, 0); d.scale.setScalar(1); d.updateMatrix(); this.pm.cw.setMatrixAt(i, d.matrix);

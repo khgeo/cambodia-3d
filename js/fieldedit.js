@@ -43,12 +43,17 @@ export class FieldEditor {
     if (this.tool === 'draw' || this.tool === 'split') { const [sx, sz] = this.snap(x, z); this.draft.push([sx, sz]); if (this.tool === 'split' && this.draft.length === 2) this.finish(); else this.drawDraft(); }
   }
   // right-click: finish a drawing, or delete the vertex under the cursor
-  rightClick(e) { if (this.tool === 'draw' && this.draft.length) { this.finish(); return true; } if (this.tool === 'select' && this.sel >= 0 && e) { const v = this.vertexAt(e); if (v && !v.mid && this.fields[this.sel].ring.length > 3) { this.snapshot(); this.fields[this.sel].ring.splice(v.i, 1); this.touch(this.sel); this.draw(); this.onChange('vertex'); return true; } } return false; }
-  finish() {
-    if (this.tool === 'draw') { if (this.draft.length < 3) return; this.snapshot(); this.fields.push({ ring: this.draft.map(([x, z]) => this.ll(x, z)), conf: 1, rect: 1, src: 'digitized' }); this.touch(this.fields.length - 1); this.sel = this.fields.length - 1; this.draft = []; this.draw(); this.onChange('add'); }
-    else if (this.tool === 'split') { const [a, b] = this.draft; this.draft = []; const i = this.sel >= 0 ? this.sel : this.hit(...this.ll((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)); if (i < 0) { this.draw(); return; }
-      const R = this.fields[i].ring.map(p => this.xz(p)), side = (p, s) => s * ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])) >= 0;
-      const clip = s => { const out = []; for (let k = 0; k < R.length; k++) { const P = R[k], Q = R[(k + 1) % R.length], ip = side(P, s), iq = side(Q, s); if (ip) out.push(P); if (ip !== iq) { const d1 = (b[0] - a[0]) * (P[1] - a[1]) - (b[1] - a[1]) * (P[0] - a[0]), d2 = (b[0] - a[0]) * (Q[1] - a[1]) - (b[1] - a[1]) * (Q[0] - a[0]), t = d1 / (d1 - d2); out.push([P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t]); } } return out; };
+  rightClick(e) { if ((this.tool === 'draw' || this.tool === 'split') && this.draft.length) { this.finish(); return true; } if (this.tool === 'select' && this.sel >= 0 && e) { const v = this.vertexAt(e); if (v && !v.mid && this.fields[this.sel].ring.length > 3) { this.snapshot(); this.fields[this.sel].ring.splice(v.i, 1); this.touch(this.sel); this.draw(); this.onChange('vertex'); return true; } } return false; }
+  async finish() {
+    if (this.tool === 'draw') { if (this.draft.length < 3) return; this.snapshot(); let ring = this.draft.map(([x, z]) => this.ll(x, z));
+      // the corners were snapped onto neighbouring fields: pull the new field in by half the bund gap so the bund shows as two parallel lines
+      if (this.turf) { try { const T = await this.turf(), b = T.buffer(T.polygon([[...ring, ring[0]]]), -(this.gap || 2) / 2000, { units: 'kilometers', steps: 1 }); if (b && b.geometry.type === 'Polygon') ring = b.geometry.coordinates[0].slice(0, -1); } catch (e) { } }
+      this.fields.push({ ring, conf: 1, rect: 1, src: 'digitized' }); this.touch(this.fields.length - 1); this.sel = this.fields.length - 1; this.draft = []; this.draw(); this.onChange('add'); }
+    else if (this.tool === 'split') { if (this.draft.length < 2) return; const a = this.draft[0], b = this.draft[this.draft.length - 1]; this.draft = []; const i = this.sel >= 0 ? this.sel : this.hit(...this.ll((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)); if (i < 0) { this.draw(); return; }
+      // each half is clipped against the cut line moved half the bund gap towards it, so the new bund is two parallel lines
+      const R = this.fields[i].ring.map(p => this.xz(p)), L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / L, nz = (b[0] - a[0]) / L, h = (this.gap || 2) / 2;
+      const dist = (p, s) => s * ((p[0] - a[0]) * nx + (p[1] - a[1]) * nz) - h;
+      const clip = s => { const out = []; for (let k = 0; k < R.length; k++) { const P = R[k], Q = R[(k + 1) % R.length], dp = dist(P, s), dq = dist(Q, s); if (dp >= 0) out.push(P); if ((dp >= 0) !== (dq >= 0)) { const t = dp / (dp - dq); out.push([P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t]); } } return out; };
       const A = clip(1), B = clip(-1); if (A.length < 3 || B.length < 3) { this.draw(); return; }
       this.snapshot(); const f = this.fields[i]; this.fields.splice(i, 1, { ...f, ring: A.map(([x, z]) => this.ll(x, z)), src: 'edited' }, { ...f, ring: B.map(([x, z]) => this.ll(x, z)), src: 'edited' }); this.touch(i); this.touch(i + 1); this.sel = i; this.draw(); this.onChange('split'); }
   }
