@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=76">
+<link rel="stylesheet" href="css/app.css?v=77">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -60,7 +60,7 @@
   <nav id="rail" aria-label="Tools">
     <button id="back" data-tip="Back to the map">◀</button>
     <hr>
-    <button data-fly="view" data-tip="Views, drive, walk, flight, video" class="on">🎥</button>
+    <button data-fly="view" data-tip="Views, drive, walk, flight, video">🎥</button>
     <button data-fly="display" data-tip="Ground, terrain and objects">🖼️</button>
     <button data-fly="env" data-tip="Time, weather and rice season">🌤️</button>
     <button data-fly="info" data-tip="Land cover and statistics">📊</button>
@@ -96,7 +96,7 @@
     <button class="langBtn" data-tip="ភាសាខ្មែរ / English">ខ្មែរ</button>
   </nav>
   <div id="catMenu" hidden></div>
-  <div class="panel fly" id="scenePanel">
+  <div class="panel fly hidden" id="scenePanel">
     <div class="row top"><h1 id="flyTitle">Views</h1><button class="hideP" data-panel="scenePanel" title="Hide panel">✕</button></div>
     <div class="aoiT" id="aoiTitle">3D landscape</div>
     <section data-sec="view">
@@ -153,7 +153,7 @@
     <div class="row"><button id="run" title="Run">🏃</button><button id="walk2drive" title="Back into the vehicle" hidden>🚗</button><button class="exit" data-exit title="Exit (Esc)">✕</button></div>
   </div>
   <div id="joy" class="joy" hidden><div class="knob"></div></div>
-  <button class="fab" id="sceneToggle" aria-label="Panel">☰</button>
+  <button class="fab show" id="sceneToggle" aria-label="Panel">☰</button>
   <div id="layerPanel" hidden>
     <div class="row lphead"><b>Layers</b><span id="lpHint" class="hint"></span><button id="lpMin" title="Hide / show the layer list">▴</button><button id="lpClose" title="Close">✕</button></div>
     <div id="lpContent">
@@ -572,6 +572,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=76"></script>
+<script type="module" src="js/app.js?v=77"></script>
 </body>
 </html>

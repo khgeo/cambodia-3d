@@ -5,7 +5,7 @@
 // directions and distances. The Milky Way, the other galaxies' shapes and the cosmic web are illustrations.
 // Frame: equatorial J2000 with y = celestial north (the globe's frame turned by the sidereal time).
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=76';
+import { t, lang } from './i18n.js?v=77';
 
 const D2R = Math.PI / 180, AU = 1.495978707e8, LY = 9.4607e12, ER = 6371, OBL = 23.43928 * D2R;
 const rev = x => ((x % 360) + 360) % 360;
@@ -95,7 +95,7 @@ export class Cosmos {
   constructor(globe) {
     this.g = globe; this.w = globe.w; this.active = false; this.rate = 0; this.tOff = 0; this.az = 0; this.el = 0.3; this.dist = 8 * ER; this.focus = 'Earth';
     const sc = this.scene = new THREE.Scene(); sc.background = new THREE.Color(0x02040a); this.cam = new THREE.PerspectiveCamera(45, 1, 0.002, 2e5);
-    sc.add(new THREE.AmbientLight(0xffffff, 0.06)); this.sunLight = new THREE.PointLight(0xffffff, 3.2, 0, 0); sc.add(this.sunLight);
+    sc.add(new THREE.AmbientLight(0xffffff, 0.1)); this.sunLight = new THREE.PointLight(0xffffff, 3.2, 0, 0); sc.add(this.sunLight);
     this.objs = []; this.items = []; this.pos = {}; this.build(); this.ui(); this.events();
   }
   now() { return Date.now() + this.tOff; }
@@ -106,19 +106,21 @@ export class Cosmos {
     const bands = (cols, turb = 0.15) => T('', 512, 256, (g, w, h) => { for (let y = 0; y < h; y++) { const k = (Math.sin(y * 0.11) + Math.sin(y * 0.37) * 0.5 + 1.5) / 3, c = cols[Math.floor(k * cols.length) % cols.length]; g.fillStyle = c; g.fillRect(0, y, w, 1); } for (let i = 0; i < 900; i++) { g.fillStyle = `rgba(255,255,255,${rnd() * turb})`; g.fillRect(rnd() * w, rnd() * h, 10 + rnd() * 40, 1 + rnd() * 2); } });
     const rock = (base, spots, n = 400) => T('', 512, 256, (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); for (let i = 0; i < n; i++) { g.fillStyle = spots[(rnd() * spots.length) | 0]; g.globalAlpha = 0.25 + rnd() * 0.4; g.beginPath(); g.arc(rnd() * w, rnd() * h, 2 + rnd() * (n > 300 ? 9 : 28), 0, 7); g.fill(); } g.globalAlpha = 1; });
     const TEX = { Mercury: rock('#8f8a85', ['#6d6863', '#b0aaa4', '#5c5853'], 700), Venus: bands(['#e8cf9a', '#dcbf86', '#f0dcae'], 0.08), Mars: rock('#b5532a', ['#8c3a1c', '#d07a4b', '#e9d7c9', '#5e2a14'], 300), Jupiter: bands(['#d8b48a', '#b07a52', '#efe0c6', '#c79a6c', '#8e5c3c']), Saturn: bands(['#e3c98f', '#d1b479', '#f0e0b6', '#c7a86e'], 0.06), Uranus: bands(['#9fe3e8', '#a8e8ec', '#93d9df'], 0.03), Neptune: bands(['#4b70dd', '#3e5fc6', '#5b84ee'], 0.07), Pluto: rock('#cdb79e', ['#a88c6e', '#efe2cf', '#7a6050'], 200), Moon: rock('#9b9b98', ['#6e6e6c', '#bdbdb9', '#5a5a58'], 900) };
-    const sphere = new THREE.SphereGeometry(1, 64, 32);
+    const sphere = new THREE.SphereGeometry(1, 64, 32), TL = new THREE.TextureLoader(), real = (mat, f) => TL.load('textures/space/' + f, x => { x.colorSpace = THREE.SRGBColorSpace; x.anisotropy = 8; mat.map = x; mat.needsUpdate = true; });
+    const FILE = { Mercury: '2k_mercury.jpg', Venus: '2k_venus_atmosphere.jpg', Mars: '2k_mars.jpg', Jupiter: '2k_jupiter.jpg', Saturn: '2k_saturn.jpg', Uranus: '2k_uranus.jpg', Neptune: '2k_neptune.jpg', Moon: '2k_moon.jpg' };
+    this.SPIN = { Mercury: 1407.6, Venus: -5832.5, Mars: 24.62, Jupiter: 9.925, Saturn: 10.66, Uranus: -17.24, Neptune: 16.11, Pluto: -153.3 };
     // Sun
-    { const m = new THREE.Mesh(sphere, new THREE.MeshBasicMaterial({ color: 0xfff1c4 })); const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: T('', 256, 256, (g) => { const r = g.createRadialGradient(128, 128, 0, 128, 128, 128); r.addColorStop(0, 'rgba(255,240,200,1)'); r.addColorStop(0.2, 'rgba(255,200,90,.55)'); r.addColorStop(0.5, 'rgba(255,140,40,.12)'); r.addColorStop(1, 'rgba(255,120,0,0)'); g.fillStyle = r; g.fillRect(0, 0, 256, 256); }), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    { const sm = new THREE.MeshBasicMaterial({ color: 0xffffff }); real(sm, '2k_sun.jpg'); const m = new THREE.Mesh(sphere, sm); const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: T('', 256, 256, (g) => { const r = g.createRadialGradient(128, 128, 0, 128, 128, 128); r.addColorStop(0, 'rgba(255,240,200,1)'); r.addColorStop(0.2, 'rgba(255,200,90,.55)'); r.addColorStop(0.5, 'rgba(255,140,40,.12)'); r.addColorStop(1, 'rgba(255,120,0,0)'); g.fillStyle = r; g.fillRect(0, 0, 256, 256); }), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
       m.add(glow); glow.scale.setScalar(9); sc.add(m); this.addBody({ id: 'Sun', name: 'Sun', km: 'ព្រះអាទិត្យ', R: 696000, mesh: m, col: '#ffd76a', kind: 'star', info: 'Our star: 109 times wider than Earth, 4.6 billion years old.', show: [0, 3e17] }); }
     // planets, Moon
     for (const [n, km, R, col, pra, pdec, info] of PLANETS) {
       let mesh; if (n === 'Earth') { mesh = new THREE.Mesh(sphere, this.g.earth.material); }
-      else { mesh = new THREE.Mesh(sphere, new THREE.MeshStandardMaterial({ map: TEX[n], roughness: 1, metalness: 0 })); const pole = new THREE.Vector3(...dirRD(pra, pdec)); mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), pole); }
+      else { const mat = new THREE.MeshStandardMaterial({ map: TEX[n], roughness: 1, metalness: 0 }); if (FILE[n]) real(mat, FILE[n]); mesh = new THREE.Mesh(sphere, mat); mesh.userData.pole = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...dirRD(pra, pdec))); mesh.quaternion.copy(mesh.userData.pole); }
       if (n === 'Saturn') { const rg = new THREE.RingGeometry(1.24, 2.27, 128, 1), uv = rg.attributes.uv, P = rg.attributes.position; for (let i = 0; i < P.count; i++) { const r = Math.hypot(P.getX(i), P.getY(i)); uv.setXY(i, (r - 1.24) / 1.03, 0.5); }
-        const ring = new THREE.Mesh(rg, new THREE.MeshBasicMaterial({ map: T('', 512, 4, (g, w) => { for (let x = 0; x < w; x++) { const f = x / w, a = (f > 0.48 && f < 0.52 ? 0.05 : 0.35 + 0.5 * Math.abs(Math.sin(f * 40)) * (1 - f * 0.6)); g.fillStyle = `rgba(226,205,160,${a})`; g.fillRect(x, 0, 1, 4); } }), transparent: true, side: THREE.DoubleSide, depthWrite: false })); ring.rotation.x = -Math.PI / 2; mesh.add(ring); }
+        const rmat = new THREE.MeshBasicMaterial({ map: T('', 512, 4, (g, w) => { for (let x = 0; x < w; x++) { const f = x / w, a = (f > 0.48 && f < 0.52 ? 0.05 : 0.35 + 0.5 * Math.abs(Math.sin(f * 40)) * (1 - f * 0.6)); g.fillStyle = `rgba(226,205,160,${a})`; g.fillRect(x, 0, 1, 4); } }), transparent: true, side: THREE.DoubleSide, depthWrite: false }); TL.load('textures/space/2k_saturn_ring_alpha.png', x => { x.colorSpace = THREE.SRGBColorSpace; rmat.map = x; rmat.needsUpdate = true; }); const ring = new THREE.Mesh(rg, rmat); ring.rotation.x = -Math.PI / 2; mesh.add(ring); }
       sc.add(mesh); this.addBody({ id: n, name: n, km, R, mesh, col, kind: n === 'Pluto' ? 'dwarf' : 'planet', info, show: n === 'Earth' ? [0, 3e11] : ['Mercury', 'Venus', 'Mars'].includes(n) ? [0, 5e10] : [0, 2e11] });
     }
-    { const m = new THREE.Mesh(sphere, new THREE.MeshStandardMaterial({ map: TEX.Moon, roughness: 1 })); sc.add(m); this.addBody({ id: 'Moon', name: 'Moon', km: 'ព្រះច័ន្ទ', R: 1737, mesh: m, col: '#d7d7d2', kind: 'moon', info: 'Earth\'s only natural satellite, 384,400 km away. 12 people have walked on it.', show: [0, 3e7] }); }
+    { const mm = new THREE.MeshStandardMaterial({ map: TEX.Moon, roughness: 1 }); real(mm, FILE.Moon); const m = new THREE.Mesh(sphere, mm); sc.add(m); this.addBody({ id: 'Moon', name: 'Moon', km: 'ព្រះច័ន្ទ', R: 1737, mesh: m, col: '#d7d7d2', kind: 'moon', info: 'Earth\'s only natural satellite, 384,400 km away. 12 people have walked on it.', show: [0, 3e7] }); }
     // orbits (heliocentric, km) and the Moon's orbit (geocentric)
     this.orbits = []; const T0 = (this.now() / 864e5 + 2440587.5 - 2451545) / 36525;
     for (const n of ['Mercury', 'Venus', 'Earth', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto']) { const pts = []; for (let k = 0; k <= 256; k++) pts.push(...helio(EL[n], T0, k / 256 * 360)); const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pts.map(v => v / AU), 3));
@@ -197,7 +199,9 @@ export class Cosmos {
     // bodies
     const G = gmstDeg(ms) * D2R;
     for (const o of this.items) { const p = P[o.id]; if (!p) continue;
-      let Lp = 1; if (o.mesh) { Lp = this.place(o.mesh, p, cam, S, o.R); if (o.id === 'Earth') { o.mesh.rotation.set(0, G, 0); o.mesh.visible = !bg; } }
+      let Lp = 1; if (o.mesh) { Lp = this.place(o.mesh, p, cam, S, o.R); if (o.id === 'Earth') { o.mesh.rotation.set(0, G, 0); o.mesh.visible = !bg; }
+        else if (o.id === 'Moon') { const X = new THREE.Vector3(P.Earth[0] - p[0], P.Earth[1] - p[1], P.Earth[2] - p[2]).normalize(), Y = new THREE.Vector3(0, 1, 0).addScaledVector(X, -X.y).normalize(), Z = new THREE.Vector3().crossVectors(X, Y); o.mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, Z)); }
+        else if (o.mesh.userData.pole && this.SPIN[o.id]) o.mesh.quaternion.copy(o.mesh.userData.pole).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (ms / 3.6e6 / this.SPIN[o.id]) % 1 * 2 * Math.PI)); }
       if (o.mark) { this.place(o.mark, p, cam, S); if (bg && o.id === 'Earth') { o.mark.visible = false; continue; } o.mark.visible = true; o.mark.material.uniforms.uOp.value = o.mesh ? Math.max(0, 1 - (o.R * S / Math.max(Lp, 1e-9)) / 0.006) : (o.show ? fade(o.show[0] / 30, o.show[0], D, o.show[1], o.show[1] * 30) : 1); }
       if (o.cloud) { this.place(o.cloud, p, cam, S, o.cloudR); o.cloud.material.uniforms.uOp.value = 0.75 * fade(o.cloudR * 2, o.cloudR * 30, D, 1e30, 1e31); } }
     this.place(this.sunLight, P.Sun, cam, S); this.g.U.sun.value.set(...(() => { const s = [P.Sun[0] - P.Earth[0], P.Sun[1] - P.Earth[1], P.Sun[2] - P.Earth[2]], L = Math.hypot(...s); const v = new THREE.Vector3(s[0] / L, s[1] / L, s[2] / L).applyAxisAngle(new THREE.Vector3(0, 1, 0), -G); return [v.x, v.y, v.z]; })());
@@ -216,7 +220,7 @@ export class Cosmos {
     if (this.rate) this.tOff += dt * 1000 * this.rate; const w = this.w, el = w.renderer.domElement, asp = el.clientWidth / Math.max(1, el.clientHeight); if (this.cam.aspect !== asp) { this.cam.aspect = asp; this.cam.updateProjectionMatrix(); }
     const ms = this.now(); this.positions(ms);
     if (this.fly) { const F = this.fly; F.t = Math.min(1, F.t + dt / F.dur); const e = F.t * F.t * (3 - 2 * F.t), to = this.pos[F.to] || F.b; F.cur = [0, 1, 2].map(i => F.a[i] + (to[i] - F.a[i]) * e);
-      this.dist = Math.exp(Math.log(F.d0) + (Math.log(F.d1) - Math.log(F.d0)) * e + F.hump * Math.sin(Math.PI * e)); if (F.t >= 1) { this.focus = F.to; this.fly = null; } }
+      this.dist = Math.exp(Math.log(F.d0) + (Math.log(F.d1) - Math.log(F.d0)) * e + F.hump * Math.sin(Math.PI * e)); this.az = F.az0 + F.dAz * e; this.el = F.el0 + F.dEl * e; if (F.t >= 1) { this.focus = F.to; this.fly = null; } }
     if (this.autoSpin && !this.drag) this.az += dt * 0.03;
     const D = this.draw(ms, false), cam = this.camKm, f = this.focusPos();
     this.cam.position.set(0, 0, 0); this.cam.up.set(0, 1, 0); this.cam.lookAt((f[0] - cam[0]) * this.S, (f[1] - cam[1]) * this.S, (f[2] - cam[2]) * this.S);
@@ -253,9 +257,11 @@ export class Cosmos {
     this.uiBox.hidden = false; document.body.classList.add('cosmos-on'); if (focusId && focusId !== 'Earth') this.goTo(focusId); this.g.onCosmos && this.g.onCosmos(true);
   }
   exit() { const G = gmstDeg(Date.now()) * D2R, ce = Math.cos(this.el), v = new THREE.Vector3(ce * Math.sin(this.az), Math.sin(this.el), ce * Math.cos(this.az)).multiplyScalar(Math.max(this.dist, 2 * ER) / ER).applyAxisAngle(new THREE.Vector3(0, 1, 0), -G);
-    this.active = false; this.fly = null; this.tOff = 0; this.rate = 0; this.g.cam.position.copy(v.setLength(Math.min(7.4, v.length()))); this.g.cam.lookAt(0, 0, 0); this.g.ctl.enabled = true; this.g.ctl.update(); document.body.classList.remove('cosmos-on'); this.card(null); this.g.onCosmos && this.g.onCosmos(false); }
+    this.active = false; this.fly = null; this.tOff = 0; this.rate = 0; this.uiBox.hidden = true; this.g.cam.position.copy(v.setLength(Math.min(7.4, v.length()))); this.g.cam.lookAt(0, 0, 0); this.g.ctl.enabled = true; this.g.ctl.update(); document.body.classList.remove('cosmos-on'); this.card(null); this.g.onCosmos && this.g.onCosmos(false); }
   goTo(id) { const o = this.item(id); if (!o) return; this.positions(this.now()); const a = this.focusPos().slice(), b = this.pos[id], sep = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), d0 = this.dist, d1 = Math.max(o.view, o.R * 3);
-    const hump = Math.max(0, Math.log(sep * 1.4 / Math.max(d0, d1))); this.fly = { a, b, to: id, cur: a, t: 0, d0, d1, hump, dur: 2.2 + Math.min(4, hump * 0.35) }; this.card(o); }
+    const hump = Math.max(0, Math.log(sep * 1.4 / Math.max(d0, d1))); let az1 = this.az, el1 = this.el; if (o.body && id !== 'Sun' && id !== 'Earth') { const s = new THREE.Vector3(-b[0], -b[1], -b[2]).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.6); az1 = Math.atan2(s.x, s.z); el1 = Math.max(-0.5, Math.min(0.5, Math.asin(s.y) + 0.25)); } // look at the sunlit side
+    let dAz = ((az1 - this.az) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
+    this.fly = { a, b, to: id, cur: a, t: 0, d0, d1, hump, dur: 2.2 + Math.min(4, hump * 0.35), az0: this.az, dAz, el0: this.el, dEl: el1 - this.el }; this.card(o); }
   events() {
     const el = this.w.renderer.domElement, pts = new Map(); let down = null, pinch = 0;
     el.addEventListener('wheel', e => { if (!this.active) return; e.preventDefault(); this.zoom(Math.exp(e.deltaY * 0.0016)); }, { passive: false });
@@ -276,7 +282,7 @@ export class Cosmos {
       <div class="cosCard" id="cosCard" hidden></div>
       <div class="cosBottom"><div class="cosScale"><i id="cosBar"></i><span id="cosScaleT"></span><b id="cosLevel"></b></div>
         <div class="cosTime"><button data-rate="0" title="${t('Pause')}">⏸</button><button data-rate="1" title="${t('Real time')}">▶</button><button data-rate="3600">1 h/s</button><button data-rate="86400">1 ${t('day')}/s</button><button data-rate="2592000">1 ${t('month')}/s</button><button data-rate="31557600">1 ${t('year')}/s</button><button id="cosNow" title="${t('Now')}">⟲</button><span id="cosDate"></span></div>
-        <div class="cosNote">${t('Planets: JPL orbital elements · stars: Yale Bright Star Catalogue · the Milky Way, galaxy shapes and the cosmic web are illustrations.')}</div></div>
+        <div class="cosNote">${t('Planets: JPL orbital elements · stars: Yale Bright Star Catalogue · the Milky Way, galaxy shapes and the cosmic web are illustrations.')} ${t('Surface maps: Solar System Scope (CC BY 4.0), from NASA data.')}</div></div>
       <button class="cosBack" id="cosBack">🌍 ${t('Back to Earth')}</button>`;
     document.body.appendChild(d);
     d.querySelectorAll('[data-go]').forEach(b => b.onclick = () => this.goTo(b.dataset.go));
@@ -298,5 +304,5 @@ export class Cosmos {
   hud(D) { this.cardT = (this.cardT || 0) + 1; if (this.cardT % 15 === 1) this.updCard(); const el = this.w.renderer.domElement, px = 120, km = 2 * this.dist * Math.tan(this.cam.fov * D2R / 2) * px / el.clientHeight;
     const n = Math.pow(10, Math.floor(Math.log10(km))), nice = [1, 2, 5].map(k => k * n).filter(v => v <= km).pop() || n; this.uiBox.querySelector('#cosBar').style.width = (nice / km * px).toFixed(0) + 'px'; this.uiBox.querySelector('#cosScaleT').textContent = fmtKm(nice);
     const fo = this.item(this.focus); this.uiBox.querySelector('#cosLevel').textContent = fo && fo.body && D < fo.R * 60 ? (lang === 'km' && fo.km ? fo.km : t(fo.name)) : t(SCALES.find(([v]) => D < v)[1]); const dt = new Date(this.now()); this.uiBox.querySelector('#cosDate').textContent = dt.toISOString().slice(0, 16).replace('T', ' ') + ' UTC'; }
-  hideLabels() { this.labelBox.hidden = true; }
+  hideLabels() { this.labelBox.hidden = true; this.uiBox.hidden = true; }
 }

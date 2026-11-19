@@ -1,6 +1,7 @@
 // English / ខ្មែរ. Strings are written in English in the page and code; this table translates them.
 // A leading icon (emoji or arrow) is kept and the rest is looked up. New text is translated as it appears.
 export const KM = {
+  'Surface maps: Solar System Scope (CC BY 4.0), from NASA data.': 'ផែនទីផ្ទៃ៖ Solar System Scope (CC BY 4.0) ពីទិន្នន័យ NASA។',
   'light-years': 'ឆ្នាំពន្លឺ',
   'million light-years': 'លានឆ្នាំពន្លឺ',
   'billion light-years': 'ពាន់លានឆ្នាំពន្លឺ',
