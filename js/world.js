@@ -5,26 +5,27 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=71';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=71';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=71';
-import { buildTrees, GrassField } from './vegetation.js?v=71';
-import { RoadNet, Driver, Walker } from './modes.js?v=71';
-import { vehicleKit } from './vehicles.js?v=71';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=71';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=71';
-import { LayerStack } from './layers.js?v=71';
-import { Survey } from './survey.js?v=71';
-import { Editor } from './editor.js?v=71';
-import { Atmos } from './atmos.js?v=71';
-import { NightLights } from './lights.js?v=71';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=71';
-import { Tactical, loadCatalog } from './tactical.js?v=71';
-import { LcTrainer } from './lctrain.js?v=71';
-import { Radar } from './radar.js?v=71';
-import { Globe } from './globe.js?v=71';
-import { SEASON } from './vegetation.js?v=71';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=71';
+import * as G from './geo.js?v=72';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=72';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=72';
+import { buildTrees, GrassField } from './vegetation.js?v=72';
+import { RoadNet, Driver, Walker } from './modes.js?v=72';
+import { vehicleKit } from './vehicles.js?v=72';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=72';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=72';
+import { LayerStack } from './layers.js?v=72';
+import { Survey } from './survey.js?v=72';
+import { Editor } from './editor.js?v=72';
+import { Atmos } from './atmos.js?v=72';
+import { NightLights } from './lights.js?v=72';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=72';
+import { Tactical, loadCatalog } from './tactical.js?v=72';
+import { LcTrainer } from './lctrain.js?v=72';
+import { Radar } from './radar.js?v=72';
+import { Globe } from './globe.js?v=72';
+import { SEASON } from './vegetation.js?v=72';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=72';
+import { ResultLayers } from './results.js?v=72';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -101,6 +102,7 @@ function movingAvg(vals, win) { // uniform-ish spacing
 /* ====================================================================== */
 export class World {
   constructor(container) {
+    this.results = new ResultLayers(this);
     this.container = container;
     const r = this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     r.setPixelRatio(Math.min(devicePixelRatio, 2)); r.setSize(container.clientWidth, container.clientHeight);
@@ -206,7 +208,7 @@ export class World {
 
   /* ================================================================ LOAD */
   async load(aoi, opts, say) {
-    this.clearGeometry(); this.setMode('orbit');
+    this.clearGeometry(); this.setMode('orbit'); this.results.clear();
     for (const t of this.textures || []) t.dispose(); this.textures = [];
     const F = this.F = new Frame(aoi), W = F.W, H = F.H, X0 = -W / 2, X1 = W / 2, Z0 = -H / 2, Z1 = H / 2, S = Math.max(W, H);
     const D = this.D = { aoi, W, H, X0, Z0, X1, Z1, S, stats: {} };
@@ -722,6 +724,7 @@ export class World {
     if (this.editor) this.editor.rebuild();
     if (this.tactical) { this.tactical.clearAnalysis(); this.tactical.rebuild(); } else { try { if (JSON.parse(localStorage.getItem('cambodia3d.tac.v1') || '[]').length) loadCatalog().then(() => { this.tactical = this.tactical || new Tactical(this); this.tactical.rebuild(); }); } catch (e) {} }
     if (this.survey) this.survey.redraw();
+    this.results.rebuild();
     this.exag = exag; if (this.layers) { const t = this.layers.t; await this.layers.rebuild(); this.layers.setExplode(t, true); }
     if (this.U) { this.applySideGeology(); if (this.section) this.makeSection(this.section.A, this.section.B); }
     say('');
@@ -1116,6 +1119,14 @@ export class World {
   }
 
   /* ---------- camera views & player modes ---------- */
+  // N key: look straight down with north at the top; again: tilt back to an oblique view, still facing north
+  northView(top) {
+    if (this.mode !== 'orbit') this.setMode('orbit');
+    const q = this.controls.target.clone(), off = this.camera.position.clone().sub(q), d = off.length(), polar = Math.acos(Math.min(1, off.y / d)), az = Math.atan2(off.x, off.z);
+    if (top == null) top = !(polar < 0.06 && Math.abs(az) < 0.06);
+    const a = top ? 0.002 : 0.95, p1 = new V3(q.x, q.y + d * Math.cos(a), q.z + d * Math.sin(a));
+    this.flight = { t: 0, p0: this.camera.position.clone(), q0: q.clone(), p1, q1: q }; return top;
+  }
   goView(name, instant) {
     this.setMode('orbit');
     const v = this.views && this.views[name]; if (!v) return;

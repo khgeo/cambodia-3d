@@ -2,8 +2,8 @@
 // Above-ground layers (water, roads, plants, buildings, traffic) rise; derived map layers (land cover,
 // elevation, soil, geology) sink below the imagery surface. A level bar picks / isolates a layer.
 import * as THREE from 'three';
-import { UNITS, SOIL_CLASSES, geologyAt, soilAt } from './section.js?v=71';
-import { LC } from './landcover.js?v=71';
+import { UNITS, SOIL_CLASSES, geologyAt, soilAt } from './section.js?v=72';
+import { LC } from './landcover.js?v=72';
 
 export const LAYERS = [
   { id: 'traffic', short: 'Traffic & people', name: 'Traffic & people', c: '#ff8a3d', side: 1, on: true },
@@ -96,7 +96,7 @@ export class LayerStack {
   /* ---- build the extra slabs (planar-UV copy of the terrain) ---- */
   async rebuild() {
     const w = this.w, D = w.D; if (!D || !w.terrainMesh) return; this.dispose();
-    const grp = this.extra = new THREE.Group(); w.root.add(grp);
+    const grp = this.extra = new THREE.Group(); w.root.add(grp); this.frames = null; this.syncResults();
     const geo = w.terrainMesh.geometry.clone(), P = geo.attributes.position, uv = geo.attributes.uv;
     for (let i = 0; i < P.count; i++) uv.setXY(i, (P.getX(i) - D.X0) / D.W, 1 - (P.getZ(i) - D.Z0) / D.H);
     uv.needsUpdate = true; this.slabGeo = geo;
@@ -128,7 +128,7 @@ export class LayerStack {
     this.secLines.renderOrder = 9; this.secLines.visible = false; grp.add(this.secLines);
     this.secCurtain = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({ color: 0xffe14a, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false }));
     this.secCurtain.visible = false; grp.add(this.secCurtain);
-    this.collect();
+    this.syncResults();
     if (w.U) this.buildUnder();
     if (this.ioYears) this.makeTimeSlab();
     this.skirts(); this.apply(true);
@@ -252,8 +252,27 @@ export class LayerStack {
     o.trees = [...(w.treeMeshes || []), w.grass && w.grass.group].filter(Boolean);
     o.traffic = [...(w.vehMeshes || []).flatMap(g => [g.paint, g.fixed]), ...Object.values(w.pm || {})].filter(Boolean);
     for (const k in this.slab || {}) o[k] = [this.slab[k]];
+    if (w.results) for (const r of w.results.list) o[r.id] = w.results.parts(r);
     for (const L of LAYERS) for (const m of o[L.id] || []) if (m.userData.base == null) m.userData.base = m.position.y;
     if (this.floodMesh) this.floodMesh.userData.flood = true;
+  }
+  // result layers made by the apps (fields, rice maps …) join the stack just above the satellite surface
+  syncResults() {
+    const R = this.w.results ? this.w.results.list : [], D = this.w.D;
+    for (let i = LAYERS.length - 1; i >= 0; i--) { const L = LAYERS[i]; if (!L.result || R.find(r => r.id === L.id)) continue; LAYERS.splice(i, 1); delete this.state[L.id];
+      for (const o of [this.frames && this.frames[L.id], this.labels && this.labels[L.id]]) if (o && this.extra) { this.extra.remove(o); o.material.map && o.material.map.dispose(); o.material.dispose(); }
+      if (this.frames) { delete this.frames[L.id]; delete this.labels[L.id]; } if (this.focus === L.id) this.focus = null; }
+    for (const r of R) {
+      let L = LAYERS.find(l => l.id === r.id); const nm = `${r.icon} ${r.name}`;
+      if (!L) { L = { id: r.id, short: nm, name: nm, c: r.c, side: 1, on: true, result: true }; LAYERS.splice(LAYERS.findIndex(l => l.id === 'surface'), 0, L); } else { L.short = L.name = nm; L.c = r.c; }
+      if (!this.state[r.id]) this.state[r.id] = { on: r.on, op: r.op }; else Object.assign(this.state[r.id], { on: r.on, op: r.op });
+      if (r.mesh && r.mesh.material.userData.op0 == null) { const u = r.mesh.material.userData; r.mesh.material.opacity = 1; u.op0 = 1; u.tr0 = true; u.dw0 = false; }
+      if (this.legend && r.legend) this.legend[r.id] = r.legend;
+      if (this.frames && this.extra && !this.frames[r.id] && this.ringGeo) { const ext = Math.max(D.W, D.H);
+        const f = new THREE.LineLoop(this.ringGeo, new THREE.LineBasicMaterial({ color: r.c, transparent: true })); f.visible = false; this.extra.add(f); this.frames[r.id] = f;
+        const s = label(nm, r.c); s.scale.set(ext * 0.26, ext * 0.26 * 96 / 512, 1); s.visible = false; this.extra.add(s); this.labels[r.id] = s; }
+    }
+    if (this.frames) this.collect(); this.dirty = true;
   }
   available(id) { return !!(this.objs[id] && this.objs[id].length); }
   /* ---- layout ---- */

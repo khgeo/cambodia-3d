@@ -1,6 +1,16 @@
 // English / ខ្មែរ. Strings are written in English in the page and code; this table translates them.
 // A leading icon (emoji or arrow) is kept and the rest is looked up. New text is translated as it appears.
 export const KM = {
+  'Result layers': 'ស្រទាប់លទ្ធផល',
+  'Maps made by the apps stay here after you close them. They also appear in 🗂️ Layers.': 'ផែនទីដែលកម្មវិធីបង្កើត នៅតែនៅទីនេះ ទោះបិទកម្មវិធីក៏ដោយ។ វាក៏បង្ហាញក្នុង 🗂️ ស្រទាប់ផងដែរ។',
+  'Remove this layer': 'លុបស្រទាប់នេះ',
+  'Rice planting date (SOS)': 'កាលបរិច្ឆេទដាំស្រូវ (SOS)',
+  'Rice ecosystem': 'ប្រព័ន្ធអេកូស្រូវ',
+  'Mineral prospects': 'តំបន់សក្ដានុពលរ៉ែ',
+  'EIA screening zones': 'តំបន់ត្រួតពិនិត្យ EIA',
+  'Map overlay': 'ផែនទីត្រួត',
+  '🧭 North (N)': '🧭 ទិសជើង (N)',
+  'Straight down, north up (N). Press again to tilt.': 'មើលចុះត្រង់ ទិសជើងនៅខាងលើ (N)។ ចុចម្ដងទៀតដើម្បីផ្អៀង។',
   'Saved in this browser': 'បានរក្សាទុកក្នុងកម្មវិធីរុករកនេះ',
   'Could not save (browser storage full?)': 'មិនអាចរក្សាទុកបាន (កន្លែងផ្ទុកពេញ?)',
   'lots': 'ក្បាលដី',
