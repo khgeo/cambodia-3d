@@ -214,6 +214,15 @@ export const KM = {
   'OpenStreetMap streets and amenities…': 'ផ្លូវ និងសេវាពី OpenStreetMap…', 'Overpass busy – using the roads of the 3D scene only': 'Overpass រវល់ – ប្រើតែផ្លូវក្នុងទេសភាព 3D', 'Earth Engine: people, greenery, heat and flood…': 'Earth Engine៖ ប្រជាជន ភាពបៃតង កំដៅ និងទឹកជំនន់…',
   'Street-network travel times…': 'រយៈពេលធ្វើដំណើរតាមបណ្ដាញផ្លូវ…', 'streets': 'ផ្លូវ', 'transit stops': 'ចំណតឡានក្រុង',
   'Overpass busy – using the roads of the 3D scene and the bundled amenities': 'Overpass រវល់ – ប្រើផ្លូវក្នុងទេសភាព 3D និងសេវាដែលភ្ជាប់មកជាមួយ',
+  'Field Boundaries (AgriMapper): every field from the image with the Agri ONNX model': 'ព្រំស្រែ (AgriMapper)៖ ស្រែនីមួយៗពីរូបភាពផ្កាយរណប ដោយម៉ូដែល Agri ONNX', 'Field Boundaries': 'ព្រំស្រែ',
+  'Every field in the 3D area from the satellite image, with your Agri ONNX model (AgriMapper), running in this browser. Roads, water and buildings from OpenStreetMap cut the fields so roads are not mapped as fields.': 'ស្រែនីមួយៗក្នុងតំបន់ 3D ពីរូបភាពផ្កាយរណប ដោយម៉ូដែល Agri ONNX (AgriMapper) ដំណើរការក្នុងកម្មវិធីរុករកនេះ។ ផ្លូវ ទឹក និងអគារពី OpenStreetMap កាត់ស្រែ ដើម្បីកុំឲ្យផ្លូវត្រូវគូសជាស្រែ។',
+  'Field sensitivity (extent)': 'ភាពរសើបស្រែ (extent)', 'Split at boundary below': 'បំបែកនៅព្រំក្រោម', 'Merge weak edges below': 'បញ្ចូលគែមខ្សោយក្រោម', 'Bund gap (m)': 'គម្លាតភ្លឺស្រែ (ម)', 'Minimum field (m²)': 'ស្រែតូចបំផុត (ម²)',
+  'Rectangularity ≥': 'ភាពជាចតុកោណ ≥', 'Straighten edges (m)': 'តម្រង់គែម (ម)', 'Minimum width (m)': 'ទទឹងតូចបំផុត (ម)', 'Cut fields with OSM roads, water and buildings': 'កាត់ស្រែដោយផ្លូវ ទឹក និងអគារ OSM',
+  'Test-time augmentation (×4 slower, cleaner)': 'ការពង្រីកពេលសាកល្បង (យឺត ×4 ស្អាតជាង)', 'Detect fields': 'រកព្រំស្រែ', 'fields': 'ស្រែ', 'median': 'មធ្យមភាគ', 'mean confidence': 'ភាពជឿជាក់មធ្យម', '3D bunds': 'ភ្លឺស្រែ 3D',
+  'Outlines on the ground': 'ខ្សែព្រំលើដី', 'Fill by size': 'ពណ៌តាមទំហំ', 'Tap a field to see its size. Rice SOS and Rice Ecosystem can now fill whole fields (🧩 By field).': 'ចុចលើស្រែដើម្បីមើលទំហំ។ Rice SOS និង Rice Ecosystem អាចបំពេញស្រែទាំងមូលបាន (🧩 តាមស្រែ)។',
+  'Not in a mapped field': 'មិនស្ថិតក្នុងស្រែដែលបានគូស', 'Field': 'ស្រែ', 'confidence': 'ភាពជឿជាក់', 'rectangularity': 'ភាពជាចតុកោណ', 'By field': 'តាមស្រែ', 'run Field Boundaries first': 'ដំណើរការព្រំស្រែជាមុនសិន',
+  'Fill whole fields with their most common class (needs Field Boundaries)': 'បំពេញស្រែទាំងមូលដោយថ្នាក់ដែលមានច្រើនជាងគេ (ត្រូវការព្រំស្រែ)', 'Preparing the image…': 'កំពុងរៀបចំរូបភាព…', 'Fields from the model…': 'កំពុងបង្កើតស្រែពីម៉ូដែល…', 'Watershed…': 'Watershed…', 'Polygons…': 'ពហុកោណ…',
+  'Cut tree canopy out of fields (Agri trees model, ×2 time)': 'កាត់ម្លប់ឈើចេញពីស្រែ (ម៉ូដែលដើមឈើ Agri, ពេល ×2)',
   'Large area: downloading the data can take a long time. Continue?': 'តំបន់ធំ៖ ការទាញយកទិន្នន័យអាចចំណាយពេលយូរ។ បន្តទេ?',
 };
 export let lang = 'en';

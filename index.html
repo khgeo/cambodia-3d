@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=66">
+<link rel="stylesheet" href="css/app.css?v=67">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -87,6 +87,7 @@
       <button id="urbanBtn" data-cat="apps" data-tip="Urban Analytics: access, greenery, heat, livability">🏙️</button>
       <button id="riceSosBtn" data-cat="apps" data-tip="Rice SOS Mapper: planting dates from Sentinel-1">🌾</button>
       <button id="riceEcoBtn" data-cat="apps" data-tip="Rice Ecosystem Mapper: rainfed, irrigated, recession rice">🌱</button>
+      <button id="fieldsBtn" data-cat="apps" data-tip="Field Boundaries (AgriMapper): every field from the image with the Agri ONNX model">🧩</button>
       <button id="mineralBtn" data-cat="apps" data-tip="MineralScope: mineral mapping from satellite bands">🪨</button>
       <button id="topoBtn" data-cat="export" data-tip="Export: topographic map, GeoPackage &amp; GEOINT brief">🗺️</button>
     </div>
@@ -427,6 +428,24 @@
       <div id="uaRes"></div>
     </div>
   </div>
+  <div id="fieldsPanel" class="rpanel gpanel" hidden>
+    <div class="row lphead"><b>🧩 Field Boundaries</b><span id="fbHint" class="hint"></span><button id="fbMin" title="Hide / show">▴</button><button id="fbClose" title="Close">✕</button></div>
+    <div>
+      <div class="svhelp">Every field in the 3D area from the satellite image, with your Agri ONNX model (AgriMapper), running in this browser. Roads, water and buildings from OpenStreetMap cut the fields so roads are not mapped as fields.</div>
+      <details class="eiadv"><summary>Settings</summary>
+        <div class="gpgrid"><label>Field sensitivity (extent)<input id="fb_extent_thr" type="number" step="0.05"></label><label>Split at boundary below<input id="fb_boundary_thr" type="number" step="0.01"></label>
+        <label>Merge weak edges below<input id="fb_merge_thr" type="number" step="0.05"></label><label>Bund gap (m)<input id="fb_gap_m" type="number" step="0.5"></label>
+        <label>Minimum field (m²)<input id="fb_min_area_m2" type="number" step="50"></label><label>Rectangularity ≥<input id="fb_min_rect" type="number" step="0.05"></label>
+        <label>Straighten edges (m)<input id="fb_regularise_m" type="number" step="0.5"></label><label>Minimum width (m)<input id="fb_min_width_m" type="number" step="0.5"></label></div>
+        <label><input type="checkbox" id="fb_osm_cut" checked> Cut fields with OSM roads, water and buildings</label>
+        <label><input type="checkbox" id="fb_tta"> Test-time augmentation (×4 slower, cleaner)</label>
+        <label><input type="checkbox" id="fb_trees"> Cut tree canopy out of fields (Agri trees model, ×2 time)</label>
+      </details>
+      <button id="fbRun" class="primary eirun">▶ Detect fields</button>
+      <div id="fbStatus" class="svhelp"></div>
+      <div id="fbRes"></div>
+    </div>
+  </div>
   <div id="placePanel" class="rpanel" hidden>
     <div class="row lphead"><b>📍 Place info</b><span id="plHint" class="hint"></span><button id="plMin" title="Hide / show">▴</button><button id="plClose" title="Close">✕</button></div>
     <div id="plContent">
@@ -545,6 +564,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=66"></script>
+<script type="module" src="js/app.js?v=67"></script>
 </body>
 </html>
