@@ -2,7 +2,7 @@
 // data processed on Google Earth Engine – dry-season composites (Sentinel-2, Landsat 8/9, ASTER SWIR / TIR),
 // vegetation / cropland / built-up / water masks, band-ratio mineral indices, Crósta PCA, robust z-scores,
 // DEM lineament density, fuzzy prospectivity models, false-positive control and ranked targets.
-import { evaluate } from './gee.js?v=67';
+import { evaluate } from './gee.js?v=68';
 
 export const INDEX_INFO = {
   iron_oxide: 'Iron oxide (hematite, goethite)', ferrous: 'Ferrous minerals', clay_oh: 'Clay / hydroxyl (OH) minerals', gossan: 'Gossan',

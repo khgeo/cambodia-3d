@@ -223,6 +223,7 @@ export const KM = {
   'Not in a mapped field': 'មិនស្ថិតក្នុងស្រែដែលបានគូស', 'Field': 'ស្រែ', 'confidence': 'ភាពជឿជាក់', 'rectangularity': 'ភាពជាចតុកោណ', 'By field': 'តាមស្រែ', 'run Field Boundaries first': 'ដំណើរការព្រំស្រែជាមុនសិន',
   'Fill whole fields with their most common class (needs Field Boundaries)': 'បំពេញស្រែទាំងមូលដោយថ្នាក់ដែលមានច្រើនជាងគេ (ត្រូវការព្រំស្រែ)', 'Preparing the image…': 'កំពុងរៀបចំរូបភាព…', 'Fields from the model…': 'កំពុងបង្កើតស្រែពីម៉ូដែល…', 'Watershed…': 'Watershed…', 'Polygons…': 'ពហុកោណ…',
   'Cut tree canopy out of fields (Agri trees model, ×2 time)': 'កាត់ម្លប់ឈើចេញពីស្រែ (ម៉ូដែលដើមឈើ Agri, ពេល ×2)',
+  'Road-aware (v2 fields + v1 boundaries)': 'ដឹងពីផ្លូវ (ស្រែ v2 + ព្រំ v1)', 'Original Agri model (v1)': 'ម៉ូដែល Agri ដើម (v1)', 'Road-aware v2 only': 'តែ v2 ដឹងពីផ្លូវ',
   'Large area: downloading the data can take a long time. Continue?': 'តំបន់ធំ៖ ការទាញយកទិន្នន័យអាចចំណាយពេលយូរ។ បន្តទេ?',
 };
 export let lang = 'en';
