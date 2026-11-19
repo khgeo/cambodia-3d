@@ -4,7 +4,7 @@
 // filling, rectangularity / width / area filters, 2 m bund gap) plus a road / water / building cut from the
 // scene's OpenStreetMap masks, which removes the road confusion of the model.
 import * as THREE from 'three';
-import * as G from './geo.js?v=68';
+import * as G from './geo.js?v=69';
 
 const ORT = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
 let ort = null, provider_ = ''; const sessions = {};
@@ -198,6 +198,36 @@ export function osmCut(world, im) {
   for (let y = 0; y < im.H; y++) { const z = F.z(im.lat(y + 0.5)), j = Math.floor((z - Z0) / MR); if (j < 0 || j >= mh) continue;
     for (let x = 0; x < im.W; x++) { const i = Math.floor((F.x(im.lon(x + 0.5)) - X0) / MR); if (i < 0 || i >= mw) continue; const q = j * mw + i; for (const k of masks) if (k[q]) { m[y * im.W + x] = 1; break; } } }
   return m;
+}
+
+// share of tree canopy inside each field, from the scene's own image classification (2.5 m grid, class 2 = canopy)
+export function dropCanopy(world, fields, maxShare = 0.5) {
+  const D = world.D, F = world.F, { gw, gh, C, X0, Z0, cls } = D; if (!cls) return fields;
+  return fields.filter(f => { const R = f.ring.map(([lo, la]) => [F.x(lo), F.z(la)]); let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const [x, z] of R) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    let n = 0, t = 0; for (let j = Math.max(0, Math.floor((z0 - Z0) / C)); j <= Math.min(gh - 1, Math.floor((z1 - Z0) / C)); j++) for (let i = Math.max(0, Math.floor((x0 - X0) / C)); i <= Math.min(gw - 1, Math.floor((x1 - X0) / C)); i++) {
+      const x = X0 + (i + .5) * C, z = Z0 + (j + .5) * C; let c = false; for (let a = 0, b = R.length - 1; a < R.length; b = a++) if ((R[a][1] > z) !== (R[b][1] > z) && x < (R[b][0] - R[a][0]) * (z - R[a][1]) / (R[b][1] - R[a][1]) + R[a][0]) c = !c;
+      if (!c) continue; n++; if (cls[j * gw + i] === 2) t++; }
+    f.canopy = n ? t / n : 0; return f.canopy <= maxShare; });
+}
+
+// drop fields that are mostly tree canopy according to the Agri trees model (sampled every 3 px inside each field)
+export function dropByTrees(fields, im, tree, maxShare = 0.5) {
+  return fields.filter(f => { const R = f.ring.map(([lo, la]) => [im.px(lo), im.py(la)]); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const [x, y] of R) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    let n = 0, t = 0; for (let y = Math.max(0, Math.floor(y0)); y <= Math.min(im.H - 1, y1); y += 3) for (let x = Math.max(0, Math.floor(x0)); x <= Math.min(im.W - 1, x1); x += 3) {
+      let c = false; for (let a = 0, b = R.length - 1; a < R.length; b = a++) if ((R[a][1] > y) !== (R[b][1] > y) && x < (R[b][0] - R[a][0]) * (y - R[a][1]) / (R[b][1] - R[a][1]) + R[a][0]) c = !c;
+      if (!c) continue; n++; if (tree[y * im.W + x] > 0.5) t++; }
+    f.canopy = n ? t / n : 0; return f.canopy <= maxShare; });
+}
+
+// drop forest / orchard patches by colour: dark and green (mean excess green > 10 and brightness < 85).
+// Dry-season paddy is brown and brighter; green rice in the wet season is much brighter than tree canopy.
+export function dropDarkGreen(fields, im, exg = 10, bright = 85) {
+  const d = im.canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, im.W, im.H).data;
+  return fields.filter(f => { const R = f.ring.map(([lo, la]) => [im.px(lo), im.py(la)]); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const [x, y] of R) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+    let n = 0, eg = 0, br = 0; for (let y = Math.max(0, Math.floor(y0)); y <= Math.min(im.H - 1, y1); y += 2) for (let x = Math.max(0, Math.floor(x0)); x <= Math.min(im.W - 1, x1); x += 2) {
+      let c = false; for (let a = 0, b = R.length - 1; a < R.length; b = a++) if ((R[a][1] > y) !== (R[b][1] > y) && x < (R[b][0] - R[a][0]) * (y - R[a][1]) / (R[b][1] - R[a][1]) + R[a][0]) c = !c;
+      if (!c) continue; const q = (y * im.W + x) * 4; n++; eg += d[q + 1] - (d[q] + d[q + 2]) / 2; br += (d[q] + d[q + 1] + d[q + 2]) / 3; }
+    f.exg = n ? eg / n : 0; f.bright = n ? br / n : 0; return !(f.exg > exg && f.bright < bright); });
 }
 
 /* ---------------- 3D: raised bunds along every field edge ---------------- */
