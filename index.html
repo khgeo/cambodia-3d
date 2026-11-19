@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=74">
+<link rel="stylesheet" href="css/app.css?v=75">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -72,6 +72,7 @@
     <button class="catBtn" data-cat="export" data-tip="Export: topographic map, GeoPackage, brief">🗺️</button>
     <div id="toolDock" hidden>
       <button id="layersBtn" data-cat="explore" data-tip="Layers: pull apart &amp; explore">🗂️</button>
+      <button id="navBtn" data-cat="explore" data-tip="3D GPS navigation: routes, turn-by-turn, lanes, traffic-light countdowns">🚘</button>
       <button id="placeBtn" data-cat="explore" data-tip="Place info: names, photos, details of any place">📍</button>
       <button id="skyBtn" data-cat="explore" data-tip="Night sky: stars, planets &amp; star chart (StarChart)">🌌</button>
       <button id="globeBtn" data-cat="explore" data-tip="Whole Earth: where this area is, live clouds, wind, satellites, flights">🌍</button>
@@ -102,7 +103,7 @@
       <div class="seg wrap" id="views">
         <button data-v="overview" class="on">Overview</button><button data-v="oblique">Oblique</button><button data-v="street">Low</button><button data-v="drive">🚗 Drive</button><button data-v="walk">🚶 Walk</button>
       </div>
-      <div class="row icons"><button id="tourBtn" title="Cinematic flight around the area">🎥 Fly</button><button id="recBtn" title="Record the view as a video">⏺ Rec</button><button id="northBtn" title="Straight down, north up (N). Press again to tilt.">🧭 North (N)</button></div>
+      <div class="row icons"><button id="tourBtn" title="Cinematic flight around the area">🎥 Fly</button><button id="navBtn2" title="3D GPS navigation">🚘 Navigate</button><button id="recBtn" title="Record the view as a video">⏺ Rec</button><button id="northBtn" title="Straight down, north up (N). Press again to tilt.">🧭 North (N)</button></div>
       <p class="tip">Esc leaves Drive or Walk.</p>
     </section>
     <section data-sec="display" hidden>
@@ -449,6 +450,10 @@
       <div id="fbRes"></div>
     </div>
   </div>
+  <div id="navPanel" class="rpanel gpanel" hidden>
+    <div class="row lphead"><b>🚘 Navigation</b><span id="nvHint" class="hint"></span><button id="nvMin" title="Hide / show">▴</button><button id="nvClose" title="Close">✕</button></div>
+    <div id="navContent"></div>
+  </div>
   <div id="placePanel" class="rpanel" hidden>
     <div class="row lphead"><b>📍 Place info</b><span id="plHint" class="hint"></span><button id="plMin" title="Hide / show">▴</button><button id="plClose" title="Close">✕</button></div>
     <div id="plContent">
@@ -567,6 +572,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=74"></script>
+<script type="module" src="js/app.js?v=75"></script>
 </body>
 </html>

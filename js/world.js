@@ -5,27 +5,27 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=74';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=74';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=74';
-import { buildTrees, GrassField } from './vegetation.js?v=74';
-import { RoadNet, Driver, Walker } from './modes.js?v=74';
-import { vehicleKit } from './vehicles.js?v=74';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=74';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=74';
-import { LayerStack } from './layers.js?v=74';
-import { Survey } from './survey.js?v=74';
-import { Editor } from './editor.js?v=74';
-import { Atmos } from './atmos.js?v=74';
-import { NightLights } from './lights.js?v=74';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=74';
-import { Tactical, loadCatalog } from './tactical.js?v=74';
-import { LcTrainer } from './lctrain.js?v=74';
-import { Radar } from './radar.js?v=74';
-import { Globe } from './globe.js?v=74';
-import { SEASON } from './vegetation.js?v=74';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=74';
-import { ResultLayers } from './results.js?v=74';
+import * as G from './geo.js?v=75';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=75';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=75';
+import { buildTrees, GrassField } from './vegetation.js?v=75';
+import { RoadNet, Driver, Walker } from './modes.js?v=75';
+import { vehicleKit } from './vehicles.js?v=75';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=75';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=75';
+import { LayerStack } from './layers.js?v=75';
+import { Survey } from './survey.js?v=75';
+import { Editor } from './editor.js?v=75';
+import { Atmos } from './atmos.js?v=75';
+import { NightLights } from './lights.js?v=75';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=75';
+import { Tactical, loadCatalog } from './tactical.js?v=75';
+import { LcTrainer } from './lctrain.js?v=75';
+import { Radar } from './radar.js?v=75';
+import { Globe } from './globe.js?v=75';
+import { SEASON } from './vegetation.js?v=75';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=75';
+import { ResultLayers } from './results.js?v=75';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -208,7 +208,7 @@ export class World {
 
   /* ================================================================ LOAD */
   async load(aoi, opts, say) {
-    this.clearGeometry(); this.setMode('orbit'); this.results.clear();
+    this.clearGeometry(); this.setMode('orbit'); this.results.clear(); if (this.nav && this.nav.active) this.nav.close();
     for (const t of this.textures || []) t.dispose(); this.textures = [];
     const F = this.F = new Frame(aoi), W = F.W, H = F.H, X0 = -W / 2, X1 = W / 2, Z0 = -H / 2, Z1 = H / 2, S = Math.max(W, H);
     const D = this.D = { aoi, W, H, X0, Z0, X1, Z1, S, stats: {} };
@@ -624,7 +624,7 @@ export class World {
       ribbon(pts, st.w / 2, [st.mk, st.lanes, st.s]);
       const oneway = (r.flags & 1) || (r.flags & 16) ? 1 : 0;
       if (r.cls <= 14 && r.cls !== 13 && L > 20) this.lanesForTraffic.push({ pts, st, cls: r.cls, oneway, urban: r.flags & 8 });
-      if (r.cls <= 16 && r.cls !== 15) netRoads.push({ pts, hw: st.w / 2, oneway, cls: r.cls, urban: r.flags & 8, bridge: !!isBridge });
+      if (r.cls <= 16 && r.cls !== 15) netRoads.push({ pts, hw: st.w / 2, oneway, cls: r.cls, urban: r.flags & 8, bridge: !!isBridge, lanes: st.lanes, id: r.id });
     }
     for (const pts of railPts) { for (const p of pts) p.y = Math.max(p.g, hAt(p.x, p.z)) + 0.32; ribbon(pts, 1.8, [0, 1, 10]); }
     if (RB.pos.length) {
@@ -724,7 +724,7 @@ export class World {
     if (this.editor) this.editor.rebuild();
     if (this.tactical) { this.tactical.clearAnalysis(); this.tactical.rebuild(); } else { try { if (JSON.parse(localStorage.getItem('cambodia3d.tac.v1') || '[]').length) loadCatalog().then(() => { this.tactical = this.tactical || new Tactical(this); this.tactical.rebuild(); }); } catch (e) {} }
     if (this.survey) this.survey.redraw();
-    this.results.rebuild();
+    this.results.rebuild(); if (this.nav) this.nav.rebuild();
     this.exag = exag; if (this.layers) { const t = this.layers.t; await this.layers.rebuild(); this.layers.setExplode(t, true); }
     if (this.U) { this.applySideGeology(); if (this.section) this.makeSection(this.section.A, this.section.B); }
     say('');
@@ -1364,7 +1364,8 @@ export class World {
     if (this.trafficOn !== false) this.updateTraffic(dt);
     this.waterNormal.offset.x += dt * 0.012; this.waterNormal.offset.y += dt * 0.007;
     let focus;
-    if (this.mode === 'drive' && this.driver) {
+    if (this.nav && this.nav.active && this.mode === 'orbit') focus = this.nav.frame(dt);
+    else if (this.mode === 'drive' && this.driver) {
       { const d = this.driver, f = d.fwd; let lim = Infinity;
         for (const v of this.vehicles || []) { const dx = v.pos.x - d.pos.x, dz = v.pos.z - d.pos.z, along = dx * f.x + dz * f.z; if (along <= 0 || along > 70) continue;
           const lat = Math.abs(dx * f.z - dz * f.x); if (lat > 1.9) continue; const same = v.fwd.x * f.x + v.fwd.z * f.z, gap = along - ((v.len || 4) + ((this.kit[d.kind] || {}).len || 4.5)) / 2;

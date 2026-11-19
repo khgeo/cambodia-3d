@@ -1,6 +1,6 @@
 // 2D overview map (whole Cambodia, lazy road tiles) + AOI selection + 3D scene control
-import * as G from './geo.js?v=74';
-import { t, lang, setLang, initLang, onLang, addKm } from './i18n.js?v=74';
+import * as G from './geo.js?v=75';
+import { t, lang, setLang, initLang, onLang, addKm } from './i18n.js?v=75';
 const tr = t; // translator, for places where a local variable is called t
 
 const $ = id => document.getElementById(id);
@@ -100,7 +100,7 @@ document.querySelectorAll('#rail [data-fly]').forEach(b => b.onclick = () => {
 function syncRail() {
   const open = !$('scenePanel').classList.contains('hidden');
   document.querySelectorAll('#rail [data-fly]').forEach(b => b.classList.toggle('on', open && b.dataset.fly === flySec));
-  const P = { layersBtn: 'layerPanel', surveyBtn: 'surveyPanel', editBtn: 'editPanel', sectionBtn: 'sectionPanel', tacBtn: 'tacPanel', topoBtn: 'topoPanel', lcBtn: 'lcPanel', radarBtn: 'radarPanel', globeBtn: 'globePanel', changeBtn: 'changePanel', intelBtn: 'intelPanel', placeBtn: 'placePanel', skyBtn: 'skyPanel', eiaBtn: 'eiaPanel', riceSosBtn: 'riceSosPanel', riceEcoBtn: 'riceEcoPanel', mineralBtn: 'mineralPanel', urbanBtn: 'urbanPanel', fieldsBtn: 'fieldsPanel' };
+  const P = { layersBtn: 'layerPanel', surveyBtn: 'surveyPanel', editBtn: 'editPanel', sectionBtn: 'sectionPanel', tacBtn: 'tacPanel', topoBtn: 'topoPanel', lcBtn: 'lcPanel', radarBtn: 'radarPanel', globeBtn: 'globePanel', changeBtn: 'changePanel', intelBtn: 'intelPanel', placeBtn: 'placePanel', skyBtn: 'skyPanel', eiaBtn: 'eiaPanel', riceSosBtn: 'riceSosPanel', riceEcoBtn: 'riceEcoPanel', mineralBtn: 'mineralPanel', urbanBtn: 'urbanPanel', fieldsBtn: 'fieldsPanel', navBtn: 'navPanel' };
   for (const [b, p] of Object.entries(P)) if ($(b) && $(p)) $(b).classList.toggle('act', !$(p).hidden);
   document.querySelectorAll('#rail .catBtn').forEach(c => c.classList.toggle('act', [...document.querySelectorAll(`#toolDock [data-cat="${c.dataset.cat}"]`)].some(b => b.classList.contains('act'))));
 }
@@ -237,7 +237,7 @@ function setOn(id, v) { document.querySelectorAll(`#${id} button`).forEach(b => 
 $('build').onclick = async () => {
   $('mapView').hidden = true; $('sceneView').hidden = false;
   if (!world) {
-    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=74'); world = new World($('scene')); window.__world = world; world.results.onChange = rlRender; world.onGlobe = v => globeUI(v);
+    progress('Starting 3D engine…'); const { World } = await import('./world.js?v=75'); world = new World($('scene')); window.__world = world; world.results.onChange = rlRender; world.onGlobe = v => globeUI(v);
     world.onRightClick = e => { // finish the current drawing
       if (EI && EI.drawing && !$('eiaPanel').hidden) { $('eiFinish').onclick(); return; }
       if (FB && FB.FE && !$('fieldsPanel').hidden && FB.FE.rightClick(e)) return;
@@ -254,13 +254,13 @@ $('build').onclick = async () => {
     world.onVehicle = k => { $('vehicle').value = k; };
     world.onSectionHint = t => { $('secHint').textContent = t; };
     world.onSection = async S => {
-      const { drawProfile, legendHTML } = await import('./section.js?v=74');
+      const { drawProfile, legendHTML } = await import('./section.js?v=75');
       $('sectionPanel').classList.remove('picking', 'min'); $('secMin').textContent = '▾';
       const cv = $('secCanvas'); cv.width = Math.min(1600, Math.round(cv.clientWidth * Math.min(2, devicePixelRatio))); cv.height = Math.round(cv.width * 0.36);
       drawProfile(cv, S); $('secLegend').innerHTML = legendHTML(S); $('secHint').textContent = 'Done – ↺ for a new line, ▾ to minimise';
     };
-    const { joystick } = await import('./modes.js?v=74'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
-    const { Hud } = await import('./hud.js?v=74'); new Hud($('hud'), world);
+    const { joystick } = await import('./modes.js?v=75'); joystick($('joy'), (x, y) => world.walker.move.set(x, y));
+    const { Hud } = await import('./hud.js?v=75'); new Hud($('hud'), world);
   }
   world.paused = false;
   const [wk, hk] = kmSize(aoi);
@@ -310,14 +310,14 @@ document.querySelectorAll('[data-exit]').forEach(b => b.onclick = () => { world.
 if (innerWidth < 640) showPanel('mapPanel', false);
 /* right-hand column: keep the layer panel under the inset map, never on top of it */
 const placeRight = () => {
-  const lp = ['surveyPanel', 'editPanel', 'tacPanel', 'topoPanel', 'lcPanel', 'radarPanel', 'globePanel', 'changePanel', 'intelPanel', 'placePanel', 'skyPanel', 'eiaPanel', 'riceSosPanel', 'riceEcoPanel', 'mineralPanel', 'urbanPanel', 'fieldsPanel', 'layerPanel'].map($).find(e => !e.hidden) || $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
+  const lp = ['surveyPanel', 'editPanel', 'tacPanel', 'topoPanel', 'lcPanel', 'radarPanel', 'globePanel', 'changePanel', 'intelPanel', 'placePanel', 'skyPanel', 'eiaPanel', 'riceSosPanel', 'riceEcoPanel', 'mineralPanel', 'urbanPanel', 'fieldsPanel', 'navPanel', 'layerPanel'].map($).find(e => !e.hidden) || $('layerPanel'), hud = $('hud'); if (lp.hidden) { document.body.classList.remove('lp-open'); return; }
   document.body.classList.add('lp-open');
   if (innerWidth < 640) { lp.style.top = ''; lp.style.maxHeight = ''; return; }
   const top = hud.hidden ? 12 : hud.getBoundingClientRect().bottom + 8;
   lp.style.top = top + 'px'; lp.style.maxHeight = (innerHeight - top - 12) + 'px';
 };
 addEventListener('resize', placeRight);
-const RP = { layerPanel: 'lpClose', surveyPanel: 'svClose', editPanel: 'edClose', tacPanel: 'tacClose', topoPanel: 'topoClose', lcPanel: 'lcClose', radarPanel: 'radarClose', changePanel: 'chClose', intelPanel: 'inClose', placePanel: 'plClose', skyPanel: 'skClose', eiaPanel: 'eiClose', riceSosPanel: 'rsClose', riceEcoPanel: 'reClose', mineralPanel: 'mnClose', urbanPanel: 'uaClose', fieldsPanel: 'fbClose' };
+const RP = { layerPanel: 'lpClose', surveyPanel: 'svClose', editPanel: 'edClose', tacPanel: 'tacClose', topoPanel: 'topoClose', lcPanel: 'lcClose', radarPanel: 'radarClose', changePanel: 'chClose', intelPanel: 'inClose', placePanel: 'plClose', skyPanel: 'skClose', eiaPanel: 'eiClose', riceSosPanel: 'rsClose', riceEcoPanel: 'reClose', mineralPanel: 'mnClose', urbanPanel: 'uaClose', fieldsPanel: 'fbClose', navPanel: 'nvClose' };
 function closeOthers(keep) { for (const [p, c] of Object.entries(RP)) if (p !== keep && $(p) && !$(p).hidden && $(c)) $(c).onclick(); }
 /* result layers (maps made by the apps) in the Display panel; they stay after an app panel is closed */
 function rlRender() {
@@ -328,7 +328,7 @@ function rlRender() {
   if (LS && !$('layerPanel').hidden) lpRender();
 }
 $('northBtn').onclick = () => { if (world && world.D) world.northView(); };
-addEventListener('keydown', e => { if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && !e.altKey && world && world.D && world.mode === 'orbit' && !(LS && LS.t > 0.01) && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) && !e.target.isContentEditable) { world.northView(); e.preventDefault(); } });
+addEventListener('keydown', e => { if ((e.key === 'n' || e.key === 'N') && !e.ctrlKey && !e.metaKey && !e.altKey && world && world.D && world.mode === 'orbit' && !(LS && LS.t > 0.01) && !(world.nav && world.nav.trip) && !/INPUT|TEXTAREA|SELECT/.test(e.target.tagName) && !e.target.isContentEditable) { world.northView(); e.preventDefault(); } });
 addEventListener('keydown', e => { const FE = FB && FB.FE; if (!FE || !FE.active || $('fieldsPanel').hidden || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
   if ((e.key === 'Delete' || e.key === 'Backspace') && FE.tool === 'select') { if (FE.vsel >= 0) FE.deleteVertex(); else if (FE.sel >= 0) FE.remove(); e.preventDefault(); }
   else if (e.key === 'Enter' && FE.draft.length) { FE.finish(); e.preventDefault(); }
@@ -372,7 +372,7 @@ $('layersBtn').onclick = async () => {
   if (world.mode !== 'orbit') world.setMode('orbit');
   if (world.groundStyle && world.groundStyle !== 'sat') { world.setGround('sat'); setOn('ground', 'sat'); } // the satellite surface stays the original image
   $('lpHint').textContent = 'Preparing layers…';
-  const mod = await import('./layers.js?v=74'); LAYERS_DEF = mod.LAYERS;
+  const mod = await import('./layers.js?v=75'); LAYERS_DEF = mod.LAYERS;
   LS = await world.openLayers(t => { $('lpHint').textContent = t; });
   LS.onT = t => { $('lpExplode').value = Math.round(t * 100); };
   LS.onFocus = () => lpRender();
@@ -477,7 +477,7 @@ const svProfile = m => {
 const svOpen = async () => {
   if (!world || !world.D) return;
   closeOthers('surveyPanel');
-  SVM = await import('./survey.js?v=74'); SV = world.openSurvey(); SV.onChange = svRender;
+  SVM = await import('./survey.js?v=75'); SV = world.openSurvey(); SV.onChange = svRender;
   SV.onArrive = () => { svSay('Arrived at the target'); if (SV.tool === 'points') $('svMark').classList.add('pulse'); setTimeout(() => $('svMark').classList.remove('pulse'), 2500); svRender(); };
   if (!$('svCode').options.length) $('svCode').innerHTML = SVM.CODES.map(c => `<option>${c}</option>`).join('');
   $('surveyPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); svRender();
@@ -560,7 +560,7 @@ $('editBtn').onclick = async () => {
   if (!world || !world.D) return;
   closeOthers('editPanel');
   if (world.mode !== 'orbit') world.setMode('orbit');
-  EDM = await import('./editor.js?v=74'); ED = world.openEditor(); ED.onChange = edRender;
+  EDM = await import('./editor.js?v=75'); ED = world.openEditor(); ED.onChange = edRender;
   ED.onHover = p => { $('edSnapKind').textContent = p && p.kind ? '→ ' + p.kind : ''; };
   if (!$('edRoad').options.length) { fillSel('#edRoad'.slice(1), EDM.ROAD_TYPES, ED.opts.road); fillSel('edRoof', EDM.ROOFS, ED.opts.roof); fillSel('edWall', EDM.WALLS, ED.opts.wall); fillSel('edRoofC', EDM.ROOF_COLS, ED.opts.roofC); fillSel('edTree', EDM.TREES, ED.opts.tree); }
   $('editPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); edRender();
@@ -601,7 +601,7 @@ const tacTab = k => { document.querySelectorAll('.tactabs button').forEach(b => 
 document.querySelectorAll('.tactabs button').forEach(b => b.onclick = () => { tacTab(b.dataset.tt); if (TC && b.dataset.tt !== 'ana' && /los|viewshed|ring|measure/.test(TC.mode)) { TC.mode = 'place'; tacRender(); } });
 $('tacBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('tacPanel'); if (world.mode !== 'orbit') world.setMode('orbit');
-  TCM = await import('./tactical.js?v=74'); TCAT = (await TCM.loadCatalog()).CAT;
+  TCM = await import('./tactical.js?v=75'); TCAT = (await TCM.loadCatalog()).CAT;
   TC = await world.openTactical(); TC.onChange = () => {}; TC.onMsg = m => $('tacHint').textContent = t(m); TC.onResult = tacResult; TC.lang = lang; TC.labels = $('tacLabels').value;
   TC.onSelect = f => { if (!f) { $('tacHint').textContent = t('Tap a symbol first'); return; } $('tacHint').textContent = t('Editing') + ': ' + nm(TCAT.catalog[f.code]); $('tacLabel').value = f.label || ''; TC.label = f.label || ''; tacDirSet(f.dir ?? null, false); };
   $('tacPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false); tacRender();
@@ -664,7 +664,7 @@ $('topoBtn').onclick = async () => {
 $('topoClose').onclick = () => { $('topoPanel').hidden = true; placeRight(); };
 $('topoMin').onclick = () => { const c = $('topoPanel').classList.toggle('collapsed'); $('topoMin').textContent = c ? '▾' : '▴'; };
 $('topoMake').onclick = async () => {
-  if (!world || !world.D) return; const M = await import('./topomap.js?v=74'); $('topoMake').disabled = true;
+  if (!world || !world.D) return; const M = await import('./topomap.js?v=75'); $('topoMake').disabled = true;
   try {
     TOPO = await M.makeTopoMap(world, { paper: $('topoPaper').value, scale: $('topoScale').value, ci: $('topoCI').value, lang: $('topoLang').value, dpi: +$('topoDPI').value, title: $('topoTitle').value.trim(), titleKm: $('topoTitleKm').value.trim(),
       names: $('topoNames').checked, hill: $('topoHill').checked, image: $('topoImg').checked, mine: $('topoMine').checked, survey: $('topoSurvey').checked, tac: $('topoTac').checked }, m => $('topoHint').textContent = t(m));
@@ -677,13 +677,13 @@ $('topoMake').onclick = async () => {
 const topoName = ext => `topo-${($('topoTitle').value || 'map').replace(/[^A-Za-z0-9]+/g, '_')}-1_${TOPO.scale}.${ext}`;
 $('topoPNG').onclick = () => TOPO && TOPO.canvas.toBlob(b => download(topoName('png'), b));
 $('topoPDF').onclick = async () => { if (!TOPO) return; $('topoPDF').disabled = true; $('topoHint').textContent = t('Making PDF…');
-  try { const M = await import('./topomap.js?v=74'), extra = $('topoBrief').checked ? await briefPages(m => $('topoHint').textContent = t(m)) : null; await M.toPDF(TOPO, topoName('pdf'), extra); }
+  try { const M = await import('./topomap.js?v=75'), extra = $('topoBrief').checked ? await briefPages(m => $('topoHint').textContent = t(m)) : null; await M.toPDF(TOPO, topoName('pdf'), extra); }
   catch (e) { console.error(e); alert(t('Could not make the PDF') + ': ' + e.message); }
   $('topoHint').textContent = ''; $('topoPDF').disabled = false; };
 
 $('gpkgBtn').onclick = async () => {
   if (!world || !world.D) return; $('gpkgBtn').disabled = true;
-  try { const M = await import('./gpkg.js?v=74'), r = await M.exportGeoPackage(world, m => $('topoHint').textContent = t(m));
+  try { const M = await import('./gpkg.js?v=75'), r = await M.exportGeoPackage(world, m => $('topoHint').textContent = t(m));
     const nm = `cambodia3d-${($('topoTitle').value || 'area').replace(/[^A-Za-z0-9]+/g, '_')}-${new Date().toISOString().slice(0, 10)}.gpkg`; download(nm, r.blob);
     $('topoHint').textContent = `${nm} · ${(r.blob.size / 1e6).toFixed(1)} MB · ${Object.values(r.counts).filter(Boolean).length} ${t('vector layers')} + 2 ${t('rasters')}`;
   } catch (e) { console.error(e); $('topoHint').textContent = 'Error: ' + e.message; }
@@ -754,7 +754,7 @@ let CH = null, CHV = null, CHS = { mode: 'swipe', swipe: 0.5 };
 const chSay = m => $('chHint').textContent = t(m);
 $('changeBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('changePanel'); if (world.mode !== 'orbit') world.setMode('orbit'); $('changePanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
-  CH = CH || await import('./change.js?v=74');
+  CH = CH || await import('./change.js?v=75');
   if (!CHV || CHV.aoi !== world.D.aoi) { chSay('Checking image versions…'); try { const v = await CH.versions(world.D, chSay); CHV = { aoi: world.D.aoi, v };
       $('chBefore').innerHTML = v.map((r, i) => `<option value="${r.num}" ${i === Math.min(v.length - 1, 3) ? 'selected' : ''}>${r.date}</option>`).join('') || `<option>${t('No older images here')}</option>`;
       $('chAfter').innerHTML = `<option value="">${t('Current scene image')}</option>` + v.map(r => `<option value="${r.num}">${r.date}</option>`).join('');
@@ -794,12 +794,32 @@ $('chSwipe').oninput = e => { CHS.swipe = e.target.value / 100; if (world && wor
 /* Place info (like a map app): name, photos, address, details, nearby */
 let PI = null, PLACES = null, plLabels = null, plMark = null, plReq = 0;
 const esc2 = x => String(x ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-async function plLoadNames() { if (!world || !world.D) return []; if (PLACES && PLACES.aoi === world.D.aoi) return PLACES.list; const TM = await import('./topomap.js?v=74'), a = world.D.aoi, list = await TM.localNames({ w: a.w - 0.03, e: a.e + 0.03, s: a.s - 0.03, n: a.n + 0.03 }); PLACES = { aoi: world.D.aoi, list }; return list; }
+async function plLoadNames() { if (!world || !world.D) return []; if (PLACES && PLACES.aoi === world.D.aoi) return PLACES.list; const TM = await import('./topomap.js?v=75'), a = world.D.aoi, list = await TM.localNames({ w: a.w - 0.03, e: a.e + 0.03, s: a.s - 0.03, n: a.n + 0.03 }); PLACES = { aoi: world.D.aoi, list }; return list; }
 async function plShowNames(on) { if (plLabels) { world.root.remove(plLabels); plLabels.traverse(o => { if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); plLabels = null; } if (!on) return; const list = await plLoadNames(); plLabels = PI.placeLabels(world, list, lang); world.root.add(plLabels); }
 $('placeBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('placePanel'); if (world.mode !== 'orbit') world.setMode('orbit'); $('placePanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
-  PI = PI || await import('./placeinfo.js?v=74'); world.pickHandler = (x, z) => plShow(x, z); $('plHint').textContent = t('Tap any place'); if ($('plNames').checked) plShowNames(true);
+  PI = PI || await import('./placeinfo.js?v=75'); world.pickHandler = (x, z) => plShow(x, z); $('plHint').textContent = t('Tap any place'); if ($('plNames').checked) plShowNames(true);
 };
+// ---- 3D GPS navigation ----
+let NV = null;
+async function nvPlaces() { // destinations: place names, land owners' houses, map notes, field lots with a parcel number
+  const out = [], F = world.F;
+  for (const p of await plLoadNames()) { const g = p.tags || {}, km = g['name:km'] || '', en = g['name:en'] || g.name || ''; if (!km && !en) continue; const ic = g.place ? '🏘️' : g.amenity === 'place_of_worship' ? '🛕' : g.amenity === 'school' ? '🏫' : g.amenity === 'marketplace' ? '🛒' : g.amenity === 'hospital' || g.amenity === 'clinic' ? '🏥' : g.natural === 'peak' ? '⛰️' : '📍';
+    out.push({ name: lang === 'km' ? (km || en) : (en || km), alt: lang === 'km' ? en : km, x: F.x(p.lon), z: F.z(p.lat), icon: ic }); }
+  if (FB && FB.owners) for (const o of FB.owners) if (o.house) out.push({ name: FB.LO.displayName(o), alt: o.village || '', x: F.x(o.house[0]), z: F.z(o.house[1]), icon: '🏠' });
+  if (FB && FB.fields) FB.fields.forEach((f, i) => { if (!f.parcel_no && !f.owner_id) return; const c = FB.LO.centroid(f), o = FB.owners.find(q => q.id === f.owner_id); out.push({ name: `${tr('Field')} #${i + 1}${f.parcel_no ? ' · ' + f.parcel_no : ''}`, alt: o ? FB.LO.displayName(o) : '', x: F.x(c[0]), z: F.z(c[1]), icon: '🌾' }); });
+  if (world.notes) for (const n of world.notes.here ? world.notes.here() : []) out.push({ name: n.title, alt: n.text || '', x: F.x(n.lon), z: F.z(n.lat), icon: '📌' });
+  return out;
+}
+async function nvOpen() {
+  if (!world || !world.D) return; closeOthers('navPanel'); if (world.mode !== 'orbit') world.setMode('orbit'); $('navPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
+  if (!NV) { const M = await import('./nav.js?v=75'); NV = world.nav = new M.Nav(world, { places: nvPlaces, onTrip: on => { $('navPanel').hidden = on; if (!on) placeRight(); }, onClose: () => { $('navPanel').hidden = true; if (world) world.pickHandler = null; placeRight(); syncRail(); } }); }
+  await NV.open(); world.pickHandler = (x, z) => NV.pick(x, z); syncRail();
+}
+$('navBtn').onclick = nvOpen; $('navBtn2').onclick = nvOpen;
+$('nvClose').onclick = () => { $('navPanel').hidden = true; if (NV) NV.close(); if (world) world.pickHandler = null; placeRight(); syncRail(); };
+$('nvMin').onclick = () => { const c = $('navPanel').classList.toggle('collapsed'); $('nvMin').textContent = c ? '▾' : '▴'; };
+onLang.push(() => { if (NV && NV.active && !$('navPanel').hidden) NV.renderPanel(); });
 // ---- EIA Screening (from the EIA Screening QGIS plugin) ----
 let EI = null; // { M: module, mode: 'poly'|'line', pts: [[x,z]], drawing, fp: GeoJSON feature, res, weights, line3d, admin }
 const eiSay = (k, ok, text) => {
@@ -869,10 +889,10 @@ function eiRender() { // results tab
 $('eiaBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('eiaPanel'); $('eiaPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
   if (!EI) {
-    EI = { M: await import('./eia.js?v=74'), pts: [], weights: null }; await EI.M.loadKm(); if (lang === 'km') setLang('km');
+    EI = { M: await import('./eia.js?v=75'), pts: [], weights: null }; await EI.M.loadKm(); if (lang === 'km') setLang('km');
     $('eiType').innerHTML = EI.M.PROJECT_TYPES.map(p => `<option value="${p.key}">${tr(p.label)}</option>`).join(''); $('eiType').value = 'plantation'; $('eiType').onchange();
     // administrative areas around here: commune, district, province (geoBoundaries)
-    const PI2 = PI || (PI = await import('./placeinfo.js?v=74')), F = world.F, ad = await PI2.adminAt(F.lat0, F.lon0);
+    const PI2 = PI || (PI = await import('./placeinfo.js?v=75')), F = world.F, ad = await PI2.adminAt(F.lat0, F.lon0);
     if (ad) { const o = [['com', `${tr('Commune')}: ${ad.com_km || ''} ${ad.com_en || ''}`], ['dis', `${tr('District')}: ${ad.dis_km || ''} ${ad.dis_en || ''}`], ['pro', `${tr('Province')}: ${ad.pro_km || ''} ${ad.pro_en || ''}`]];
       $('eiAdmin').insertAdjacentHTML('beforeend', o.map(([k, l]) => `<option value="${k}">${l.replace(/\s+/g, ' ').trim()}</option>`).join('')); EI.ad = ad;
       EI.admin = [ad.com_en && 'Commune ' + ad.com_en, ad.dis_en && 'District ' + ad.dis_en, ad.pro_en && 'Province ' + ad.pro_en].filter(Boolean).join(', '); }
@@ -1040,13 +1060,13 @@ function fbRender() {
       aoi: A, date: new Date().toISOString().slice(0, 10), km: lang === 'km', ids: $('fbIds').checked,
       credits: ['Fields: AgriMapper Agri ONNX model (YAM Sarath), checked and edited in Cambodia 3D', `Imagery: ${(world.credit || 'Esri World Imagery').replace(/<[^>]+>/g, '')}`, 'ក្រុមស្រាវជ្រាវ និងអភិវឌ្ឍន៍ព័ត៌មានភូមិសាស្ត្រ', 'Geoinformatics and Research Lab, RUPP'],
       L: { boundary: tr('Field boundary'), legend: tr('Legend'), stats: tr('Statistics'), location: tr('Location'), fields: tr('Fields'), total: tr('Total area'), median: tr('Median size'), mean: tr('Mean size'), date: tr('Date'), model: tr('Field from the model'), edited: tr('Edited by hand'), digitized: tr('Digitized by hand') } }; };
-  $('fbGpkg').onclick = async () => { const o = $('fbOut'); o.textContent = '⏳'; try { const G = await import('./gpkg.js?v=74'), r = await G.exportGeoPackage(world, s => o.textContent = '⏳ ' + tr(s), { fieldsOnly: true }); dl(r.blob, name + '.gpkg'); o.textContent = `✅ ${F.length} ${tr('fields')} → ${name}.gpkg`; } catch (e) { o.textContent = '⚠️ ' + e.message; } };
+  $('fbGpkg').onclick = async () => { const o = $('fbOut'); o.textContent = '⏳'; try { const G = await import('./gpkg.js?v=75'), r = await G.exportGeoPackage(world, s => o.textContent = '⏳ ' + tr(s), { fieldsOnly: true }); dl(r.blob, name + '.gpkg'); o.textContent = `✅ ${F.length} ${tr('fields')} → ${name}.gpkg`; } catch (e) { o.textContent = '⚠️ ' + e.message; } };
   const pdfLib = async () => { if (!window.jspdf) await new Promise((ok, bad) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'; s.onload = ok; s.onerror = bad; document.head.appendChild(s); }); return window.jspdf.jsPDF; };
   $('fbLayout').onclick = async () => { const o = $('fbOut'); o.textContent = '⏳ ' + tr('Drawing the map…');
-    try { const O = await import('./fieldout.js?v=74'), m = await meta(), paper = $('fbPaper').value, L = await O.layout(FB.im, F, m, paper), J = await pdfLib(), doc = new J({ orientation: 'l', unit: 'mm', format: paper.toLowerCase() });
+    try { const O = await import('./fieldout.js?v=75'), m = await meta(), paper = $('fbPaper').value, L = await O.layout(FB.im, F, m, paper), J = await pdfLib(), doc = new J({ orientation: 'l', unit: 'mm', format: paper.toLowerCase() });
       doc.addImage(L.canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, L.mm[0], L.mm[1]); doc.save(`${name}_map_${paper}.pdf`); o.textContent = `✅ ${name}_map_${paper}.pdf`; } catch (e) { console.error(e); o.textContent = '⚠️ ' + e.message; } };
   $('fbReport').onclick = async () => { const o = $('fbOut'); o.textContent = '⏳ ' + tr('Drawing the map…');
-    try { const O = await import('./fieldout.js?v=74'), m = await meta(), mp = O.fieldMap(FB.im, F, 1500, 1500, { ids: true });
+    try { const O = await import('./fieldout.js?v=75'), m = await meta(), mp = O.fieldMap(FB.im, F, 1500, 1500, { ids: true });
       const L = { report: tr('Field boundary report'), fields: tr('Fields'), total: tr('Total area'), median: tr('Median size'), mean: tr('Mean size'), map: tr('Map'), sizes: tr('Field sizes'), cls: tr('Size class'), sources: tr('Sources'), method: tr('Method'), list: tr('Field list'), perim: tr('perimeter') + ' (m)', src: tr('Source'), model: tr('model'), edited: tr('edited'), digitized: tr('digitized'), more: tr('+ %d more fields in the GeoPackage / CSV'),
         methodText: tr('Fields were detected from zoom-18 satellite imagery (about 0.6 m) with the Agri ONNX field-boundary model running in the browser: marker watershed on the boundary map, merging of weak edges, shared straightened edges and a 2 m bund gap. OpenStreetMap roads, water and buildings were cut out, dark-green forest patches dropped, and the result was checked and edited by hand.') };
       m.owners = FB.owners; Object.assign(L, { owners: tr('Land owners'), owner: tr('Owner'), village: tr('Village'), lots: tr('Lots'), house: tr('House (lat, lon)'), ownerNote: tr('Owner names are personal information; share this report only with people allowed to see them.') });
@@ -1068,14 +1088,14 @@ async function fbRun() {
     let cut = o.osm_cut ? M.osmCut(world, im) : null;
     FB.treeP = null; if (o.trees) { const T = FB.treeP = await M.predict(im, { ...o, tta: false }, s => st.textContent = '⏳ 🌳 ' + s, 'cambodia_trees'); cut = cut || new Uint8Array(im.W * im.H); let k = 0; for (let q = 0; q < cut.length; q++) if (T.extent[q] > 0.5) { cut[q] = 1; k++; } FB.treePct = 100 * k / cut.length; }
     say('Fields from the model…'); const seg = await M.segment(im, P, o, cut, say);
-    const { turf } = await import('./eia.js?v=74'); let keep = seg.fields; if ($('fb_forest').checked) keep = M.dropDarkGreen(keep, im);
+    const { turf } = await import('./eia.js?v=75'); let keep = seg.fields; if ($('fb_forest').checked) keep = M.dropDarkGreen(keep, im);
     FB.fields = await M.bundGap(keep, o.gap_m, turf); FB.seg = { m: seg.m, n: seg.fields.length }; FB.seg = { m: seg.m, n: seg.fields.length }; FB.seg = { m: seg.m, n: seg.fields.length };
     fbRender(); st.textContent = `✅ ${FB.fields.length} ${tr('fields')} · ${im.W}×${im.H} px (${im.mpp.toFixed(2)} m) · ${Math.round((performance.now() - t0) / 1000)} s`;
   } catch (e) { console.error(e); st.textContent = '⚠️ ' + e.message; } finally { b.disabled = false; }
 }
 $('fieldsBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('fieldsPanel'); $('fieldsPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
-  if (!FB) { FB = { M: await import('./fields.js?v=74'), E: await import('./fieldedit.js?v=74'), LO: await import('./landowners.js?v=74'), turf: (await import('./eia.js?v=74')).turf }; FB_KEYS.forEach(k => $('fb_' + k).value = FB.M.DEFAULTS[k]); $('fb_extent_thr').value = 0.35; $('fb_model').onchange = e => $('fb_extent_thr').value = e.target.value === 'v1' ? 0.5 : 0.35; }
+  if (!FB) { FB = { M: await import('./fields.js?v=75'), E: await import('./fieldedit.js?v=75'), LO: await import('./landowners.js?v=75'), turf: (await import('./eia.js?v=75')).turf }; FB_KEYS.forEach(k => $('fb_' + k).value = FB.M.DEFAULTS[k]); $('fb_extent_thr').value = 0.35; $('fb_model').onchange = e => $('fb_extent_thr').value = e.target.value === 'v1' ? 0.5 : 0.35; }
   if (FB.fields) fbRender();
   else { const S = FB.LO.load(world.D.aoi || aoi); if (S && S.fields && S.fields.length) { $('fbRes').innerHTML = `<div class="row"><button id="fbLoad" class="primary" style="margin:0">📂 ${tr('Open saved fields')} (${S.fields.length}, ${S.date.slice(0, 16).replace('T', ' ')})</button></div>`; $('fbLoad').onclick = () => { FB.fields = S.fields; FB.owners = S.owners || []; FB.provider = tr('saved'); FB.M.imagery(world, world.D.aoi || aoi, (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`).then(im => FB.im = im); fbRender(); }; } }
 };
@@ -1085,9 +1105,9 @@ $('fbMin').onclick = () => { const c = $('fieldsPanel').classList.toggle('collap
 
 // ---- shared: administrative areas around the 3D area (geoBoundaries communes, unioned to district / province) ----
 let ADM = null;
-async function adminHere() { if (ADM) return ADM; PI = PI || await import('./placeinfo.js?v=74'); ADM = await PI.adminAt(world.F.lat0, world.F.lon0); return ADM; }
+async function adminHere() { if (ADM) return ADM; PI = PI || await import('./placeinfo.js?v=75'); ADM = await PI.adminAt(world.F.lat0, world.F.lon0); return ADM; }
 async function adminGeom(k) {
-  const ad = await adminHere(), { turf } = await import('./eia.js?v=74'), T = await turf(), A = await PI.adminList();
+  const ad = await adminHere(), { turf } = await import('./eia.js?v=75'), T = await turf(), A = await PI.adminList();
   const want = A.filter(u => k === 'com' ? u.p.com_en === ad.com_en && u.p.dis_en === ad.dis_en : k === 'dis' ? u.p.dis_en === ad.dis_en && u.p.pro_en === ad.pro_en : u.p.pro_en === ad.pro_en);
   let f = want.length > 1 ? T.union(T.featureCollection(want.map(u => T.feature(u.g)))) : want.length ? T.feature(want[0].g) : null; return f && T.simplify(f, { tolerance: 0.0004 });
 }
@@ -1148,7 +1168,7 @@ async function rsRun() {
 $('riceSosBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('riceSosPanel'); $('riceSosPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
   if (!RS) {
-    RS = { M: await import('./ricesos.js?v=74'), G: await import('./gee.js?v=74') }; addKm('data/ricesos_km.json');
+    RS = { M: await import('./ricesos.js?v=75'), G: await import('./gee.js?v=75') }; addKm('data/ricesos_km.json');
     const d = RS.M.DEFAULTS, ss = RS.M.defaultSeason(); $('rsStart').value = ss.sos_start; $('rsEnd').value = ss.sos_end; $('rsOrbit').value = d.orbit;
     RS_NUM.forEach(k => $('rs_' + k).value = d[k]); RS_CHK.forEach(k => $('rs_' + k).checked = d[k]);
     RS.G.mountConnect($('rsGee')); RS.G.preload();
@@ -1168,7 +1188,7 @@ async function govSet(G, visImg) { GOV.lay = !$('mineralPanel').hidden ? MN_LAY 
 const govControls = p => `<div class="row"><label><input type="checkbox" id="${p}Show" ${GOV.on ? 'checked' : ''}> ${tr('Show on the 3D ground')}</label><span>${tr('Opacity')}</span><input type="range" id="${p}Op" min="20" max="100" value="${GOV.op}" style="flex:1"></div><div class="row">${byFieldBox(p + 'ByField')}</div>`;
 const govBind = p => { GOV.byField = !!($(p + 'ByField') && $(p + 'ByField').checked); $(p + 'ByField').onchange = e => { GOV.byField = e.target.checked; govApply(); }; $(p + 'Show').onchange = e => { GOV.on = e.target.checked; govApply(); }; $(p + 'Op').oninput = e => { GOV.op = +e.target.value; govApply(); }; };
 async function geeArea(sel) { const a = world.D.aoi || aoi; if (sel.value === 'aoi') return { region: ee.Geometry.Rectangle([a.w, a.s, a.e, a.n]), label: tr('3D area'), km2: (a.e - a.w) * 111.32 * Math.cos((a.s + a.n) / 2 * Math.PI / 180) * (a.n - a.s) * 110.57, isAoi: true };
-  const f = await adminGeom(sel.value), { turf } = await import('./eia.js?v=74'), T = await turf(); return { region: ee.Geometry(f.geometry), label: sel.selectedOptions[0].textContent, km2: T.area(f) / 1e6, feature: f }; }
+  const f = await adminGeom(sel.value), { turf } = await import('./eia.js?v=75'), T = await turf(); return { region: ee.Geometry(f.geometry), label: sel.selectedOptions[0].textContent, km2: T.area(f) / 1e6, feature: f }; }
 async function geeAreaOptions(sel, def) { const ad = await adminHere(); if (!ad) return; sel.insertAdjacentHTML('beforeend', ['com', 'dis', 'pro'].map(k => `<option value="${k}">${adminLabel(ad, k).replace(/\s+/g, ' ').trim()}</option>`).join('')); if (def) sel.value = def; }
 const dl = (blob, name) => { const el = document.createElement('a'); el.href = typeof blob === 'string' ? blob : URL.createObjectURL(blob); el.download = name; el.click(); };
 const doyDate = (y, d) => d > 0 ? new Date(Date.UTC(y, 0, d)).toISOString().slice(0, 10) : '–';
@@ -1206,7 +1226,7 @@ async function reRun() {
 }
 $('riceEcoBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('riceEcoPanel'); $('riceEcoPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
-  if (!RE) { RE = { M: await import('./riceeco.js?v=74'), G: await import('./gee.js?v=74') }; addKm('data/riceeco_km.json');
+  if (!RE) { RE = { M: await import('./riceeco.js?v=75'), G: await import('./gee.js?v=75') }; addKm('data/riceeco_km.json');
     const y = RE.M.defaultYear(); $('reYear').innerHTML = Array.from({ length: y - 2016 }, (_, i) => y - i).map(v => `<option value="${v}">${v}–${v + 1}</option>`).join('');
     RE_NUM.forEach(k => $('re_' + k).value = RE.M.DEFAULTS[k]); RE_CHK.forEach(k => $('re_' + k).checked = RE.M.DEFAULTS[k]); RE.G.mountConnect($('reGee')); RE.G.preload(); geeAreaOptions($('reArea'), 'com'); }
 };
@@ -1249,7 +1269,7 @@ async function mnRun() {
 }
 $('mineralBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('mineralPanel'); $('mineralPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
-  if (!MN) { MN = { M: await import('./mineral.js?v=74'), G: await import('./gee.js?v=74') }; $('mnModel').innerHTML = Object.entries(MN.M.MODELS).map(([k, [l]]) => `<option value="${k}">${tr(l)}</option>`).join('');
+  if (!MN) { MN = { M: await import('./mineral.js?v=75'), G: await import('./gee.js?v=75') }; $('mnModel').innerHTML = Object.entries(MN.M.MODELS).map(([k, [l]]) => `<option value="${k}">${tr(l)}</option>`).join('');
     MN.G.mountConnect($('mnGee')); MN.G.preload(); geeAreaOptions($('mnArea'), 'dis'); }
 };
 $('mnRun').onclick = mnRun;
@@ -1315,7 +1335,7 @@ async function uaRun() {
 }
 $('urbanBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('urbanPanel'); $('urbanPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
-  if (!UA) { UA = { M: await import('./urban.js?v=74'), G: await import('./gee.js?v=74') }; addKm('data/urban_km.json'); UA.G.mountConnect($('uaGee')); UA.G.preload(); }
+  if (!UA) { UA = { M: await import('./urban.js?v=75'), G: await import('./gee.js?v=75') }; addKm('data/urban_km.json'); UA.G.mountConnect($('uaGee')); UA.G.preload(); }
   if (UA.R) { uaPaint(); uaRender(); }
 };
 $('uaRun').onclick = uaRun;
@@ -1371,7 +1391,7 @@ function skGaze(on) {
 }
 $('skyBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('skyPanel'); $('skyPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
-  SKM = SKM || await import('./sky.js?v=74'); SKD = SKD || await SKM.loadSky();
+  SKM = SKM || await import('./sky.js?v=75'); SKD = SKD || await SKM.loadSky();
   if (!$('skTime').value) $('skTime').value = skLocal(new Date());
   await world.getAtmos().useRealSky(true); $('skyInset').hidden = !$('skInsetOn').checked; skApply(); requestAnimationFrame(skTick);
 };
@@ -1410,7 +1430,7 @@ $('plClose').onclick = () => { $('placePanel').hidden = true; if (world) { world
 $('plMin').onclick = () => { const c = $('placePanel').classList.toggle('collapsed'); $('plMin').textContent = c ? '▾' : '▴'; };
 $('plNames').onchange = e => { if (PI && world) plShowNames(e.target.checked); };
 async function plShow(x, z, preset) {
-  const w = world, D = w.D, F = w.F, lat = F.lat(z), lon = F.lon(x), req = ++plReq, T3 = await import('three'), HM = await import('./hud.js?v=74');
+  const w = world, D = w.D, F = w.F, lat = F.lat(z), lon = F.lon(x), req = ++plReq, T3 = await import('three'), HM = await import('./hud.js?v=75');
   // marker
   if (!plMark) { const c = document.createElement('canvas'); c.width = 64; c.height = 96; const g = c.getContext('2d'); g.fillStyle = '#ea4335'; g.strokeStyle = '#8a1a12'; g.lineWidth = 3; g.beginPath(); g.moveTo(32, 92); g.bezierCurveTo(10, 56, 4, 44, 4, 32); g.arc(32, 32, 28, Math.PI, 0); g.bezierCurveTo(60, 44, 54, 56, 32, 92); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#7a0f08'; g.beginPath(); g.arc(32, 32, 10, 0, 7); g.fill();
     const tx = new T3.CanvasTexture(c); tx.colorSpace = T3.SRGBColorSpace; plMark = new T3.Sprite(new T3.SpriteMaterial({ map: tx, sizeAttenuation: false, depthTest: false, transparent: true })); plMark.center.set(0.5, 0); plMark.scale.set(0.03, 0.045, 1); plMark.renderOrder = 45; w.root.add(plMark); }
@@ -1442,7 +1462,7 @@ async function plShow(x, z, preset) {
     (info.wiki.length ? `<div class="plSec plWiki"><h4>${t('Wikipedia nearby')}</h4>${info.wiki.map(a => `<div class="it">${a.thumb ? `<img src="${esc2(a.thumb)}" alt="">` : ''}<div><a href="${esc2(a.url)}" target="_blank" rel="noopener">${esc2(a.title)}</a>${a.km != null ? ` <small style="color:#9fb0c0">${a.km.toFixed(1)} km</small>` : ''}<br>${esc2(a.text.slice(0, 160))}${a.text.length > 160 ? '…' : ''}</div></div>`).join('')}</div>` : '') +
     `<div class="svhelp" style="opacity:.6;margin-top:8px">© OpenStreetMap contributors · Wikimedia Commons · Wikipedia · geoBoundaries</div>`;
   $('plCard').querySelectorAll('.plNear .it').forEach(el => el.onclick = () => { const [lo, la] = el.dataset.ll.split(',').map(Number), X = F.x(lo), Z = F.z(la); if (X >= D.X0 && X <= D.X0 + D.W && Z >= D.Z0 && Z <= D.Z0 + D.H) { w.teleport(X, Z); plShow(X, Z); } });
-  $('plNote').onclick = async () => { IN = IN || await import('./intel.js?v=74'); if (!w.notes) w.notes = new IN.Notes(w); w.notes.add(x, z, { title, text: [k.en, addr.join(', ')].filter(Boolean).join(' – '), source: 'OpenStreetMap / Place info', conf: 'medium', photo: null }); $('plHint').textContent = t('Saved as a note (🛰️ Intel → Notes)'); };
+  $('plNote').onclick = async () => { IN = IN || await import('./intel.js?v=75'); if (!w.notes) w.notes = new IN.Notes(w); w.notes.add(x, z, { title, text: [k.en, addr.join(', ')].filter(Boolean).join(' – '), source: 'OpenStreetMap / Place info', conf: 'medium', photo: null }); $('plHint').textContent = t('Saved as a note (🛰️ Intel → Notes)'); };
 }
 
 /* Intel: notes, routes & access, alerts, counting, share */
@@ -1457,7 +1477,7 @@ const inTab = k => { INT.tab = k; document.querySelectorAll('.intabs button').fo
 document.querySelectorAll('.intabs button').forEach(b => b.onclick = () => inTab(b.dataset.it));
 $('intelBtn').onclick = async () => {
   if (!world || !world.D) return; closeOthers('intelPanel'); if (world.mode !== 'orbit') world.setMode('orbit'); $('intelPanel').hidden = false; placeRight(); if (innerWidth < 900) showPanel('scenePanel', false);
-  IN = IN || await import('./intel.js?v=74'); if (!world.notes) world.notes = new IN.Notes(world); NT = world.notes; NT.rebuild(); RT = new IN.Router(world); RT.profile = $('rtProf').value;
+  IN = IN || await import('./intel.js?v=75'); if (!world.notes) world.notes = new IN.Notes(world); NT = world.notes; NT.rebuild(); RT = new IN.Router(world); RT.profile = $('rtProf').value;
   world.pickHandler = intelPick; ntRender(); inTab(INT.tab); ntSelect(null);
 };
 $('inClose').onclick = () => { $('intelPanel').hidden = true; if (world) world.pickHandler = null; placeRight(); };
@@ -1510,7 +1530,7 @@ $('ctClear').onclick = () => { if (ctGroup) { world.root.remove(ctGroup); ctGrou
 $('ctExport').onclick = () => { if (!INT.count) return; const g = { type: 'FeatureCollection', features: INT.count.items.map(([lo, la], i) => ({ type: 'Feature', properties: { id: i + 1 }, geometry: { type: 'Point', coordinates: [+lo.toFixed(7), +la.toFixed(7)] } })) }, b = new Blob([JSON.stringify(g)], { type: 'application/geo+json' }), a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = 'counted_objects.geojson'; a.click(); };
 // share link
 $('shMake').onclick = async () => {
-  if (!world || !world.D) return; IN = IN || await import('./intel.js?v=74'); const D = world.D, a = D.aoi, inA = c => c[0] >= a.w && c[0] <= a.e && c[1] >= a.s && c[1] <= a.n;
+  if (!world || !world.D) return; IN = IN || await import('./intel.js?v=75'); const D = world.D, a = D.aoi, inA = c => c[0] >= a.w && c[0] <= a.e && c[1] >= a.s && c[1] <= a.n;
   const notes = world.notes ? world.notes.here().map(n => ({ ...n, photo: null })) : JSON.parse(localStorage.getItem('cambodia3d.notes.v1') || '[]').filter(n => inA([n.lon, n.lat])).map(n => ({ ...n, photo: null }));
   const tac = world.tactical ? world.tactical.features.filter(f => world.tactical.inAOI(f)) : JSON.parse(localStorage.getItem('cambodia3d.tac.v1') || '[]').filter(f => f.coords.some(inA));
   const edits = (world.editor ? world.editor.features : JSON.parse(localStorage.getItem('cambodia3d.edits.v1') || '[]')).filter(f => f.coords && f.coords.some(inA));
@@ -1521,7 +1541,7 @@ $('shMake').onclick = async () => {
 };
 // open a shared link: after the area is built, add the shared notes, symbols and drawings, and set the view
 async function applyShared() {
-  const m = location.hash.match(/[#&]s=([A-Za-z0-9_-]+)/); if (!m || applyShared.done === m[1]) return; applyShared.done = m[1]; IN = IN || await import('./intel.js?v=74');
+  const m = location.hash.match(/[#&]s=([A-Za-z0-9_-]+)/); if (!m || applyShared.done === m[1]) return; applyShared.done = m[1]; IN = IN || await import('./intel.js?v=75');
   let st; try { st = await IN.unpackState(m[1]); } catch (e) { return; } if (!st) return;
   if (st.notes && st.notes.length) { if (!world.notes) world.notes = new IN.Notes(world); const have = new Set(world.notes.list.map(n => n.id)); for (const n of st.notes) if (!have.has(n.id)) world.notes.list.push(n); world.notes.save(); world.notes.rebuild(); }
   if (st.tac && st.tac.length) { const T = await world.openTactical(); T.active = false; const have = new Set(T.features.map(f => f.id)); for (const f of st.tac) if (!have.has(f.id)) T.features.push(f); T.save(); await T.rebuild(); }
@@ -1532,17 +1552,17 @@ async function applyShared() {
 
 /* GEOINT area brief: one printable page with everything known about the area */
 async function buildBrief() {
-  const D = world.D, a = D.aoi, lat = (a.s + a.n) / 2, lon = (a.w + a.e) / 2, HM = await import('./hud.js?v=74'), TM = await import('./topomap.js?v=74'), u = HM.utm(lat, lon);
+  const D = world.D, a = D.aoi, lat = (a.s + a.n) / 2, lon = (a.w + a.e) / 2, HM = await import('./hud.js?v=75'), TM = await import('./topomap.js?v=75'), u = HM.utm(lat, lon);
   world.renderer.render(world.scene, world.camera); const shot = world.renderer.domElement.toDataURL('image/jpeg', 0.85);
   const img = (() => { const c = document.createElement('canvas'), k = Math.min(1, 900 / D.img.width); c.width = D.img.width * k; c.height = D.img.height * k; c.getContext('2d').drawImage(D.img, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.85); })();
   const lcC = (() => { const LCm = world.LC, c = document.createElement('canvas'); c.width = D.gw; c.height = D.gh; const g = c.getContext('2d'), im = g.createImageData(D.gw, D.gh); for (let i = 0; i < D.lc.length; i++) { const h = (LCm[D.lc[i]] || { c: '#cccccc' }).c; im.data.set([parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16), 255], i * 4); } g.putImageData(im, 0, 0); return c.toDataURL('image/png'); })();
-  let wx = null; try { wx = await (await import('./weather.js?v=74')).currentWeather(lat, lon); } catch (e) { }
+  let wx = null; try { wx = await (await import('./weather.js?v=75')).currentWeather(lat, lon); } catch (e) { }
   let names = []; try { names = await TM.localNames({ w: a.w - 0.05, e: a.e + 0.05, s: a.s - 0.05, n: a.n + 0.05 }); } catch (e) { }
   const near = names.filter(p => p.tags.place).map(p => ({ n: p.tags['name:en'] || p.tags['name:km'], km: p.tags['name:km'] || '', d: Math.hypot((p.lon - lon) * 108.7, (p.lat - lat) * 110.6) })).filter(p => p.n).sort((x, y) => x.d - y.d).slice(0, 8);
   const poi = names.filter(p => !p.tags.place).map(p => p.tags.amenity || p.tags.natural || p.tags.waterway).reduce((m, k) => (m[k] = (m[k] || 0) + 1, m), {});
   // terrain
   let lo = 1e9, hi = -1e9, sl = 0, ns = 0; for (let j = 0; j < 40; j++) for (let i = 0; i < 40; i++) { const x = D.X0 + (i + .5) / 40 * D.W, z = D.Z0 + (j + .5) / 40 * D.H, e = world.rawElevation(x, z); lo = Math.min(lo, e); hi = Math.max(hi, e); const s1 = Math.hypot(world.rawElevation(x + 15, z) - world.rawElevation(x - 15, z), world.rawElevation(x, z + 15) - world.rawElevation(x, z - 15)) / 30; sl += Math.atan(s1) * 180 / Math.PI; ns++; }
-  const HWn = (await import('./intel.js?v=74')).HW, roadLen = {}; for (const r of D.roads || []) { const k = HWn[r.cls] || 'road'; let L = 0; for (let i = 1; i < r.pts.length; i++) L += Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]); roadLen[k] = (roadLen[k] || 0) + L; }
+  const HWn = (await import('./intel.js?v=75')).HW, roadLen = {}; for (const r of D.roads || []) { const k = HWn[r.cls] || 'road'; let L = 0; for (let i = 1; i < r.pts.length; i++) L += Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]); roadLen[k] = (roadLen[k] || 0) + L; }
   const lcRows = Object.entries(D.lcPct || {}).filter(([k, v]) => +k > 0 && v > 0.002).sort((x, y) => y[1] - x[1]).map(([k, v]) => `<tr><td><i style="background:${world.LC[k].c}"></i>${world.LC[k].en} <span class=km>${world.LC[k].km}</span></td><td>${(v * 100).toFixed(1)}%</td><td>${(v * D.W * D.H / 1e4).toFixed(1)} ha</td></tr>`).join('');
   const tac = world.tactical ? world.tactical.features.filter(f => world.tactical.inAOI(f)) : [], rd = world.radar && world.radar.placed ? world.radar.list() : [], sv = world.survey ? world.survey.points || [] : [];
   const notesH = world.notes ? world.notes.here() : [];
@@ -1625,7 +1645,7 @@ const WMO = c => c >= 95 ? ['storm', '⛈️', 'Thunderstorm'] : (c >= 51 && c <
 async function liveWeather() {
   if (!world || !world.D) return; const a = world.D.aoi, lat = (a.s + a.n) / 2, lon = (a.w + a.e) / 2;
   try {
-    const W = await (await import('./weather.js?v=74')).currentWeather(lat, lon), d0 = W.days[0] || { min: W.temp, max: W.temp, rain: 0 };
+    const W = await (await import('./weather.js?v=75')).currentWeather(lat, lon), d0 = W.days[0] || { min: W.temp, max: W.temp, rain: 0 };
     const now = new Date(Date.now() + 7 * 3600e3), hn = now.getUTCHours() + now.getUTCMinutes() / 60, h = hn < 5 ? 23.5 : Math.min(23.5, hn); // Cambodia local time
     const A = world.getAtmos(); A.setWeather(W.wx); A.setHour(h, true); $('hour').value = h; $('hourLbl').textContent = fmtHour(h);
     document.querySelectorAll('[data-wx]').forEach(x => x.classList.toggle('on', x.dataset.wx === W.wx));
@@ -1654,7 +1674,7 @@ $('secClose').onclick = () => { $('sectionPanel').hidden = true; if (world) { wo
 $('secWall').onchange = e => { if (!world) return; world.sectionWallOn = e.target.checked; if (world.sectionWall) world.sectionWall.visible = e.target.checked; };
 const download = (name, blob) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); };
 $('secPng').onclick = () => $('secCanvas').toBlob(b => download('cross-section.png', b));
-$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=74'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
+$('secCsv').onclick = async () => { if (!world || !world.section) return; const { sectionCSV } = await import('./section.js?v=75'); download('cross-section.csv', new Blob([sectionCSV(world.section.S)], { type: 'text/csv' })); };
 
 /* language */
 document.querySelectorAll('.langBtn').forEach(b => b.onclick = () => setLang(lang === 'km' ? 'en' : 'km'));
