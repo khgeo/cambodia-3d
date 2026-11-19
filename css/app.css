@@ -660,3 +660,18 @@ body.nav-on #rail,body.nav-on #scenePanel,body.nav-on #hud,body.nav-on .fab,body
 .nvArrH{font-size:22px;font-weight:800;margin-bottom:4px}.nvArrG{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:12px 0}.nvArrG div{background:#141f33;border-radius:10px;padding:8px 4px}.nvArrG b{display:block;font-size:16px}.nvArrG small{font-size:10.5px;color:#9fb6d8}
 @media (max-width:640px){.nvDist{font-size:32px}.nvRoad{font-size:15px}.nvSpeed{width:80px;height:80px;top:calc(max(10px,env(safe-area-inset-top)) + 150px)}.nvSpeed b{font-size:26px}.nvSig{top:calc(max(10px,env(safe-area-inset-top)) + 245px)}}
 .navhud [hidden]{display:none!important}
+/* ---------- cosmic zoom ---------- */
+.cosLabels{position:fixed;inset:0;pointer-events:none;z-index:6}.cosLabels span{position:absolute;transform:translate(-50%,0);font:600 12px system-ui,"Noto Sans Khmer",sans-serif;text-shadow:0 0 3px #000,0 0 6px #000;white-space:nowrap}.cosLabels span.f{font-size:14px;font-weight:800}
+body:not(.globe-on) .cosLabels{display:none}
+.cosUI{position:fixed;inset:0;pointer-events:none;z-index:30;color:#e6edf3;font-family:system-ui,"Noto Sans Khmer",sans-serif}.cosUI>*{pointer-events:auto}
+.cosTop{position:absolute;top:12px;left:84px;width:min(300px,calc(100% - 100px))}.cosTop input{width:100%;box-sizing:border-box;background:rgba(14,20,32,.9);color:#fff;border:1px solid #2f4a78;border-radius:20px;padding:8px 14px;font:inherit}
+#cosFound{background:rgba(14,20,32,.95);border-radius:10px;margin-top:4px;max-height:280px;overflow:auto}#cosFound div{padding:6px 12px;cursor:pointer;font-size:13px}#cosFound div:hover{background:#1f2a36}#cosFound em{color:#8fa2b4;font-style:normal;font-size:11px}
+.cosJump{position:absolute;top:60px;left:84px;display:flex;flex-wrap:wrap;gap:4px;max-width:calc(100% - 100px)}.cosJump button{background:rgba(14,20,32,.85);border:1px solid #2f4a78;border-radius:50%;width:38px;height:38px;font-size:18px;padding:0}
+.cosCard,.satCard{position:absolute;top:110px;left:84px;width:min(320px,calc(100% - 100px));background:rgba(14,20,32,.92);border:1px solid #2f4a78;border-radius:14px;padding:10px 12px;font-size:13px;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.satCard{position:fixed;z-index:30;color:#e6edf3;top:auto;bottom:20px}.cosCh{display:flex;align-items:center;gap:6px}.cosCh b{font-size:17px}.cosCh span{color:#8fa2b4}.cosCh button{margin-left:auto;padding:0 8px}.cosK{color:#8fa2b4;font-size:11.5px;margin-bottom:4px}.cosInfo{color:#c9d4de;margin-top:4px;font-size:12.5px}
+.cosBottom{position:absolute;left:84px;bottom:48px;right:12px;display:flex;flex-direction:column;gap:6px;pointer-events:none}.cosBottom>*{pointer-events:auto;align-self:flex-start}
+.cosScale{display:flex;align-items:center;gap:8px;background:rgba(14,20,32,.8);border-radius:10px;padding:5px 10px;font-size:12px}.cosScale i{display:block;height:4px;border:2px solid #fff;border-top:0;min-width:10px}.cosScale b{color:#ffd76a}
+.cosTime{display:flex;flex-wrap:wrap;align-items:center;gap:3px;background:rgba(14,20,32,.8);border-radius:10px;padding:4px 6px;font-size:12px}.cosTime button{padding:3px 7px;font-size:11.5px}.cosTime button.on{background:#2f7fd0;color:#fff}.cosTime span{margin-left:6px;color:#9fb6d8}
+.cosNote{font-size:10.5px;color:#7f8fa0;max-width:520px}
+.cosBack{position:absolute;top:12px;right:12px;background:#1677ff;color:#fff;border:0;border-radius:20px;padding:8px 14px;font-weight:700}
+@media (max-width:640px){.cosTop,.cosJump,.cosCard,.cosBottom{left:12px}.cosTop{top:58px}.cosJump{top:104px}.cosCard{top:150px}}

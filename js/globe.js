@@ -4,6 +4,7 @@
 // or (with your proxy) OpenSky.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { t } from './i18n.js?v=76';
 
 const R_KM = 6371, D2R = Math.PI / 180;
 const GIBS = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=EPSG:4326&BBOX=-90,-180,90,180&FORMAT=';
@@ -21,21 +22,20 @@ function sunLatLon(d = new Date()) {
 export class Globe {
   constructor(world) {
     this.w = world; this.on = false; this.opt = { clouds: true, night: true, wind: true, flights: true, temp: false, rain: false, storms: true, radar: true, sats: { resource: true, stations: true, visual: true, 'gps-ops': false, weather: false, starlink: false } };
-    const sc = this.scene = new THREE.Scene(); sc.background = new THREE.Color(0x02040a);
+    const sc = this.scene = new THREE.Scene(); // the sky behind the Earth (stars, Sun, Moon, planets) is drawn by the cosmos view
     this.cam = new THREE.PerspectiveCamera(40, 1, 0.001, 200);
-    this.ctl = new OrbitControls(this.cam, world.renderer.domElement); this.ctl.enabled = false; this.ctl.enablePan = false; this.ctl.minDistance = 1.0003; this.ctl.maxDistance = 9; this.ctl.enableZoom = false; this.ctl.enableDamping = true; this.ctl.dampingFactor = 0.08;
+    this.ctl = new OrbitControls(this.cam, world.renderer.domElement); this.ctl.addEventListener('start', () => { this.followSat = null; }); this.ctl.enabled = false; this.ctl.enablePan = false; this.ctl.minDistance = 1.0003; this.ctl.maxDistance = 9; this.ctl.enableZoom = false; this.ctl.enableDamping = true; this.ctl.dampingFactor = 0.08;
     // zoom by height above the ground, so you can go from space down to a few km smoothly
-    world.renderer.domElement.addEventListener('wheel', e => { if (!this.on || this.anim) return; e.preventDefault();
-      const d = this.cam.position.length(), alt0 = d - 1, alt = Math.min(8, Math.max(0.0003, alt0 * Math.exp(e.deltaY * 0.0012)));
+    world.renderer.domElement.addEventListener('wheel', e => { if (!this.on || this.anim || (this.cos && this.cos.active)) return; e.preventDefault();
+      const d = this.cam.position.length(), alt0 = d - 1;
+      if (alt0 >= 7.9 && e.deltaY > 0 && this.cos) { this.followSat = null; this.cos.enterFromGlobe(this.cam); return; } // keep zooming out: into space
+      const alt = Math.min(8, Math.max(0.0003, alt0 * Math.exp(e.deltaY * 0.0012)));
       // keep the place under the cursor under the cursor: turn the view towards it by the same share as the height changes
       const el = world.renderer.domElement, r = el.getBoundingClientRect(), rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), this.cam);
       const hit = rc.intersectObject(this.earth, false)[0], c = this.cam.position.clone().normalize();
       if (hit) { const p = hit.point.clone().normalize(), ang = c.angleTo(p), f = 1 - alt / alt0; if (ang > 1e-6) { const ax = new THREE.Vector3().crossVectors(c, p).normalize(); c.applyAxisAngle(ax, ang * Math.max(-1, Math.min(1, f))); } }
       this.cam.position.copy(c.multiplyScalar(1 + alt)); this.cam.up.set(0, 1, 0); this.cam.lookAt(0, 0, 0); }, { passive: false });
     this.tiles = new Map();
-    // stars
-    { const N = 4000, p = new Float32Array(N * 3); for (let i = 0; i < N; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(50); p.set([v.x, v.y, v.z], i * 3); }
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); sc.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xffffff, size: 1.2, sizeAttenuation: false }))); }
     // earth with day / night
     const blank = (c) => { const cv = document.createElement('canvas'); cv.width = cv.height = 4; const g = cv.getContext('2d'); g.fillStyle = c; g.fillRect(0, 0, 4, 4); return new THREE.CanvasTexture(cv); };
     this.U = { day: { value: blank('#1d3b5a') }, night: { value: blank('#000000') }, sun: { value: new THREE.Vector3(1, 0, 0) }, nightOn: { value: 1 } };
@@ -79,14 +79,15 @@ export class Globe {
     if (this.on) return; const w = this.w; this.on = true; w.controls.enabled = false; this.ctl.enabled = true; this.placePlate();
     const p = xyz(this.lat, this.lon, 1); this.cam.position.copy(p.clone().multiplyScalar(1.002)); this.ctl.target.set(0, 0, 0); this.ctl.update();
     this.anim = { t: 0, from: 1.002, to: 3.4, dir: p.clone().normalize() }; this.onToggle && this.onToggle(true);
-    if (!this.loaded) { this.loaded = true; this.loadBase(); }
+    if (!this.loaded) { this.loaded = true; this.loadBase(); import('./cosmos.js?v=76').then(M => { this.cos = new M.Cosmos(this); }).catch(e => console.warn('cosmos', e)); this.satEvents(); }
     this.refresh(); clearInterval(this.timer); this.timer = setInterval(() => this.refresh(), 60000);
   }
   leave() {
+    if (this.cos && this.cos.active) this.cos.exit();
     if (!this.on || (this.anim && this.anim.out)) return; const p = xyz(this.lat, this.lon, 1).normalize(), d = this.cam.position.length();
     this.anim = { t: 0, from: d, to: 1.0012, dir: p, start: this.cam.position.clone().normalize(), out: true };
   }
-  finishLeave() { const w = this.w; this.on = false; this.ctl.enabled = false; w.controls.enabled = true; clearInterval(this.timer); w.clock.getDelta(); this.onToggle && this.onToggle(false); }
+  finishLeave() { const w = this.w; if (this.cos) this.cos.hideLabels(); this.followSat = null; this.satCard(null); this.on = false; this.ctl.enabled = false; w.controls.enabled = true; clearInterval(this.timer); w.clock.getDelta(); this.onToggle && this.onToggle(false); }
   /* ---------- data ---------- */
   async loadBase() {
     const W = 4096, H = 2048;
@@ -372,6 +373,8 @@ export class Globe {
   /* ---------- per frame ---------- */
   frame(dt) {
     const w = this.w, el = w.renderer.domElement, asp = el.clientWidth / Math.max(1, el.clientHeight); if (this.cam.aspect !== asp) { this.cam.aspect = asp; this.cam.updateProjectionMatrix(); }
+    if (this.cos && this.cos.active) { this.cos.frame(dt); return; }
+    if (this.followSat && !this.anim) { const p = this.satPos(this.followSat.rec, new Date()); if (p) { const d = this.cam.position.length(); this.cam.position.lerp(p.clone().setLength(d), Math.min(1, dt * 2)); this.satCardUpd(); } }
     if (this.anim) { const A = this.anim; A.t = Math.min(1, A.t + dt / 2.2); const e = A.t * A.t * (3 - 2 * A.t), d = A.from + (A.to - A.from) * e;
       const dir = A.out ? A.start.clone().lerp(A.dir, e).normalize() : A.dir.clone(); this.cam.position.copy(dir.multiplyScalar(d)); if (A.t >= 1) { this.anim = null; if (A.out) { this.finishLeave(); return; } } }
     else { this.ctl.rotateSpeed = Math.min(1, (this.cam.position.length() - 1) * 0.5); this.ctl.zoomSpeed = 0.8; this.ctl.update();
@@ -384,8 +387,27 @@ export class Globe {
     const dd = this.cam.position.length(), alt = dd - 1; if (this.plate) this.plate.scale.setScalar(Math.max(1, alt * 0.012 / this.plateReal));
     this.cam.near = Math.max(0.00005, alt * 0.4); this.cam.far = 60; this.cam.updateProjectionMatrix(); this.rimU.k.value = Math.min(1, alt / 0.08);
     if (!this._tileT || performance.now() - this._tileT > 400) { this._tileT = performance.now(); this.updateTiles(alt); }
-    w.renderer.render(this.scene, this.cam);
+    if (this.cos) { this.cos.renderBackground(this.cam); const r = w.renderer, ac = r.autoClear; r.autoClear = false; r.clearDepth(); r.render(this.scene, this.cam); r.autoClear = ac; }
+    else w.renderer.render(this.scene, this.cam);
   }
+  /* ---------- tap a satellite: card, and the view follows it ---------- */
+  satEvents() {
+    const el = this.w.renderer.domElement; let down = null;
+    el.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY, performance.now()]; });
+    el.addEventListener('pointerup', e => { if (!this.on || !down || (this.cos && this.cos.active) || this.anim) return; const moved = Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6 || performance.now() - down[2] > 500; down = null; if (moved) return;
+      if (this.cos && this.cos.pick(e, true)) return; const s = this.pickSat(e); if (s) { this.followSat = s; this.satCard(s); const p = this.satPos(s.rec, new Date()); if (p) { const alt = p.length() - 1; this.anim = { t: 0, from: this.cam.position.length(), to: 1 + Math.max(alt * 2.2, alt + 0.25), dir: p.clone().normalize() }; } } });
+  }
+  pickSat(e) { const hidden = (c, p) => { const d = p.clone().sub(c), a = d.lengthSq(), b = 2 * c.dot(d), cc = c.lengthSq() - 1, disc = b * b - 4 * a * cc; if (disc < 0) return false; const t1 = (-b - Math.sqrt(disc)) / (2 * a); return t1 > 0 && t1 < 1; }; const r = this.w.renderer.domElement.getBoundingClientRect(), d = new Date(), v = new THREE.Vector3(), camD = this.cam.position.length(); let best = null, bd = 14;
+    for (const [grp, g] of Object.entries(this.satObjs)) { if (!g.visible) continue; const list = this.sats[grp].list, arr = g.userData.pts.geometry.attributes.position.array;
+      const C = this.cam.position; for (let i = 0; i < list.length; i++) { v.set(arr[i * 3], arr[i * 3 + 1], arr[i * 3 + 2]); if (!v.lengthSq()) continue; if (hidden(C, v)) continue;
+        v.project(this.cam); if (v.z > 1) continue; const sx = (v.x + 1) / 2 * r.width + r.left, sy = (1 - v.y) / 2 * r.height + r.top, dd = Math.hypot(sx - e.clientX, sy - e.clientY) - (list[i].sp ? 6 : 0); if (dd < bd) { bd = dd; best = list[i]; best.grp = grp; } } }
+    return best; }
+  satCard(s) { let c = document.getElementById('satCard'); if (!s) { if (c) c.hidden = true; return; } if (!c) { c = document.createElement('div'); c.id = 'satCard'; c.className = 'satCard'; document.body.appendChild(c); } c.hidden = false; this.satCardUpd(); }
+  satCardUpd() { const s = this.followSat, c = document.getElementById('satCard'); if (!s || !c || c.hidden) return; const now = performance.now(); if (this._scT && now - this._scT < 900) return; this._scT = now;
+    const SJ = this.SJ, d = new Date(), pv = SJ.propagate(s.rec, d); if (!pv || !pv.position) return; const gd = SJ.eciToGeodetic(pv.position, SJ.gstime(d)), v = pv.velocity, sp = Math.hypot(v.x, v.y, v.z), per = 2 * Math.PI / s.rec.no;
+    c.innerHTML = `<div class="cosCh"><b style="color:${SAT_GROUPS[s.grp] ? SAT_GROUPS[s.grp][1] : '#fff'}">🛰️ ${s.sp ? s.sp.label : s.name}</b><button id="satX">✕</button></div><div class="cosK">${SAT_GROUPS[s.grp] ? SAT_GROUPS[s.grp][0] : ''}${s.sp && s.sp.label !== s.name ? ' · ' + s.name : ''}</div>
+      <div>⬆️ ${Math.round(gd.height).toLocaleString()} km · 💨 ${sp.toFixed(2)} km/s (${Math.round(sp * 3600).toLocaleString()} km/h)</div><div>🔄 ${per.toFixed(1)} min · ∠ ${(s.rec.inclo / D2R).toFixed(1)}° · 📍 ${(gd.latitude / D2R).toFixed(2)}°, ${(gd.longitude / D2R).toFixed(2)}°</div><div class="cosInfo">${t('The view follows it. Drag or tap ✕ to stop.')}</div>`;
+    c.querySelector('#satX').onclick = () => { this.followSat = null; this.satCard(null); }; }
   info() { const d = new Date(); return { utc: d.toISOString().slice(11, 16), ...this.status, radar: this.w.radar && this.w.radar.placed ? `Radar: ${this.w.radar.range} km, ${this.w.radar.list().length} aircraft detected` : '', sats: Object.entries(this.sats).filter(([g]) => this.opt.sats[g]).map(([g, v]) => `${SAT_GROUPS[g][0]} ${v.list.length}`).join(' · '), flights: this.status.flights || (this.nFlights ? `Aircraft: ${this.nFlights} from the radar` : '') }; }
 }
 export { SAT_GROUPS };
