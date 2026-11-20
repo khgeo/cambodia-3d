@@ -44,7 +44,7 @@ export const KM = {
   'Planet': 'ភព',
   'Dwarf planet': 'ភពតឿ',
   'Moon': 'ព្រះច័ន្ទ',
-  'Space probe': 'យានអវកាស',
+  'Space probe': 'យានអវកាស', 'Constellation lines and names': 'ខ្សែ និងឈ្មោះក្រុមផ្កាយ',
   'Indoor ride: pedal your exercise bike (Bluetooth) and ride these roads on the TV': 'ជិះកង់ក្នុងផ្ទះ៖ ធាក់កង់ហាត់ប្រាណ (ប៊្លូធូស) ហើយជិះលើផ្លូវទាំងនេះនៅលើទូរទស្សន៍', 'Connect bike': 'ភ្ជាប់កង់', 'Heart rate': 'ចង្វាក់បេះដូង', 'time': 'ពេល', 'slope': 'ជម្រាល',
   'No bike connected – use ↑ / ↓ or the slider to pedal': 'មិនទាន់ភ្ជាប់កង់ – ប្រើ ↑ / ↓ ឬរំកិលដើម្បីធាក់', 'Virtual pedalling': 'ធាក់និម្មិត', 'Turn left at the next junction': 'បត់ឆ្វេងនៅផ្លូវបំបែកខាងមុខ', 'Turn right at the next junction': 'បត់ស្ដាំនៅផ្លូវបំបែកខាងមុខ', 'View': 'ទិដ្ឋភាព', 'Full screen (TV)': 'ពេញអេក្រង់ (ទូរទស្សន៍)',
   'Keys: ↑ ↓ pedal (no bike) · ← → turn at the next junction · C view · F full screen · H hide controls · Esc stop': 'គ្រាប់ចុច៖ ↑ ↓ ធាក់ (គ្មានកង់) · ← → បត់នៅផ្លូវបំបែកខាងមុខ · C ទិដ្ឋភាព · F ពេញអេក្រង់ · H លាក់ប៊ូតុង · Esc ឈប់',

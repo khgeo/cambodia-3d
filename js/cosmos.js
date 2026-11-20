@@ -5,8 +5,8 @@
 // directions and distances. The Milky Way, the other galaxies' shapes and the cosmic web are illustrations.
 // Frame: equatorial J2000 with y = celestial north (the globe's frame turned by the sidereal time).
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=87';
-import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=87';
+import { t, lang } from './i18n.js?v=88';
+import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=88';
 
 const D2R = Math.PI / 180, AU = 1.495978707e8, LY = 9.4607e12, ER = 6371, OBL = 23.43928 * D2R;
 const rev = x => ((x % 360) + 360) % 360;
@@ -179,6 +179,11 @@ export class Cosmos {
       const bv = v => { const t2 = Math.max(-0.4, Math.min(2, v)); return t2 < 0 ? [0.67, 0.75, 1] : t2 < 0.4 ? [0.8 + t2 * 0.2, 0.85 + t2 * 0.15, 1] : t2 < 0.8 ? [1, 0.96 - (t2 - 0.4) * 0.15, 0.92 - (t2 - 0.4) * 0.4] : [1, 0.8 - (t2 - 0.8) * 0.2, 0.6 - (t2 - 0.8) * 0.3]; };
       for (const [ra, dec, mag, b] of S.stars) { const M = b > 1.1 ? -0.5 : 0.6 + 4 * Math.max(-0.2, b), pc = Math.min(1500, Math.max(3, Math.pow(10, (mag - M + 5) / 5))), d = dirRD(ra, dec), r = pc * 3.2616; p.push(d[0] * r, d[1] * r, d[2] * r); c.push(...bv(b)); s.push(Math.max(0.7, 4.6 - mag * 0.62)); }
       this.stars = cloud(p, c, s, pointsMat(1.25, 1)); this.scene.add(this.stars);
+      // constellation stick figures on the sky sphere around the camera (as seen from Earth), with their names
+      { const LP = []; for (const segs of Object.values(S.lines)) for (const seg of segs) for (let i = 1; i < seg.length; i++) LP.push(...dirRD(seg[i - 1][0], seg[i - 1][1]), ...dirRD(seg[i][0], seg[i][1]));
+        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(LP, 3));
+        this.conLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x7fa6e8, depthWrite: false, depthTest: false }) /* opaque pass, drawn first: the Earth and planets cover it */); this.conLines.frustumCulled = false; this.conLines.renderOrder = -1; this.conLines.scale.setScalar(6e4); this.scene.add(this.conLines);
+        this.conNames = S.cons.filter(c => c[4] <= 2 || S.km[c[0]]).map(([id, en, ra, dec]) => ({ en, km: S.km[id], d: new THREE.Vector3(...dirRD(ra, dec)) })); }
       for (const [n, ra, dec, ly, col, R, info] of STARS) this.addPoint({ id: n, name: n, kind: 'star', col, fixed: dirRD(ra, dec).map(v => v * ly * LY), R, info, show: [3e12, 2e17], view: Math.max(R * 6, 3e8), size: 5 });
     } catch (e) { console.warn('stars', e); }
   }
@@ -218,6 +223,7 @@ export class Cosmos {
     this.place(this.moonOrbit, P.Earth, cam, S, 384400); this.moonOrbit.material.opacity = 0.4 * fade(2e4, 2e5, D, 1e7, 2e8); this.moonOrbit.visible = this.moonOrbit.material.opacity > 0.01;
     for (const [b, lo, hi] of [[this.asteroids, 3e7, 2e11], [this.kuiper, 5e8, 5e12], [this.oort, 5e10, 2e15]]) { this.place(b, P.Sun, cam, S, AU); b.material.uniforms.uOp.value = 0.8 * fade(lo, lo * 20, D, hi / 30, hi); b.visible = b.material.uniforms.uOp.value > 0.01; }
     this.place(this.helio, P.Sun, cam, S, AU); this.helio.material.opacity = 0.06 * fade(3e9, 3e10, D, 3e12, 3e13); this.helio.visible = this.helio.material.opacity > 0.003;
+    if (this.conLines) { const op = this.conOn === false ? 0 : 0.35 * fade(1, 2, D, 2e11, 3e13); this.conLines.material.color.setRGB(0.5, 0.65, 0.91).multiplyScalar(op * 1.15); this.conLines.visible = op > 0.01; this.conOp = op; }
     if (this.stars) { this.place(this.stars, P.Sun, cam, S, LY); this.stars.material.uniforms.uOp.value = fade(1, 2, D, 3e16, 5e17) || (D < 1 ? 1 : 0); }
     this.place(this.galaxy, this.galC, cam, S, LY); this.galaxy.material.uniforms.uOp.value = 0.12 + 0.6 * fade(1e15, 3e17, D, 1e21, 3e22); this.galaxy.material.uniforms.uSize.value = D < 1e17 ? 2.2 : 1.6;
     this.place(this.web, P.Sun, cam, S, LY); this.web.material.uniforms.uOp.value = 0.7 * fade(3e19, 1e21, D, 1e30, 1e31); this.web.visible = this.web.material.uniforms.uOp.value > 0.01;
@@ -255,9 +261,20 @@ export class Cosmos {
       out.push({ o, sx: (v.x + 1) / 2 * rc.width + rc.left, sy: (1 - v.y) / 2 * rc.height + rc.top, pri: isF ? 0 : o.body ? 1 : o.kind === 'galaxy' ? 2 : 3, rpx: o.R * this.S / L * rc.height / (2 * Math.tan(this.cam.fov * D2R / 2)) }); }
     return out.sort((a, b) => a.pri - b.pri); }
   labels(D, bg) { const L = this.vis = this.visibleItems(D, bg), used = [], h = [];
-    for (const it of L) { if (used.some(([x, y]) => Math.abs(x - it.sx) < 70 && Math.abs(y - it.sy) < 16)) continue; used.push([it.sx, it.sy]); if (used.length > 45) break; const o = it.o, nm = lang === 'km' && o.km ? o.km : t(o.name);
+    const blk = this.panelRects();
+    for (const it of L) { if (used.some(([x, y]) => Math.abs(x - it.sx) < 70 && Math.abs(y - it.sy) < 16) || (it.o.id !== this.focus && blk(it.sx, it.sy))) continue; used.push([it.sx, it.sy]); if (used.length > 45) break; const o = it.o, nm = lang === 'km' && o.km ? o.km : t(o.name);
       h.push(`<span class="${o.id === this.focus && !bg ? 'f' : ''}" style="left:${it.sx.toFixed(0)}px;top:${(it.sy + Math.max(6, Math.min(it.rpx, 300))).toFixed(0)}px;color:${o.col}">${esc(nm)}</span>`); }
+    if (this.conOp > 0.05 && this.conNames) { const rc = this.w.renderer.domElement.getBoundingClientRect(), v = new THREE.Vector3(), blocked = this.panelRects();
+      const E = this.pos.Earth, ck = this.camKm, ev = new THREE.Vector3(E[0] - ck[0], E[1] - ck[1], E[2] - ck[2]), eL = ev.length(), eR = Math.asin(Math.min(1, ER * 1.08 / Math.max(eL, 1))); ev.normalize();
+      for (const c of this.conNames) { if (Math.acos(THREE.MathUtils.clamp(c.d.dot(ev), -1, 1)) < eR) continue; // behind the Earth
+        v.copy(c.d).multiplyScalar(6e4).project(this.cam); if (v.z > 1 || Math.abs(v.x) > 0.98 || Math.abs(v.y) > 0.98) continue; const x = (v.x + 1) / 2 * rc.width + rc.left, y = (1 - v.y) / 2 * rc.height + rc.top;
+        if (blocked(x, y) || used.some(([a, b]) => Math.abs(a - x) < 80 && Math.abs(b - y) < 14)) continue; used.push([x, y]);
+        h.push(`<span class="con" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;opacity:${Math.min(1, this.conOp * 2.2).toFixed(2)}">${esc(lang === 'km' && c.km ? c.km : t(c.en))}</span>`); } }
     this.labelBox.innerHTML = h.join(''); this.labelBox.hidden = false; }
+  // screen areas covered by panels, toolbars and buttons: names are not put there
+  panelRects() { const now = performance.now(); if (!this._pr || now - this._prT > 500) { this._prT = now; this._pr = [...document.querySelectorAll('#toolbar, .toolbar, #sidebar, .rpanel, #globePanel, #skyPanel, #skyInset, .cosTop, .cosJump, .cosCard, .cosBottom, .cosBack, .satCard, #hud')]
+      .filter(e => !e.hidden && e.offsetParent !== null).map(e => e.getBoundingClientRect()).filter(r => r.width && r.height); }
+    const R = this._pr; return (x, y) => R.some(r => x > r.left - 30 && x < r.right + 30 && y > r.top - 12 && y < r.bottom + 12); }
   pick(e, bg) { if (!this.vis) return null; let best = null, bd = 22; for (const it of this.vis) { const d = Math.hypot(it.sx - e.clientX, it.sy - e.clientY) - Math.min(it.rpx || 0, 200); if (d < bd) { bd = d; best = it.o; } } return best; }
   /* ---------------- moving around ---------------- */
   enterFromGlobe(gcam, focusId) {
@@ -287,7 +304,7 @@ export class Cosmos {
   ui() {
     const d = this.uiBox = document.createElement('div'); d.className = 'cosUI'; d.hidden = true;
     d.innerHTML = `<div class="cosTop"><input id="cosFind" placeholder="🔎 ${t('Planet, star, galaxy…')}" autocomplete="off"><div id="cosFound"></div></div>
-      <div class="cosJump">${[['Earth', '🌍'], ['Moon', '🌙'], ['Sun', '☀️'], ['Mars', '🔴'], ['Jupiter', '🟠'], ['Saturn', '🪐'], ['Voyager 1', '🛰️'], ['Alpha Centauri A', '⭐'], ['Milky Way', '🌌'], ['Andromeda Galaxy', '🌀'], ['Observable universe', '🔭']].map(([id, i]) => `<button data-go="${id}" title="${esc(t(id))}">${i}</button>`).join('')}</div>
+      <div class="cosJump">${[['Earth', '🌍'], ['Moon', '🌙'], ['Sun', '☀️'], ['Mars', '🔴'], ['Jupiter', '🟠'], ['Saturn', '🪐'], ['Voyager 1', '🛰️'], ['Alpha Centauri A', '⭐'], ['Milky Way', '🌌'], ['Andromeda Galaxy', '🌀'], ['Observable universe', '🔭']].map(([id, i]) => `<button data-go="${id}" title="${esc(t(id))}">${i}</button>`).join('')}<button id="cosCon" class="on" title="${t('Constellation lines and names')}">✳️</button></div>
       <div class="cosCard" id="cosCard" hidden></div>
       <div class="cosBottom"><div class="cosScale"><i id="cosBar"></i><span id="cosScaleT"></span><b id="cosLevel"></b></div>
         <div class="cosTime"><button data-rate="0" title="${t('Pause')}">⏸</button><button data-rate="1" title="${t('Real time')}">▶</button><button data-rate="3600">1 h/s</button><button data-rate="86400">1 ${t('day')}/s</button><button data-rate="2592000">1 ${t('month')}/s</button><button data-rate="31557600">1 ${t('year')}/s</button><button id="cosNow" title="${t('Now')}">⟲</button><span id="cosDate"></span></div>
@@ -295,6 +312,8 @@ export class Cosmos {
       <button class="cosBack" id="cosBack">🌍 ${t('Back to Earth')}</button>`;
     document.body.appendChild(d);
     d.querySelectorAll('[data-go]').forEach(b => b.onclick = () => this.goTo(b.dataset.go));
+    try { this.conOn = localStorage.getItem('cambodia3d.constellations') !== '0'; } catch (e) { } d.querySelector('#cosCon').classList.toggle('on', this.conOn !== false);
+    d.querySelector('#cosCon').onclick = e => { this.conOn = this.conOn === false; e.currentTarget.classList.toggle('on', this.conOn); try { localStorage.setItem('cambodia3d.constellations', this.conOn ? '1' : '0'); } catch (er) { } };
     d.querySelectorAll('[data-rate]').forEach(b => b.onclick = () => { this.rate = +b.dataset.rate; d.querySelectorAll('[data-rate]').forEach(x => x.classList.toggle('on', x === b)); });
     d.querySelector('#cosNow').onclick = () => { this.tOff = 0; this.rate = 1; };
     d.querySelector('#cosBack').onclick = () => { if (this.focus === 'Earth' && !this.fly) this.exit(); else { this.goTo('Earth'); this.fly.d1 = 6 * ER; } };

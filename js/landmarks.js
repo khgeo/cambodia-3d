@@ -8,7 +8,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 export const LANDMARKS = [
   { id: 'angkor-wat', name: 'Angkor Wat', km: 'អង្គរវត្ត', url: 'models/landmarks/angkor_wat.glb',
-    lat: 13.41245, lon: 103.8668, ew: 187, ns: 215, top: 65, yaw: Math.PI, // the model's west faces +X: turn it round so west is west
+    lat: 13.41245, lon: 103.8668, ew: 187, ns: 215, yaw: Math.PI, // the model's west faces +X: turn it round so west is west
     credit: '"Angkor Wat" by FUD-UJEP (CC BY 4.0)' },
 ];
 
@@ -42,7 +42,7 @@ export async function placeLandmarks(world, list) {
           const bad = i => { w.fromBufferAttribute(P, i).applyMatrix4(o.matrixWorld); return w.x < bb.min.x - ex || w.x > bb.max.x + ex || w.z < bb.min.z - ex || w.z > bb.max.z + ex ? 2 : w.y < ground - 1.2 ? 1 : 0; };
           for (let t = 0; t < I.length; t += 3) { const a = bad(I[t]), b = bad(I[t + 1]), c2 = bad(I[t + 2]); if (a === 2 || b === 2 || c2 === 2 || (a && b && c2)) continue; keep.push(I[t], I[t + 1], I[t + 2]); }
           o.geometry.setIndex(keep); }); }
-      const across = Math.max(sz.x, sz.z), sh = L.ew / across, sv = L.top / Math.max(1, bb.max.y - ground); // fit the footprint, and the tallest tower to its real height
+      const across = Math.max(sz.x, sz.z), sh = L.ew / across, sv = sh * (L.vscale || 1); // fit the footprint; keep the model's own proportions (no stretching up)
       const inner = new THREE.Group(); inner.add(m); m.position.set(-c.x, -ground, -c.z);
       const holder = new THREE.Group(); holder.add(inner); inner.scale.set(sh, sv, sh); holder.rotation.y = L.yaw || 0;
       holder.position.set(x, world.groundAt(x, z) - 0.15, z); holder.name = 'landmark:' + L.id;

@@ -3,8 +3,8 @@
 // Data are fetched live for the screening window: Open Development Cambodia (WFS), OpenStreetMap (Overpass),
 // Esri | Impact Observatory land cover, Hansen forest loss (cloud GeoTIFF), Terrarium elevation tiles.
 import * as THREE from 'three';
-import { t, lang, KM } from './i18n.js?v=87';
-import { loadIO } from './landcover.js?v=87';
+import { t, lang, KM } from './i18n.js?v=88';
+import { loadIO } from './landcover.js?v=88';
 
 let TURF = null, GT = null, KMOK = false;
 export const turf = async () => TURF || (TURF = await import('https://cdn.jsdelivr.net/npm/@turf/turf@7.2.0/+esm'));

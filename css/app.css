@@ -704,3 +704,6 @@ body.ride-on #toolDock,body.ride-on .catBtn,body.ride-on #hud,body.ride-on .rpan
 .rdRow label{display:flex;gap:6px;align-items:center}.rdRow input[type=range]{width:160px}#rdStat{color:#cfe3ff}.rdHint{font-size:11px;color:#9fb0c2}
 .rideHud.min .rdCtl{display:none}
 @media (max-width:640px){.rdStats{gap:4px;padding:6px}.rdStats>div{min-width:44px}.rdStats b{font-size:16px}.rdStats .rdBig b{font-size:30px}}
+
+.cosLabels span.con{color:#9fbcf0;font-weight:500;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+#cosCon.on{background:#25457a}
