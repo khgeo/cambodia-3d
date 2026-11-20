@@ -5,31 +5,31 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=88';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=88';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=88';
-import { buildTrees, GrassField } from './vegetation.js?v=88';
-import { RoadNet, Driver, Walker } from './modes.js?v=88';
-import { vehicleKit } from './vehicles.js?v=88';
-import { loadCarPack } from './carpack.js?v=88';
-import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=88';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=88';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=88';
-import { LayerStack } from './layers.js?v=88';
-import { Survey } from './survey.js?v=88';
-import { Editor } from './editor.js?v=88';
-import { Atmos } from './atmos.js?v=88';
-import { NightLights } from './lights.js?v=88';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=88';
-import { Tactical, loadCatalog } from './tactical.js?v=88';
-import { LcTrainer } from './lctrain.js?v=88';
-import { Radar } from './radar.js?v=88';
-import { Globe } from './globe.js?v=88';
-import { SEASON } from './vegetation.js?v=88';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=88';
-import { makeCloudDome } from './skyclouds.js?v=88';
-import { EarthContext } from './earthctx.js?v=88';
-import { ResultLayers } from './results.js?v=88';
+import * as G from './geo.js?v=89';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=89';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=89';
+import { buildTrees, GrassField } from './vegetation.js?v=89';
+import { RoadNet, Driver, Walker } from './modes.js?v=89';
+import { vehicleKit } from './vehicles.js?v=89';
+import { loadCarPack } from './carpack.js?v=89';
+import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=89';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=89';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=89';
+import { LayerStack } from './layers.js?v=89';
+import { Survey } from './survey.js?v=89';
+import { Editor } from './editor.js?v=89';
+import { Atmos } from './atmos.js?v=89';
+import { NightLights } from './lights.js?v=89';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=89';
+import { Tactical, loadCatalog } from './tactical.js?v=89';
+import { LcTrainer } from './lctrain.js?v=89';
+import { Radar } from './radar.js?v=89';
+import { Globe } from './globe.js?v=89';
+import { SEASON } from './vegetation.js?v=89';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=89';
+import { makeCloudDome } from './skyclouds.js?v=89';
+import { EarthContext } from './earthctx.js?v=89';
+import { ResultLayers } from './results.js?v=89';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -1231,7 +1231,7 @@ export class World {
   }
   // flooded paddies at planting (needs Field Boundaries), straw stacks by the houses after the harvest
   async farmUpdate(fields) {
-    const RF = this._rf || (this._rf = await import('./ricefield.js?v=88')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
+    const RF = this._rf || (this._rf = await import('./ricefield.js?v=89')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
     for (const k of ['paddyMesh', 'hayMesh']) if (this[k]) { this.root.remove(this[k]); this[k].geometry.dispose(); this[k].material.dispose(); this[k] = null; }
     const F = this._farmFields || this.fields; if (this.seasonKey === 'planting' && F && F.length) { this.paddyMesh = RF.paddyWater(this, F); if (this.paddyMesh) this.root.add(this.paddyMesh); }
     if (this.seasonKey === 'harvested') { this.hayMesh = RF.hayStacks(this); if (this.hayMesh) this.root.add(this.hayMesh); }

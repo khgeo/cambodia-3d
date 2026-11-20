@@ -5,8 +5,9 @@
 // directions and distances. The Milky Way, the other galaxies' shapes and the cosmic web are illustrations.
 // Frame: equatorial J2000 with y = celestial north (the globe's frame turned by the sidereal time).
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=88';
-import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=88';
+import { t, lang } from './i18n.js?v=89';
+import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=89';
+import { loadConArt, buildConstellations } from './conart.js?v=89';
 
 const D2R = Math.PI / 180, AU = 1.495978707e8, LY = 9.4607e12, ER = 6371, OBL = 23.43928 * D2R;
 const rev = x => ((x % 360) + 360) % 360;
@@ -179,11 +180,9 @@ export class Cosmos {
       const bv = v => { const t2 = Math.max(-0.4, Math.min(2, v)); return t2 < 0 ? [0.67, 0.75, 1] : t2 < 0.4 ? [0.8 + t2 * 0.2, 0.85 + t2 * 0.15, 1] : t2 < 0.8 ? [1, 0.96 - (t2 - 0.4) * 0.15, 0.92 - (t2 - 0.4) * 0.4] : [1, 0.8 - (t2 - 0.8) * 0.2, 0.6 - (t2 - 0.8) * 0.3]; };
       for (const [ra, dec, mag, b] of S.stars) { const M = b > 1.1 ? -0.5 : 0.6 + 4 * Math.max(-0.2, b), pc = Math.min(1500, Math.max(3, Math.pow(10, (mag - M + 5) / 5))), d = dirRD(ra, dec), r = pc * 3.2616; p.push(d[0] * r, d[1] * r, d[2] * r); c.push(...bv(b)); s.push(Math.max(0.7, 4.6 - mag * 0.62)); }
       this.stars = cloud(p, c, s, pointsMat(1.25, 1)); this.scene.add(this.stars);
-      // constellation stick figures on the sky sphere around the camera (as seen from Earth), with their names
-      { const LP = []; for (const segs of Object.values(S.lines)) for (const seg of segs) for (let i = 1; i < seg.length; i++) LP.push(...dirRD(seg[i - 1][0], seg[i - 1][1]), ...dirRD(seg[i][0], seg[i][1]));
-        const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(LP, 3));
-        this.conLines = new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0x7fa6e8, depthWrite: false, depthTest: false }) /* opaque pass, drawn first: the Earth and planets cover it */); this.conLines.frustumCulled = false; this.conLines.renderOrder = -1; this.conLines.scale.setScalar(6e4); this.scene.add(this.conLines);
-        this.conNames = S.cons.filter(c => c[4] <= 2 || S.km[c[0]]).map(([id, en, ra, dec]) => ({ en, km: S.km[id], d: new THREE.Vector3(...dirRD(ra, dec)) })); }
+      // constellations as seen from Earth: figures, dotted stick figures and names, on the sky sphere around the camera
+      loadConArt().then(art => { if (!art) return; this.con = buildConstellations(art, S, (ra, dec) => new THREE.Vector3(...dirRD(ra, dec)), { dotSize: 2.2 }); this.con.group.scale.setScalar(6e4); this.scene.add(this.con.group); });
+      this.conNames = S.cons.filter(c => c[4] <= 2 || S.km[c[0]]).map(([id, en, ra, dec]) => ({ en, km: S.km[id], d: new THREE.Vector3(...dirRD(ra, dec)) }));
       for (const [n, ra, dec, ly, col, R, info] of STARS) this.addPoint({ id: n, name: n, kind: 'star', col, fixed: dirRD(ra, dec).map(v => v * ly * LY), R, info, show: [3e12, 2e17], view: Math.max(R * 6, 3e8), size: 5 });
     } catch (e) { console.warn('stars', e); }
   }
@@ -223,7 +222,7 @@ export class Cosmos {
     this.place(this.moonOrbit, P.Earth, cam, S, 384400); this.moonOrbit.material.opacity = 0.4 * fade(2e4, 2e5, D, 1e7, 2e8); this.moonOrbit.visible = this.moonOrbit.material.opacity > 0.01;
     for (const [b, lo, hi] of [[this.asteroids, 3e7, 2e11], [this.kuiper, 5e8, 5e12], [this.oort, 5e10, 2e15]]) { this.place(b, P.Sun, cam, S, AU); b.material.uniforms.uOp.value = 0.8 * fade(lo, lo * 20, D, hi / 30, hi); b.visible = b.material.uniforms.uOp.value > 0.01; }
     this.place(this.helio, P.Sun, cam, S, AU); this.helio.material.opacity = 0.06 * fade(3e9, 3e10, D, 3e12, 3e13); this.helio.visible = this.helio.material.opacity > 0.003;
-    if (this.conLines) { const op = this.conOn === false ? 0 : 0.35 * fade(1, 2, D, 2e11, 3e13); this.conLines.material.color.setRGB(0.5, 0.65, 0.91).multiplyScalar(op * 1.15); this.conLines.visible = op > 0.01; this.conOp = op; }
+    { const op = this.conOn === false ? 0 : 0.35 * fade(1, 2, D, 2e11, 3e13); this.conOp = op; if (this.con) this.con.setOpacity(op / 0.35); }
     if (this.stars) { this.place(this.stars, P.Sun, cam, S, LY); this.stars.material.uniforms.uOp.value = fade(1, 2, D, 3e16, 5e17) || (D < 1 ? 1 : 0); }
     this.place(this.galaxy, this.galC, cam, S, LY); this.galaxy.material.uniforms.uOp.value = 0.12 + 0.6 * fade(1e15, 3e17, D, 1e21, 3e22); this.galaxy.material.uniforms.uSize.value = D < 1e17 ? 2.2 : 1.6;
     this.place(this.web, P.Sun, cam, S, LY); this.web.material.uniforms.uOp.value = 0.7 * fade(3e19, 1e21, D, 1e30, 1e31); this.web.visible = this.web.material.uniforms.uOp.value > 0.01;
@@ -269,7 +268,10 @@ export class Cosmos {
       for (const c of this.conNames) { if (Math.acos(THREE.MathUtils.clamp(c.d.dot(ev), -1, 1)) < eR) continue; // behind the Earth
         v.copy(c.d).multiplyScalar(6e4).project(this.cam); if (v.z > 1 || Math.abs(v.x) > 0.98 || Math.abs(v.y) > 0.98) continue; const x = (v.x + 1) / 2 * rc.width + rc.left, y = (1 - v.y) / 2 * rc.height + rc.top;
         if (blocked(x, y) || used.some(([a, b]) => Math.abs(a - x) < 80 && Math.abs(b - y) < 14)) continue; used.push([x, y]);
-        h.push(`<span class="con" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;opacity:${Math.min(1, this.conOp * 2.2).toFixed(2)}">${esc(lang === 'km' && c.km ? c.km : t(c.en))}</span>`); } }
+        h.push(`<span class="con" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;opacity:${Math.min(1, this.conOp * 2.2).toFixed(2)}">${esc(lang === 'km' && c.km ? c.km : t(c.en))}</span>`); }
+      for (const c of (this.con && this.con.names) || []) { if (Math.acos(THREE.MathUtils.clamp(c.d.dot(ev), -1, 1)) < eR) continue; v.copy(c.d).multiplyScalar(6e4).project(this.cam); if (v.z > 1 || Math.abs(v.x) > 0.98 || Math.abs(v.y) > 0.98) continue;
+        const x = (v.x + 1) / 2 * rc.width + rc.left + 8, y = (1 - v.y) / 2 * rc.height + rc.top - 18; if (blocked(x, y) || used.some(([a, b]) => Math.abs(a - x) < 70 && Math.abs(b - y) < 14)) continue; used.push([x, y]);
+        h.push(`<span class="cstar" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;opacity:${Math.min(1, this.conOp * 2.6).toFixed(2)}">${esc(c.t)}</span>`); } }
     this.labelBox.innerHTML = h.join(''); this.labelBox.hidden = false; }
   // screen areas covered by panels, toolbars and buttons: names are not put there
   panelRects() { const now = performance.now(); if (!this._pr || now - this._prT > 500) { this._prT = now; this._pr = [...document.querySelectorAll('#toolbar, .toolbar, #sidebar, .rpanel, #globePanel, #skyPanel, #skyInset, .cosTop, .cosJump, .cosCard, .cosBottom, .cosBack, .satCard, #hud')]
@@ -308,7 +310,7 @@ export class Cosmos {
       <div class="cosCard" id="cosCard" hidden></div>
       <div class="cosBottom"><div class="cosScale"><i id="cosBar"></i><span id="cosScaleT"></span><b id="cosLevel"></b></div>
         <div class="cosTime"><button data-rate="0" title="${t('Pause')}">⏸</button><button data-rate="1" title="${t('Real time')}">▶</button><button data-rate="3600">1 h/s</button><button data-rate="86400">1 ${t('day')}/s</button><button data-rate="2592000">1 ${t('month')}/s</button><button data-rate="31557600">1 ${t('year')}/s</button><button id="cosNow" title="${t('Now')}">⟲</button><span id="cosDate"></span></div>
-        <div class="cosNote">${t('Planets: JPL orbital elements · stars: Yale Bright Star Catalogue · the Milky Way, galaxy shapes and the cosmic web are illustrations.')} ${t('Surface maps: Solar System Scope (CC BY 4.0), from NASA data.')}</div></div>
+        <div class="cosNote">${t('Planets: JPL orbital elements · stars: Yale Bright Star Catalogue · the Milky Way, galaxy shapes and the cosmic web are illustrations.')} ${t('Surface maps: Solar System Scope (CC BY 4.0), from NASA data.')} ${t('Constellation figures: Stellarium (Free Art License).')}</div></div>
       <button class="cosBack" id="cosBack">🌍 ${t('Back to Earth')}</button>`;
     document.body.appendChild(d);
     d.querySelectorAll('[data-go]').forEach(b => b.onclick = () => this.goTo(b.dataset.go));

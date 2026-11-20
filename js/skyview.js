@@ -2,7 +2,8 @@
 // planets, the Moon with its phase, constellation lines and floating names, for the area and the chosen time.
 // Scene axes: east = +x, up = +y, north = -z.
 import * as THREE from 'three';
-import { skyNow, bvColor, BODY_KM, loadSky } from './sky.js?v=88';
+import { skyNow, bvColor, BODY_KM, loadSky } from './sky.js?v=89';
+import { loadConArt, buildConstellations } from './conart.js?v=89';
 
 const D2R = Math.PI / 180;
 const dirOf = (alt, az) => { const a = alt * D2R, z = az * D2R; return [Math.sin(z) * Math.cos(a), Math.sin(a), -Math.cos(z) * Math.cos(a)]; };
@@ -27,7 +28,7 @@ export class SkyView {
     this.labels = []; this.showLines = true; this.showNames = true; this.opacity = 0;
     const host = world.renderer.domElement.parentElement; this.lab = document.createElement('div'); this.lab.className = 'skyLabels'; host.appendChild(this.lab);
   }
-  async load() { this.S = this.S || await loadSky(); return this.S; }
+  async load() { this.S = this.S || await loadSky(); this.ART = this.ART || await loadConArt(); return this.S; }
   // rebuild for a place and time
   update(lat, lon, date, lang) {
     const S = this.S; if (!S) return; this.lat = lat; this.lon = lon; this.date = date; this.lang = lang;
@@ -52,6 +53,9 @@ export class SkyView {
       const [a1, z1] = sky.hor(seg[i - 1][0], seg[i - 1][1]), [a2, z2] = sky.hor(seg[i][0], seg[i][1]); if (a1 < -2 || a2 < -2) continue; LP.push(...dirOf(a1, z1), ...dirOf(a2, z2));
     }
     const lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(LP, 3)); this.lines.geometry.dispose(); this.lines.geometry = lg;
+    // planetarium figures (translucent drawings + dotted figures) for this place and time
+    if (this.ART) { if (this.art) { this.w.scene.remove(this.art.group); this.art.dispose(); }
+      this.art = buildConstellations(this.ART, S, (ra, dec) => { const [alt, az] = sky.hor(ra, dec); return alt < -10 ? null : new THREE.Vector3(...dirOf(alt, az)); }, { artOpacity: 0.5, dotSize: 2.4 }); this.art.group.renderOrder = 2; this.w.scene.add(this.art.group); } // drawn after the night dome, so it is not dimmed by it
     for (const [id, en, ra, dec, rank] of S.cons) {
       const k = S.km[id]; if (rank > 1 && !k) continue; const [alt, az] = sky.hor(ra, dec); if (alt < 6) continue;
       L.push({ d: dirOf(alt, az), t: lang === 'km' && k ? k : k ? `${en} · ${k}` : en.replace(/ /g, ' '), c: k ? 'zod' : 'con' });
@@ -70,18 +74,20 @@ export class SkyView {
   }
   // each frame: follow the camera (the sky is infinitely far) and place the names
   frame(op) {
-    const w = this.w, cam = w.camera, R = (w.extent || 3000) * 6, on = op > 0.02; this.group.visible = on; this.lab.style.display = on && this.showNames ? '' : 'none';
-    if (!on) return; this.mat.uniforms.op.value = op; this.lineMat.opacity = 0.32 * op; this.lines.visible = this.showLines;
+    const w = this.w, cam = w.camera, R = (w.extent || 3000) * 6, on = op > 0.02; this.group.visible = on; if (this.art && !on) this.art.group.visible = false; this.lab.style.display = on && this.showNames ? '' : 'none';
+    if (!on) return; this.mat.uniforms.op.value = op; this.lineMat.opacity = 0.32 * op; this.lines.visible = this.showLines && !this.art; if (this.art) { this.art.setOpacity(this.showLines ? op : 0); this.art.group.scale.setScalar(R * 0.995); this.art.group.position.copy(cam.position); }
     this.group.position.copy(cam.position); this.pts.scale.setScalar(R); this.lines.scale.setScalar(R);
     if (this.moon.visible) { this.moon.position.copy(this.moon.userData.d).multiplyScalar(R * 0.98); const s = R * Math.tan(1.6 * D2R) * 2; this.moon.scale.set(s, s, 1); this.moon.material.opacity = Math.min(1, op * 1.2); }
     if (!this.showNames) return;
     const el = w.renderer.domElement, W = el.clientWidth, H = el.clientHeight, v = new THREE.Vector3(), fw = new THREE.Vector3(); cam.getWorldDirection(fw);
+    const now = performance.now(); if (!this._pr || now - this._prT > 500) { this._prT = now; const hr = el.getBoundingClientRect(); this._pr = [...document.querySelectorAll('#toolbar, .toolbar, .rpanel, #skyPanel, #skyInset, #hud, .cosUI')].filter(e => !e.hidden && e.offsetParent !== null).map(e => e.getBoundingClientRect()).filter(r => r.width).map(r => [r.left - hr.left - 20, r.top - hr.top - 10, r.right - hr.left + 20, r.bottom - hr.top + 10]); }
     for (const L of this.labels) {
       if (L.v.dot(fw) < 0.05) { L.e.style.display = 'none'; continue; }
       v.copy(L.v).multiplyScalar(R).add(cam.position).project(cam);
       if (v.z > 1 || Math.abs(v.x) > 1.05 || Math.abs(v.y) > 1.05) { L.e.style.display = 'none'; continue; }
-      L.e.style.display = ''; L.e.style.opacity = op; L.e.style.transform = `translate(${((v.x + 1) / 2 * W + (L.off || 7)).toFixed(1)}px,${((1 - v.y) / 2 * H - 7).toFixed(1)}px)`;
+      const sx = (v.x + 1) / 2 * W + (L.off || 7), sy = (1 - v.y) / 2 * H - 7; if (this._pr.some(r => sx > r[0] && sx < r[2] && sy > r[1] && sy < r[3])) { L.e.style.display = 'none'; continue; } // not under a panel or the toolbar
+      L.e.style.display = ''; L.e.style.opacity = op; L.e.style.transform = `translate(${sx.toFixed(1)}px,${sy.toFixed(1)}px)`;
     }
   }
-  dispose() { this.lab.remove(); this.w.scene.remove(this.group); }
+  dispose() { if (this.art) { this.w.scene.remove(this.art.group); this.art.dispose(); } this.lab.remove(); this.w.scene.remove(this.group); }
 }

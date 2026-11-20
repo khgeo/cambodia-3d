@@ -1,0 +1,8 @@
+Constellation illustrations
+===========================
+Source: Stellarium, "modern" sky culture (https://github.com/Stellarium/stellarium/tree/master/skycultures/modern),
+illustrations folder, with the anchor stars from its index.json.
+Licence of the illustrations: Free Art License 1.3 (Licence Art Libre) – https://artlibre.org/licence/lal/en/
+You may copy, distribute and change them, provided the licence and this notice go with them.
+Data (anchor stars): CC BY-SA 4.0, Stellarium team.
+Star positions used to place them: Hipparcos via d3-celestial (BSD-3-Clause).
