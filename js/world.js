@@ -5,31 +5,31 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=86';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=86';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=86';
-import { buildTrees, GrassField } from './vegetation.js?v=86';
-import { RoadNet, Driver, Walker } from './modes.js?v=86';
-import { vehicleKit } from './vehicles.js?v=86';
-import { loadCarPack } from './carpack.js?v=86';
-import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=86';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=86';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=86';
-import { LayerStack } from './layers.js?v=86';
-import { Survey } from './survey.js?v=86';
-import { Editor } from './editor.js?v=86';
-import { Atmos } from './atmos.js?v=86';
-import { NightLights } from './lights.js?v=86';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=86';
-import { Tactical, loadCatalog } from './tactical.js?v=86';
-import { LcTrainer } from './lctrain.js?v=86';
-import { Radar } from './radar.js?v=86';
-import { Globe } from './globe.js?v=86';
-import { SEASON } from './vegetation.js?v=86';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=86';
-import { makeCloudDome } from './skyclouds.js?v=86';
-import { EarthContext } from './earthctx.js?v=86';
-import { ResultLayers } from './results.js?v=86';
+import * as G from './geo.js?v=87';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=87';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=87';
+import { buildTrees, GrassField } from './vegetation.js?v=87';
+import { RoadNet, Driver, Walker } from './modes.js?v=87';
+import { vehicleKit } from './vehicles.js?v=87';
+import { loadCarPack } from './carpack.js?v=87';
+import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=87';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=87';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=87';
+import { LayerStack } from './layers.js?v=87';
+import { Survey } from './survey.js?v=87';
+import { Editor } from './editor.js?v=87';
+import { Atmos } from './atmos.js?v=87';
+import { NightLights } from './lights.js?v=87';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=87';
+import { Tactical, loadCatalog } from './tactical.js?v=87';
+import { LcTrainer } from './lctrain.js?v=87';
+import { Radar } from './radar.js?v=87';
+import { Globe } from './globe.js?v=87';
+import { SEASON } from './vegetation.js?v=87';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=87';
+import { makeCloudDome } from './skyclouds.js?v=87';
+import { EarthContext } from './earthctx.js?v=87';
+import { ResultLayers } from './results.js?v=87';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -1157,8 +1157,8 @@ export class World {
     this.camera.fov = mode === 'walk' ? 62 : 45; this.camera.updateProjectionMatrix();
     if (mode === 'walk' && prev === 'drive' && this.driver) {
       // get out on the right-hand (kerb) side and leave the vehicle parked
-      const d = this.driver, f = d.fwd, n = Math.hypot(f.x, f.z) || 1, rx = -f.z / n, rz = f.x / n, off = (d.kind.startsWith('moto') ? 0.9 : 1.6) + 0.6;
-      let x = d.pos.x + rx * off, z = d.pos.z + rz * off; if (this.walker.blocked(x, z)) { x = d.pos.x - rx * off; z = d.pos.z - rz * off; }
+      const d = this.driver; d.park(); const f = d.fwd, n = Math.hypot(f.x, f.z) || 1, rx = -f.z / n, rz = f.x / n, off = (d.kind.startsWith('moto') ? 0.9 : 1.6) + 0.6, P0 = d.parkTo || d.pos;
+      let x = P0.x - rx * off * 0.2 - f.x / n * 2, z = P0.z - rz * off * 0.2 - f.z / n * 2; // step out behind the car if (this.walker.blocked(x, z)) { x = d.pos.x - rx * off; z = d.pos.z - rz * off; }
       this.walker.place(x, z, Math.atan2(-f.x, -f.z)); this.walker.pos.y = this.groundAt(x, z) + 1.65; d.parked = true; if (this.playerMesh) this.playerMesh.visible = true;
     } else if (mode === 'walk' && prev !== 'walk') {
       const t = this.controls.target; let x = t.x, z = t.z;
@@ -1231,7 +1231,7 @@ export class World {
   }
   // flooded paddies at planting (needs Field Boundaries), straw stacks by the houses after the harvest
   async farmUpdate(fields) {
-    const RF = this._rf || (this._rf = await import('./ricefield.js?v=86')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
+    const RF = this._rf || (this._rf = await import('./ricefield.js?v=87')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
     for (const k of ['paddyMesh', 'hayMesh']) if (this[k]) { this.root.remove(this[k]); this[k].geometry.dispose(); this[k].material.dispose(); this[k] = null; }
     const F = this._farmFields || this.fields; if (this.seasonKey === 'planting' && F && F.length) { this.paddyMesh = RF.paddyWater(this, F); if (this.paddyMesh) this.root.add(this.paddyMesh); }
     if (this.seasonKey === 'harvested') { this.hayMesh = RF.hayStacks(this); if (this.hayMesh) this.root.add(this.hayMesh); }
@@ -1364,16 +1364,18 @@ export class World {
   startDrive(ri, k, kind) {
     kind = kind || this.driveKind || 'car'; this.driveKind = kind; if (this.onVehicle) this.onVehicle(kind);
     if (this.playerMesh) this.root.remove(this.playerMesh);
-    const kit = this.kit[kind], g = new THREE.Group();
+    const kit = this.kit[kind], g = new THREE.Group(), real = this.cars && this.cars[{ car: 'Sedan', pickup: 'Pickup' }[kind]];
+    if (real) { for (const p of real.parts) { const m = new THREE.Mesh(p.geo, p.mat); m.castShadow = !p.mat.transparent; g.add(m); } this.root.add(g); this.playerMesh = g; } // your own car: a real model
+    else {
     const paint = new THREE.Mesh(kit.paint, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.5, side: THREE.DoubleSide, color: kind === 'tuktuk' ? 0x2a6fb0 : 0xc0392b }));
     const fixed = new THREE.Mesh(kit.fixed, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5 }));
-    paint.castShadow = fixed.castShadow = true; g.add(paint, fixed); this.root.add(g); this.playerMesh = g;
+    paint.castShadow = fixed.castShadow = true; g.add(paint, fixed); this.root.add(g); this.playerMesh = g; }
     const speed = this.driver ? this.driver.speed : 40 / 3.6;
     this.driver = new Driver(this, this.net, g, kind); this.driver.speed = speed; this.driver.start(ri, k, 1); this.driver.step(0);
     this.pickRoad = false; this._snap = true; this.onHint && this.onHint('Driving – the car follows the road network and turns at junctions.');
   }
   enterDrive() {
-    if (this.driver) this.driver.parked = false;
+    if (this.driver) { this.driver.parked = false; this.driver.parkT = null; }
     this.setMode('drive'); this.flight = null;
     if (!this.driver) this.chooseRoad();
   }
@@ -1395,6 +1397,7 @@ export class World {
     if (this.cloudDome) this.cloudDome.position.copy(this.camera.position);
     this.waterNormal.offset.x += dt * 0.012; this.waterNormal.offset.y += dt * 0.007;
     let focus;
+    if (this.driver && this.driver.parked) this.driver.stepPark(dt); // pulling over to the roadside
     if (this.ride && this.ride.active) focus = this.ride.frame(dt);
     else if (this.nav && this.nav.active && this.mode === 'orbit') focus = this.nav.frame(dt);
     else if (this.mode === 'drive' && this.driver) {
