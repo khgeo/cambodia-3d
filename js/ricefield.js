@@ -9,7 +9,7 @@ const mulberry = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(
 export const RICE_SPEC = {
   seedling: { h: 0.32, tillers: 4, leaf: 0x6fae35, straw: 0x7f9c3a, grain: null },
   vegetative: { h: 0.85, tillers: 7, leaf: 0x3f7f22, straw: 0x4f7a26, grain: null },
-  ripe: { h: 1.0, tillers: 7, leaf: 0xa49a46, straw: 0xc0a253, grain: 0xd8a634 },
+  ripe: { h: 1.0, tillers: 7, leaf: 0x9aac3c, straw: 0xa8aa48, grain: 0xcdb23c }, // mid-November: yellow-green, heads turning gold
   stubble: { h: 0.22, tillers: 9, leaf: 0xa48a5a, straw: 0xc3a46a, grain: null },
 };
 // one rice hill: a clump of tillers, each a stem with long arching leaves and, when ripe, a nodding golden panicle
@@ -38,9 +38,9 @@ export function riceHill(kind = 'vegetative', seed = 3) {
 // a raster of the fields (1 m), a little inside each outline so the bunds stay free
 export function buildFieldMask(world, fields) {
   if (!fields || !fields.length) { FARM.mask = null; return; } const D = world.D, F = world.F, res = 1, w = Math.ceil(D.W / res), h = Math.ceil(D.H / res);
-  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.strokeStyle = '#000'; g.lineWidth = 0.9 / res; g.lineJoin = 'round';
-  for (const f of fields) { g.beginPath(); f.ring.forEach(([lo, la], k) => { const x = (F.x(lo) - D.X0) / res, y = (F.z(la) - D.Z0) / res; k ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); g.fill(); g.stroke(); }
-  const im = g.getImageData(0, 0, w, h).data, m = new Uint8Array(w * h); for (let i = 0; i < m.length; i++) m[i] = im[i * 4] > 128 ? 1 : 0;
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); g.strokeStyle = '#000'; g.lineWidth = 0.9 / res; g.lineJoin = 'round';
+  for (const [fi, f] of fields.entries()) { const id = fi + 1; g.fillStyle = `rgb(${id & 255},${(id >> 8) & 255},255)`; g.beginPath(); f.ring.forEach(([lo, la], k) => { const x = (F.x(lo) - D.X0) / res, y = (F.z(la) - D.Z0) / res; k ? g.lineTo(x, y) : g.moveTo(x, y); }); g.closePath(); g.fill(); g.stroke(); }
+  const im = g.getImageData(0, 0, w, h).data, m = new Uint16Array(w * h); for (let i = 0; i < m.length; i++) m[i] = im[i * 4 + 2] > 200 ? (im[i * 4] | (im[i * 4 + 1] << 8)) : 0;
   FARM.mask = { m, w, h, x0: D.X0, z0: D.Z0, res, at: (x, z) => { const i = ((x - D.X0) / res) | 0, j = ((z - D.Z0) / res) | 0; return i >= 0 && j >= 0 && i < w && j < h ? m[j * w + i] : 0; } };
 }
 // flooded paddies at planting time: a water sheet in every field
@@ -74,4 +74,32 @@ export function bundGeometry(world, fields) {
     const np = prof.length; for (let k = 0; k < pts.length - 1; k++) for (let q = 0; q < np - 1; q++) { const a = base + k * np + q, b = a + np; idx.push(a, b, a + 1, a + 1, b, b + 1); } v += pts.length * np; }
   if (!v) return null; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setIndex(idx); g.computeVertexNormals();
   const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide })); m.receiveShadow = m.castShadow = true; return m;
+}
+
+/* ---------- wayside plants seen in the photos: candle bush (Senna alata), banana, water lily ---------- */
+const vc = (g, hex, jit = 0.1, seed = 5) => { const r = mulberry(seed), c = new THREE.Color(hex), a = []; for (let i = 0; i < g.attributes.position.count; i++) { const k = 1 + (r() - 0.5) * jit; a.push(c.r * k, c.g * k, c.b * k); } g.setAttribute('color', new THREE.Float32BufferAttribute(a, 3)); return g; };
+const merge = gs => { let n = 0; const P = [], C = []; for (const g of gs) { const gi = g.index ? g.toNonIndexed() : g; P.push(...gi.attributes.position.array); C.push(...gi.attributes.color.array); } const o = new THREE.BufferGeometry(); o.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); o.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); o.computeVertexNormals(); return o; };
+export function sennaGeo() { // candle bush: a shrub of pinnate leaves with upright golden flower spikes
+  const r = mulberry(21), gs = [];
+  for (let i = 0; i < 4; i++) { const h = 1.1 + r() * 0.6, a = r() * 6.28, x = Math.cos(a) * 0.25, z = Math.sin(a) * 0.25;
+    gs.push(vc(new THREE.CylinderGeometry(0.012, 0.02, h, 5).translate(x, h / 2, z), 0x5f7a3a));
+    gs.push(vc(new THREE.CylinderGeometry(0.045, 0.065, 0.32, 8).translate(x, h + 0.12, z), 0xe9a21f, 0.25, i)); // flower spike: buds orange at the top, yellow below
+    gs.push(vc(new THREE.ConeGeometry(0.05, 0.12, 8).translate(x, h + 0.33, z), 0xd27a18, 0.2, i + 3));
+    for (let k = 0; k < 4; k++) { const la = a + k * 1.57 + r(), y = h * (0.35 + k * 0.12), L = 0.45 + r() * 0.2, leaf = new THREE.PlaneGeometry(L, 0.14, 4, 1); leaf.rotateX(-Math.PI / 2 + 0.25); leaf.translate(L / 2, 0, 0); leaf.rotateY(-la); leaf.translate(x, y, z); gs.push(vc(leaf, 0x4f7f2a, 0.2, k)); } }
+  return merge(gs);
+}
+export function bananaGeo() { // a banana clump: green pseudo-stem and big torn paddle leaves arching out
+  const r = mulberry(33), gs = [];
+  for (let s = 0; s < 3; s++) { const h = 2.2 + r() * 1.2, ox = (r() - 0.5) * 0.8, oz = (r() - 0.5) * 0.8; gs.push(vc(new THREE.CylinderGeometry(0.09, 0.14, h, 7).translate(ox, h / 2, oz), 0x7c9a4a));
+    for (let k = 0; k < 7; k++) { const a = k * 2.4 + r(), L = 1.6 + r() * 0.7, leaf = new THREE.PlaneGeometry(L, 0.42, 6, 1), P = leaf.attributes.position;
+      for (let i = 0; i < P.count; i++) { const x = P.getX(i) + L / 2; P.setXYZ(i, x, -0.28 * (x / L) ** 2 * L, P.getY(i)); }
+      leaf.rotateZ(0.35 + r() * 0.5); leaf.rotateY(-a); leaf.translate(ox, h, oz); gs.push(vc(leaf, k < 2 ? 0x8a7a3c : 0x5e9a2e, 0.18, k + s)); } }
+  return merge(gs);
+}
+export function lilyGeo() { // water lily: round pads with a notch, and pink flowers on stalks above the water
+  const r = mulberry(44), gs = [];
+  for (let i = 0; i < 9; i++) { const R = 0.13 + r() * 0.12, pad = new THREE.CircleGeometry(R, 14, 0.25, Math.PI * 2 - 0.25); pad.rotateX(-Math.PI / 2); pad.translate((r() - 0.5) * 1.6, 0.01 + r() * 0.01, (r() - 0.5) * 1.6); gs.push(vc(pad, i % 4 ? 0x3d5f3a : 0x6b5a2e, 0.25, i)); }
+  for (let i = 0; i < 3; i++) { const x = (r() - 0.5) * 1.2, z = (r() - 0.5) * 1.2, h = 0.12 + r() * 0.15; gs.push(vc(new THREE.CylinderGeometry(0.006, 0.006, h, 4).translate(x, h / 2, z), 0x6a3b3b));
+    for (let k = 0; k < 7; k++) { const p = new THREE.ConeGeometry(0.022, 0.11, 4); p.translate(0, 0.055, 0); p.rotateZ(0.5 + (k % 2) * 0.25); p.rotateY(k * 0.9); p.translate(x, h, z); gs.push(vc(p, 0xe23a8e, 0.15, k + i * 7)); } }
+  return merge(gs);
 }

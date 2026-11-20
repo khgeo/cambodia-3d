@@ -2,7 +2,7 @@
 // planets, the Moon with its phase, constellation lines and floating names, for the area and the chosen time.
 // Scene axes: east = +x, up = +y, north = -z.
 import * as THREE from 'three';
-import { skyNow, bvColor, BODY_KM, loadSky } from './sky.js?v=79';
+import { skyNow, bvColor, BODY_KM, loadSky } from './sky.js?v=80';
 
 const D2R = Math.PI / 180;
 const dirOf = (alt, az) => { const a = alt * D2R, z = az * D2R; return [Math.sin(z) * Math.cos(a), Math.sin(a), -Math.cos(z) * Math.cos(a)]; };

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=79">
+<link rel="stylesheet" href="css/app.css?v=80">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -133,7 +133,7 @@
       <div class="row"><label><input type="checkbox" id="liveWx"> 📡 Live weather &amp; time here</label></div>
       <div id="liveWxInfo" class="info" hidden></div>
       <label class="lbl">Rice season</label>
-      <select id="season" class="wide"><option value="image">As in the image</option><option value="planting">Jun–Jul · planting (flooded)</option><option value="growing">Aug–Oct · growing (green)</option><option value="ripening">Nov–Dec · ripening (golden)</option><option value="harvested">Jan–May · harvested (stubble)</option></select>
+      <select id="season" class="wide"><option value="auto" selected>Today (by the date)</option><option value="image">As in the image</option><option value="planting">Jun–Jul · planting (flooded)</option><option value="growing">Aug–Oct · growing (green)</option><option value="ripening">Nov–Dec · ripening (yellow-green)</option><option value="harvested">Jan–May · harvested (stubble)</option></select>
     </section>
     <section data-sec="info" hidden>
       <div id="lulc"></div>
@@ -572,6 +572,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=79"></script>
+<script type="module" src="js/app.js?v=80"></script>
 </body>
 </html>

@@ -285,6 +285,7 @@ export const KM = {
   'Village houses placed where the image shows built-up land next to a road and OpenStreetMap has no buildings': 'ផ្ទះភូមិដាក់នៅកន្លែងដែលរូបភាពបង្ហាញដីសំណង់ជាប់ផ្លូវ ហើយ OpenStreetMap គ្មានអគារ',
   'Time of day': 'ម៉ោង', 'Weather': 'អាកាសធាតុ', 'Rice season': 'រដូវស្រូវ', 'Clear sky': 'មេឃស្រឡះ', 'Hazy / burning season': 'ផ្សែងអ័ព្ទ / រដូវដុត', 'Monsoon rain': 'ភ្លៀងមូសុង', 'Thunderstorm': 'ព្យុះផ្គររន្ទះ',
   'As in the image': 'ដូចក្នុងរូបភាព', 'Jun–Jul · planting (flooded)': 'មិថុនា–កក្កដា · ស្ទូង (មានទឹក)', 'Aug–Oct · growing (green)': 'សីហា–តុលា · លូតលាស់ (ខៀវ)',
+  'Today (by the date)': 'ថ្ងៃនេះ (តាមកាលបរិច្ឆេទ)', 'Nov–Dec · ripening (yellow-green)': 'វិច្ឆិកា–ធ្នូ · ទុំ (បៃតងលឿង)',
   'Nov–Dec · ripening (golden)': 'វិច្ឆិកា–ធ្នូ · ទុំ (លឿងមាស)', 'Jan–May · harvested (stubble)': 'មករា–ឧសភា · ច្រូតរួច (គល់ចំបើង)',
   // drive / walk
   'Tap a road to start driving on it.': 'ចុចលើផ្លូវដើម្បីចាប់ផ្ដើមបើកបរ។', 'Tap a road to start driving on it (drag to move the view).': 'ចុចលើផ្លូវដើម្បីចាប់ផ្ដើមបើកបរ (អូសដើម្បីផ្លាស់ទីទិដ្ឋភាព)។',

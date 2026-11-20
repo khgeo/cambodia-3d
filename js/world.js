@@ -5,27 +5,28 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=79';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=79';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=79';
-import { buildTrees, GrassField } from './vegetation.js?v=79';
-import { RoadNet, Driver, Walker } from './modes.js?v=79';
-import { vehicleKit } from './vehicles.js?v=79';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=79';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=79';
-import { LayerStack } from './layers.js?v=79';
-import { Survey } from './survey.js?v=79';
-import { Editor } from './editor.js?v=79';
-import { Atmos } from './atmos.js?v=79';
-import { NightLights } from './lights.js?v=79';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=79';
-import { Tactical, loadCatalog } from './tactical.js?v=79';
-import { LcTrainer } from './lctrain.js?v=79';
-import { Radar } from './radar.js?v=79';
-import { Globe } from './globe.js?v=79';
-import { SEASON } from './vegetation.js?v=79';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=79';
-import { ResultLayers } from './results.js?v=79';
+import * as G from './geo.js?v=80';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=80';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=80';
+import { buildTrees, GrassField } from './vegetation.js?v=80';
+import { RoadNet, Driver, Walker } from './modes.js?v=80';
+import { vehicleKit } from './vehicles.js?v=80';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=80';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=80';
+import { LayerStack } from './layers.js?v=80';
+import { Survey } from './survey.js?v=80';
+import { Editor } from './editor.js?v=80';
+import { Atmos } from './atmos.js?v=80';
+import { NightLights } from './lights.js?v=80';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=80';
+import { Tactical, loadCatalog } from './tactical.js?v=80';
+import { LcTrainer } from './lctrain.js?v=80';
+import { Radar } from './radar.js?v=80';
+import { Globe } from './globe.js?v=80';
+import { SEASON } from './vegetation.js?v=80';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=80';
+import { makeCloudDome } from './skyclouds.js?v=80';
+import { ResultLayers } from './results.js?v=80';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -117,7 +118,7 @@ export class World {
     this.controls = new OrbitControls(this.camera, r.domElement);
     this.controls.enableDamping = true; this.controls.maxPolarAngle = Math.PI * 0.49; this.controls.screenSpacePanning = true; this.controls.zoomToCursor = true; // zoom towards the point under the cursor
 
-    this.sky = new Sky(); this.sky.scale.setScalar(45000); sc.add(this.sky);
+    this.sky = new Sky(); this.sky.scale.setScalar(45000); sc.add(this.sky); this.cloudDome = makeCloudDome(this.uTime = { value: 0 }); this.cloudDome.scale.setScalar(30000); sc.add(this.cloudDome);
     const u = this.sky.material.uniforms; u.turbidity.value = 4; u.rayleigh.value = 2.2; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.8;
     this.hemi = new THREE.HemisphereLight(0xdfeaf5, 0x5a6640, 1.0); sc.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xffffff, 3.2); this.sun.castShadow = true;
@@ -133,7 +134,7 @@ export class World {
     this.noise = noiseTexture(); this.waterNormal = waterNormals(); this.detail = detailTextures();
     this.reflRT = new THREE.WebGLRenderTarget(512, 512, { type: THREE.HalfFloatType }); this.mirrorCam = new THREE.PerspectiveCamera(); this.reflectOn = true;
     this.reflU = { uRefl: { value: this.reflRT.texture }, uTexMat: { value: new THREE.Matrix4() }, uReflOn: { value: 0 } };
-    this.uTime = { value: 0 };
+    this.uTime = this.uTime || { value: 0 };
     this.kit = vehicleKit();
     this.root = new THREE.Group(); sc.add(this.root);
     this.mode = 'orbit'; this.walker = new Walker(this);
@@ -190,7 +191,7 @@ export class World {
   setSun(elev, env, az) {
     if (az != null) this.sunAz = az;
     this.sunDir.setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - elev), THREE.MathUtils.degToRad(this.sunAz ?? 140));
-    this.sky.material.uniforms.sunPosition.value.copy(this.sunDir);
+    this.sky.material.uniforms.sunPosition.value.copy(this.sunDir); if (this.cloudDome) this.cloudDome.userData.U.uSun.value.copy(this.sunDir);
     const k = THREE.MathUtils.clamp((elev - 4) / 40, 0, 1);
     this.sun.color.set(0xffa860).lerp(new THREE.Color(0xfff3e2), k);
     this.sun.intensity = 1.6 + 1.8 * k; this.hemi.intensity = 0.5 + 0.6 * k;
@@ -696,7 +697,7 @@ export class World {
     };
     const slopeAt = (x, z) => { const e = 30, a = this.rawElevation(x + e, z) - this.rawElevation(x - e, z), b = this.rawElevation(x, z + e) - this.rawElevation(x, z - e); return Math.hypot(a, b) / (2 * e); };
     const palmOK = (x, z) => forestFrac(x, z) < 0.4 && slopeAt(x, z) < 0.07 && this.rawElevation(x, z) < 150;
-    const vctx = { ...D, mask: D.exclude, pxAt: D.pxAt, hAt, rnd, mobile: this.mobile, palmOK };
+    const vctx = { ...D, mask: D.exclude, pxAt: D.pxAt, hAt, rnd, mobile: this.mobile, palmOK, waterAt: (x, z) => { for (const ws of waterSurfaces) if (pointInRings(x, z, ws.rings)) return ws.level; return null; } };
     const t = buildTrees(vctx); this.treeMeshes = t.meshes; t.meshes.forEach(m => this.root.add(m));
     this._treeMat0 = this.treeMeshes.map(m => m.instanceMatrix.array.slice()); this.housesList0 = this.housesList || []; D.buildings0 = D.buildings0 || D.buildings; this._cleared = null;
     D.stats.trees = t.counts;
@@ -715,7 +716,7 @@ export class World {
     };
     this.controls.maxDistance = S * 3; this.controls.minDistance = 2;
     this.scene.fog.near = S * 1.2; this.scene.fog.far = S * 5;
-    this.camera.far = S * 20; this.camera.updateProjectionMatrix(); this.sky.scale.setScalar(S * 12);
+    this.camera.far = S * 20; this.camera.updateProjectionMatrix(); this.sky.scale.setScalar(S * 12); this.cloudDome.scale.setScalar(S * 8);
     if (keepView) { this.camera.position.copy(keepView.p); this.controls.target.copy(keepView.t); this.controls.update(); }
     else this.goView('overview', true);
     if (prevMode === 'walk') this.setMode('walk');
@@ -1202,14 +1203,15 @@ export class World {
   openEditor() { if (!this.editor) { this.editor = new Editor(this); this.editor.rebuild(); } this.editor.active = true; return this.editor; }
   // rice-field stage: image (as photographed), planting (flooded), growing (green), ripening (golden), harvested (stubble)
   setSeason(k) {
-    const S = { image: [0, 0, 0, 0, 1, null], planting: [0.28, 0.36, 0.36, 0.78, 0.35, 0x6f9a4a], growing: [0.24, 0.5, 0.14, 0.72, 1, 0x4f8f2a], ripening: [0.82, 0.66, 0.26, 0.78, 1.1, 0xd9b54a], harvested: [0.62, 0.52, 0.36, 0.72, 0.22, 0xa89064] }[k] || [0, 0, 0, 0, 1, null];
+    if (k === 'auto') { const mo = new Date().getMonth() + 1; k = mo >= 6 && mo <= 7 ? 'planting' : mo >= 8 && mo <= 10 ? 'growing' : mo >= 11 ? 'ripening' : 'harvested'; } // the Cambodian wet-season rice calendar
+    const S = { image: [0, 0, 0, 0, 1, null], planting: [0.28, 0.36, 0.36, 0.78, 0.35, 0x6f9a4a], growing: [0.24, 0.5, 0.14, 0.72, 1, 0x4f8f2a], ripening: [0.6, 0.7, 0.2, 0.72, 1.1, 0xb4c24a], harvested: [0.62, 0.52, 0.36, 0.72, 0.22, 0xa89064] }[k] || [0, 0, 0, 0, 1, null];
     this.terrainU.uSeason.value.set(S[0], S[1], S[2], S[3]); SEASON.h = S[4]; SEASON.col = S[5] != null ? new THREE.Color(S[5]) : null;
     SEASON.kind = { planting: 'seedling', growing: 'vegetative', ripening: 'ripe', harvested: 'stubble' }[k] || 'image'; this.seasonKey = k;
     if (this.grass) this.grass.center.set(1e9, 0, 1e9); this.farmUpdate();
   }
   // flooded paddies at planting (needs Field Boundaries), straw stacks by the houses after the harvest
   async farmUpdate(fields) {
-    const RF = this._rf || (this._rf = await import('./ricefield.js?v=79')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
+    const RF = this._rf || (this._rf = await import('./ricefield.js?v=80')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
     for (const k of ['paddyMesh', 'hayMesh']) if (this[k]) { this.root.remove(this[k]); this[k].geometry.dispose(); this[k].material.dispose(); this[k] = null; }
     const F = this._farmFields || this.fields; if (this.seasonKey === 'planting' && F && F.length) { this.paddyMesh = RF.paddyWater(this, F); if (this.paddyMesh) this.root.add(this.paddyMesh); }
     if (this.seasonKey === 'harvested') { this.hayMesh = RF.hayStacks(this); if (this.hayMesh) this.root.add(this.hayMesh); }
@@ -1370,6 +1372,7 @@ export class World {
     if (this.globe && this.globe.on) { const gdt = Math.min(this.clock.getDelta(), 0.1); if (this.radar) this.radar.step(gdt); this.globe.frame(gdt); return; }
     const dt = Math.min(this.clock.getDelta(), 0.05); this.uTime.value += dt;
     if (this.trafficOn !== false) this.updateTraffic(dt);
+    if (this.cloudDome) this.cloudDome.position.copy(this.camera.position);
     this.waterNormal.offset.x += dt * 0.012; this.waterNormal.offset.y += dt * 0.007;
     let focus;
     if (this.nav && this.nav.active && this.mode === 'orbit') focus = this.nav.frame(dt);

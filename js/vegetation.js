@@ -1,11 +1,11 @@
 // Trees (leafy species, sugar & coconut palms, bushes) placed from imagery canopy, and a near-camera
 // field of grass, rice and forest understory that follows the viewer.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=79';
-import { mulberry32 } from './geo.js?v=79';
-import { makeGrassMaterial } from './shaders.js?v=79';
-import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=79';
-import { FARM, riceHill } from './ricefield.js?v=79';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=80';
+import { mulberry32 } from './geo.js?v=80';
+import { makeGrassMaterial } from './shaders.js?v=80';
+import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=80';
+import { FARM, riceHill, sennaGeo, bananaGeo, lilyGeo } from './ricefield.js?v=80';
 
 let TEX = null;
 const texs = () => TEX || (TEX = foliageTextures());
@@ -137,6 +137,10 @@ export class GrassField {
       this.under[k] = { parts, cap: N };
     }
     for (const m of [...this.under.sapling.parts, ...this.under.bamboo.parts]) { m.castShadow = true; if (m.material.userData.depth) m.customDepthMaterial = m.material.userData.depth; }
+    // wayside plants: candle bush on the verges, bananas by the houses, water lilies on ponds and ditches
+    const vm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, side: THREE.DoubleSide });
+    const ex = (geo, N) => ({ parts: [mk(geo, vm, N)], cap: N }); this.extra = { senna: ex(sennaGeo(), Math.ceil(260 * sc)), banana: ex(bananaGeo(), Math.ceil(160 * sc)), lily: ex(lilyGeo(), Math.ceil(220 * sc)) };
+    for (const k in this.extra) this.extra[k].parts[0].castShadow = k !== 'lily';
     this.center = new THREE.Vector3(1e9, 0, 1e9);
   }
   update(target, camDist) {
@@ -158,7 +162,7 @@ export class GrassField {
         if (FM) { if (!FM.at(rx, rz)) continue; } else { const ci = Math.min(gw - 1, ((rx - X0) / C) | 0), cj = ((rz - Z0) / C) | 0; if (!(cls[cj * gw + ci] === 3 && splatRice[cj * gw + ci] > 0)) continue; }
         const hs = hash(i, j), fade = 1 - Math.sqrt(dd) / Rr, x = rx + (hs - .5) * 0.05, z = rz + (hash(j, i) - .5) * 0.05, sc = (0.85 + hs * 0.3) * (0.7 + 0.3 * fade);
         d.position.set(x, hAt(x, z) - (SEASON.kind === 'seedling' ? 0 : 0.02), z); d.rotation.set(0, hs * 6.28, 0); d.scale.set(sc, sc * (0.9 + hash(i + 1, j) * 0.2), sc); d.updateMatrix(); this.rice.setMatrixAt(nr, d.matrix);
-        if (tint) col.setScalar(0.85 + hash(i, j + 3) * 0.3); else { const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(2.6).lerp(WHITE, 0.35); }
+        if (tint) { col.setScalar(0.85 + hash(i, j + 3) * 0.3); const fid = FM ? FM.at(rx, rz) : 0; if (fid) { const q = hash(fid * 0.37, fid * 1.91); col.r *= 0.82 + q * 0.3; col.b *= 0.75 + q * 0.4; } } else { const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(2.6).lerp(WHITE, 0.35); }
         this.rice.setColorAt(nr, col); nr++; } }
     const sp = 0.42, i0 = Math.floor((target.x - R) / sp), i1 = Math.ceil((target.x + R) / sp), j0 = Math.floor((target.z - R) / sp), j1 = Math.ceil((target.z + R) / sp);
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
@@ -167,10 +171,10 @@ export class GrassField {
       const ci = Math.min(gw - 1, ((rx - X0) / C) | 0), cj = ((rz - Z0) / C) | 0, k = cls[cj * gw + ci], hs = hash(i, j), fade = 1 - Math.sqrt(dd) / R;
       if (FM ? FM.at(rx, rz) : (k === 3 && splatRice[cj * gw + ci] > 0)) continue; // rice is placed above
       {
-        const dens = k === 3 ? 0.95 : k === 2 ? 0.45 : k === 4 ? 0.15 : k === 5 ? 0.12 : 0.3;
+        const verge = masked(rx + 1.6, rz) || masked(rx - 1.6, rz) || masked(rx, rz + 1.6) || masked(rx, rz - 1.6), dens = verge ? 1 : k === 3 ? 0.95 : k === 2 ? 0.45 : k === 4 ? 0.15 : k === 5 ? 0.12 : 0.3;
         if (hs > dens || ng >= this.N) continue;
         const x = rx + (hash(i + 7, j) - .5) * sp, z = rz + (hash(i, j + 7) - .5) * sp;
-        d.position.set(x, hAt(x, z) - 0.02, z); d.rotation.set(0, hs * 40, 0); d.scale.setScalar((0.7 + hash(i + 3, j) * 0.7) * (0.55 + 0.45 * fade)); d.updateMatrix(); this.grass.setMatrixAt(ng, d.matrix);
+        d.position.set(x, hAt(x, z) - 0.02, z); d.rotation.set(0, hs * 40, 0); d.scale.setScalar((0.7 + hash(i + 3, j) * 0.7) * (0.55 + 0.45 * fade) * (verge ? 1.9 : 1)); d.updateMatrix(); this.grass.setMatrixAt(ng, d.matrix);
         const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(2.2).lerp(GRASS, 0.3); this.grass.setColorAt(ng, col); ng++;
       }
     }
@@ -200,6 +204,18 @@ export class GrassField {
         else if (hs < 0.68) put('log', x, z, 0.7 + hs * 0.6, rot);
       } else if ((k === 3 || k === 4) && hs < 0.012) put('shrub', x, z, 0.8 + hs * 20, rot);
     }
+    // wayside plants
+    { const ec = { senna: 0, banana: 0, lily: 0 }, sp3 = 2.2, R3 = Math.min(45, R), wAt = this.ctx.waterAt;
+      const putE = (k, x, y, z, s, rot) => { const e = this.extra[k]; if (ec[k] >= e.cap) return; d.position.set(x, y, z); d.rotation.set(0, rot, 0); d.scale.setScalar(s); d.updateMatrix(); e.parts[0].setMatrixAt(ec[k]++, d.matrix); };
+      for (let j = Math.floor((target.z - R3) / sp3); j <= Math.ceil((target.z + R3) / sp3); j++) for (let i = Math.floor((target.x - R3) / sp3); i <= Math.ceil((target.x + R3) / sp3); i++) {
+        const hs = hash(i * 1.3 + 0.7, j * 2.9 + 0.3), x = i * sp3 + (hash(i, j * 3) - .5) * sp3, z = j * sp3 + (hash(i * 3, j) - .5) * sp3; if ((x - target.x) ** 2 + (z - target.z) ** 2 > R3 * R3 || !inside(x, z)) continue;
+        const k = cellK(x, z), rot = hs * 40;
+        if (k === 1 && wAt && hs < 0.3) { const lv = wAt(x, z); if (lv != null) putE('lily', x, lv + 0.02, z, 0.7 + hs * 2, rot); continue; }
+        if (masked(x, z) || (FM && FM.at(x, z))) continue;
+        const verge = masked(x + 1.8, z) || masked(x - 1.8, z) || masked(x, z + 1.8) || masked(x, z - 1.8);
+        if (verge && hs < 0.05) putE('senna', x, hAt(x, z) - 0.05, z, 0.8 + hs * 6, rot);
+        else if (k === 5 && hs < 0.09) putE('banana', x, hAt(x, z) - 0.1, z, 0.8 + hs * 3, rot); }
+      for (const k in this.extra) { const m = this.extra[k].parts[0]; m.count = ec[k]; m.instanceMatrix.needsUpdate = true; } }
     for (const k in this.under) for (const m of this.under[k].parts) { m.count = cnt[k]; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
     for (const m of [this.grass, this.rice]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
   }

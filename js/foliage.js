@@ -1,8 +1,8 @@
 // Foliage kit: leaf textures (procedural, alpha-cut), sugar palm (Borassus) with fan leaves and a
 // skirt of dead fronds, leafy trees made of alpha-tested leaf cards, and forest understory plants.
 import * as THREE from 'three';
-import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js?v=79';
-import { mulberry32 } from './geo.js?v=79';
+import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js?v=80';
+import { mulberry32 } from './geo.js?v=80';
 
 /* ---------------- textures ---------------- */
 function tex(c, bleed = [70, 105, 45]) {
@@ -105,13 +105,13 @@ export function sugarPalmGeo(seed = 1, lod = 0) {
   // trunk with gentle curve, grey bark, darker base
   const trunk = new THREE.CylinderGeometry(0.21, 0.32, H, 7, 8, true).translate(0, H / 2, 0), tp = trunk.attributes.position;
   for (let i = 0; i < tp.count; i++) { const y = tp.getY(i); tp.setX(i, tp.getX(i) + bend * (y / H) ** 2); }
-  const trunkG = colored(trunk, 0x8d877c, 0.55);
+  const trunkG = colored(trunk, 0x5f5b55, 0.55); // dark grey, slender
   const fb = new Builder(), top = [bend, H, 0];
   const nG = lod ? 16 : 30, nD = lod ? 8 : 18, segs = lod ? 7 : 11;
   for (let k = 0; k < nG; k++) {
     const az = k * 2.39996 + rnd() * 0.2, el = THREE.MathUtils.degToRad(-25 + 110 * Math.pow(rnd(), 0.9));
     const dir = [Math.cos(el) * Math.cos(az), Math.sin(el), Math.cos(el) * Math.sin(az)];
-    fan(fb, top, dir, 1.5 + rnd() * 0.5, 1.5 + rnd() * 0.8, segs, THREE.MathUtils.degToRad(260 + rnd() * 50), [0x5d8a37, 0x6a9640, 0x557f33, 0x78a048, 0x4d7a2e][k % 5], rnd, false);
+    fan(fb, top, dir, 1.5 + rnd() * 0.5, 1.5 + rnd() * 0.8, segs, THREE.MathUtils.degToRad(260 + rnd() * 50), [0x587a52, 0x6b8c60, 0x4c6c4a, 0x7b9870, 0x5f8155][k % 5] /* the grey-green of sugar palm fans */, rnd, false);
   }
   for (let k = 0; k < nD; k++) { // skirt of dry fronds hanging straight down from the crown base
     const az = k / nD * Math.PI * 2 + rnd() * 0.3, el = THREE.MathUtils.degToRad(-72 - rnd() * 14), base = [top[0] + Math.cos(az) * 0.25, H - 0.1, Math.sin(az) * 0.25];

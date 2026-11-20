@@ -27,11 +27,12 @@ vec3 roadColor(){
     vec2 b = vec2(along/0.45, lat/0.22); if (mod(floor(b.y),2.0) > 0.5) b.x += 0.5;
     float e = min(fract(b.x), fract(b.y));
     col = mix(vec3(0.28,0.15,0.10), vec3(0.36,0.29,0.24), n) * (e < 0.1 ? 0.6 : 1.0);
-  } else if (surf < 4.5) {               // red laterite / dirt
-    col = vec3(0.40,0.16,0.065)*(0.62+0.62*n)*(0.78+0.44*n2);
-    float rut = exp(-pow((a - hw*0.42)/0.35, 2.0));
-    col *= 1.0 - 0.28*rut;
-    blend = smoothstep(hw-1.3, hw, a)*0.9 + 0.12;
+  } else if (surf < 4.5) {               // laterite road: pale packed centre, red gravel shoulders with pebbles
+    float c = smoothstep(hw*0.5, hw*0.9, a), fine = texture2D(uNoise, vWPos.xz*2.7).r, fine2 = texture2D(uNoise, vWPos.xz*0.9 + 0.11).r;
+    vec3 pale = vec3(0.56,0.31,0.16)*(0.86+0.22*n)*(0.9+0.2*n2)*(0.93+0.14*fine), red = vec3(0.34,0.085,0.03)*(0.7+0.6*fine2);
+    col = mix(pale, red, c); col = mix(col, vec3(0.13,0.055,0.03), step(0.8, fine)*(0.25+0.5*c));
+    col *= 1.0 + 0.07*exp(-pow((a - hw*0.36)/0.32, 2.0));
+    blend = smoothstep(hw-0.45, hw, a)*0.85 + 0.03;
   } else if (surf < 5.5) {               // gravel / compacted
     col = vec3(0.29,0.24,0.19)*(0.6+0.8*n);
     blend = smoothstep(hw-0.9, hw, a)*0.8 + 0.1;
@@ -43,7 +44,7 @@ vec3 roadColor(){
     col = vec3(0.22,0.14,0.08)*(0.7+0.5*n)*(step(0.08, fract(along/0.3))*0.4 + 0.6);
   } else if (surf < 9.5) {               // farm track: two ruts, grassy centre
     float r = exp(-pow((a-0.85)/0.33, 2.0));
-    col = mix(img, vec3(0.38,0.16,0.065)*(0.7+0.5*n), r*0.92);
+    col = mix(img, vec3(0.56,0.40,0.29)*(0.8+0.35*n), r*0.92);
   } else if (surf < 10.5) {              // railway ballast + sleepers
     col = vec3(0.20,0.18,0.16)*(0.55+0.9*n);
     if (a < 1.15 && fract(along/0.6) < 0.38) col = vec3(0.12,0.085,0.055)*(0.8+0.3*n);
@@ -86,7 +87,7 @@ vRoad = aRoad; vRoad2 = aRoad2; vWPos = (modelMatrix * vec4(transformed, 1.0)).x
       .replace('#include <common>', '#include <common>\n' + ROAD_GLSL)
       .replace('#include <map_fragment>', 'diffuseColor.rgb = roadColor();');
   };
-  m.customProgramCacheKey = () => 'road-v1';
+  m.customProgramCacheKey = () => 'road-v4';
   return m;
 }
 
@@ -156,11 +157,13 @@ if (k > 0.002) {
   float ly = dot(texture2D(map, vMapUv + vec2(0.0, uTexel.y)).rgb - texture2D(map, vMapUv - vec2(0.0, uTexel.y)).rgb, LW);
   float edge = smoothstep(0.025, 0.07, length(vec2(lx, ly))) * (sp.g / ws);
   col *= mix(1.0, d * 2.0, k * 0.85);
+  // dry-season ground: bare soil leans to laterite red-brown, grassy ground to a fresher green
+  col *= mix(vec3(1.0), vec3(1.12, 0.95, 0.80), k * sp.b / ws) * mix(vec3(1.0), vec3(0.94, 1.08, 0.86), k * sp.r / ws);
   col = mix(col, vec3(0.24, 0.20, 0.12), edge * k * 0.6);
 }
 diffuseColor.rgb *= col;`);
   };
-  m.customProgramCacheKey = () => 'terrain-v3';
+  m.customProgramCacheKey = () => 'terrain-v4';
   return m;
 }
 

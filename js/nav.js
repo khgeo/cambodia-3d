@@ -2,7 +2,7 @@
 // turn-by-turn guidance with lane advice, traffic lights with countdowns (simulated timings), voice prompts,
 // a follow camera, live GPS or a simulated drive, trip summary and GPX export.
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=79';
+import { t, lang } from './i18n.js?v=80';
 
 const KMH = 1 / 3.6;
 // travel speeds by OSM class (km/h): 1 motorway … 12 residential, 13 living street, 14 service, 16 track
