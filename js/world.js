@@ -5,29 +5,29 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=84';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=84';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=84';
-import { buildTrees, GrassField } from './vegetation.js?v=84';
-import { RoadNet, Driver, Walker } from './modes.js?v=84';
-import { vehicleKit } from './vehicles.js?v=84';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=84';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=84';
-import { LayerStack } from './layers.js?v=84';
-import { Survey } from './survey.js?v=84';
-import { Editor } from './editor.js?v=84';
-import { Atmos } from './atmos.js?v=84';
-import { NightLights } from './lights.js?v=84';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=84';
-import { Tactical, loadCatalog } from './tactical.js?v=84';
-import { LcTrainer } from './lctrain.js?v=84';
-import { Radar } from './radar.js?v=84';
-import { Globe } from './globe.js?v=84';
-import { SEASON } from './vegetation.js?v=84';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=84';
-import { makeCloudDome } from './skyclouds.js?v=84';
-import { EarthContext } from './earthctx.js?v=84';
-import { ResultLayers } from './results.js?v=84';
+import * as G from './geo.js?v=85';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=85';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=85';
+import { buildTrees, GrassField } from './vegetation.js?v=85';
+import { RoadNet, Driver, Walker } from './modes.js?v=85';
+import { vehicleKit } from './vehicles.js?v=85';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=85';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=85';
+import { LayerStack } from './layers.js?v=85';
+import { Survey } from './survey.js?v=85';
+import { Editor } from './editor.js?v=85';
+import { Atmos } from './atmos.js?v=85';
+import { NightLights } from './lights.js?v=85';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=85';
+import { Tactical, loadCatalog } from './tactical.js?v=85';
+import { LcTrainer } from './lctrain.js?v=85';
+import { Radar } from './radar.js?v=85';
+import { Globe } from './globe.js?v=85';
+import { SEASON } from './vegetation.js?v=85';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=85';
+import { makeCloudDome } from './skyclouds.js?v=85';
+import { EarthContext } from './earthctx.js?v=85';
+import { ResultLayers } from './results.js?v=85';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -944,7 +944,8 @@ export class World {
     if (!this.vehMeshes) return;
     // car-following and overtaking within each lane: keep a safe gap; if the car ahead is slower and the road
     // is two-way, pull out to the left, pass and pull back in (Cambodia drives on the right)
-    const P = this.driver && this.playerMesh ? this.driver : null, pv = P && this.mode === 'drive' && !P.parked ? (P.cur ?? P.speed) : 0, pLen = P ? (this.kit[P.kind] || {}).len || 4.5 : 0;
+    const RB = this.ride && this.ride.active ? this.ride.ob : null; // the indoor rider is on the road too: cars follow and overtake them
+    const P = RB || (this.driver && this.playerMesh ? this.driver : null), pv = RB ? RB.cur : P && this.mode === 'drive' && !P.parked ? (P.cur ?? P.speed) : 0, pLen = RB ? 1.8 : P ? (this.kit[P.kind] || {}).len || 4.5 : 0;
     if (dt > 0) for (const G of this.trafficGroups || []) {
       G.sort((a, b) => a.u - b.u);
       for (let i = 0; i < G.length; i++) {
@@ -1220,7 +1221,7 @@ export class World {
   }
   // flooded paddies at planting (needs Field Boundaries), straw stacks by the houses after the harvest
   async farmUpdate(fields) {
-    const RF = this._rf || (this._rf = await import('./ricefield.js?v=84')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
+    const RF = this._rf || (this._rf = await import('./ricefield.js?v=85')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
     for (const k of ['paddyMesh', 'hayMesh']) if (this[k]) { this.root.remove(this[k]); this[k].geometry.dispose(); this[k].material.dispose(); this[k] = null; }
     const F = this._farmFields || this.fields; if (this.seasonKey === 'planting' && F && F.length) { this.paddyMesh = RF.paddyWater(this, F); if (this.paddyMesh) this.root.add(this.paddyMesh); }
     if (this.seasonKey === 'harvested') { this.hayMesh = RF.hayStacks(this); if (this.hayMesh) this.root.add(this.hayMesh); }
@@ -1384,7 +1385,8 @@ export class World {
     if (this.cloudDome) this.cloudDome.position.copy(this.camera.position);
     this.waterNormal.offset.x += dt * 0.012; this.waterNormal.offset.y += dt * 0.007;
     let focus;
-    if (this.nav && this.nav.active && this.mode === 'orbit') focus = this.nav.frame(dt);
+    if (this.ride && this.ride.active) focus = this.ride.frame(dt);
+    else if (this.nav && this.nav.active && this.mode === 'orbit') focus = this.nav.frame(dt);
     else if (this.mode === 'drive' && this.driver) {
       { const d = this.driver, f = d.fwd; let lim = Infinity;
         for (const v of this.vehicles || []) { const dx = v.pos.x - d.pos.x, dz = v.pos.z - d.pos.z, along = dx * f.x + dz * f.z; if (along <= 0 || along > 70) continue;

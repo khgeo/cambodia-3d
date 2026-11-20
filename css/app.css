@@ -690,3 +690,17 @@ body.satview-on #globePanel,body.satview-on #satCard,body.satview-on .cosUI{disp
 .navhud .nvRecenter{bottom:260px}
 
 .cosVoy{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.cosVoy button{flex:1;padding:5px 8px;border-radius:8px;background:#1c2c48;border:1px solid #3b5a8c;color:#e6edf3;font-size:12.5px}
+
+/* indoor ride */
+body.ride-on #toolDock,body.ride-on .catBtn,body.ride-on #hud,body.ride-on .rpanel,body.ride-on #credit{display:none!important}
+.rideHud{position:fixed;inset:auto 0 0 0;z-index:40;pointer-events:none;color:#fff;font-family:system-ui,sans-serif}
+.rideHud>*{pointer-events:auto}
+.rdStats{position:fixed;top:14px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:stretch;background:rgba(8,12,18,.62);backdrop-filter:blur(6px);border-radius:16px;padding:8px 14px;cursor:pointer}
+.rdStats>div{display:flex;flex-direction:column;align-items:center;min-width:64px}.rdStats b{font-size:24px;font-variant-numeric:tabular-nums}.rdStats span{font-size:11px;color:#b9c6d3}
+.rdStats .rdBig b{font-size:46px;line-height:1;color:#ffd166}
+.rdFlash{position:fixed;top:120px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.6);padding:8px 16px;border-radius:12px;font-size:20px}
+.rdCtl{margin:0 auto 14px;width:min(900px,96vw);background:rgba(8,12,18,.72);border-radius:14px;padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.rdRow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:13px}.rdRow button{padding:6px 10px;border-radius:9px;border:1px solid #3b4d66;background:#1b2a40;color:#fff;font-size:14px}
+.rdRow label{display:flex;gap:6px;align-items:center}.rdRow input[type=range]{width:160px}#rdStat{color:#cfe3ff}.rdHint{font-size:11px;color:#9fb0c2}
+.rideHud.min .rdCtl{display:none}
+@media (max-width:640px){.rdStats{gap:4px;padding:6px}.rdStats>div{min-width:44px}.rdStats b{font-size:16px}.rdStats .rdBig b{font-size:30px}}
