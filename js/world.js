@@ -5,28 +5,29 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=82';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=82';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=82';
-import { buildTrees, GrassField } from './vegetation.js?v=82';
-import { RoadNet, Driver, Walker } from './modes.js?v=82';
-import { vehicleKit } from './vehicles.js?v=82';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=82';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=82';
-import { LayerStack } from './layers.js?v=82';
-import { Survey } from './survey.js?v=82';
-import { Editor } from './editor.js?v=82';
-import { Atmos } from './atmos.js?v=82';
-import { NightLights } from './lights.js?v=82';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=82';
-import { Tactical, loadCatalog } from './tactical.js?v=82';
-import { LcTrainer } from './lctrain.js?v=82';
-import { Radar } from './radar.js?v=82';
-import { Globe } from './globe.js?v=82';
-import { SEASON } from './vegetation.js?v=82';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=82';
-import { makeCloudDome } from './skyclouds.js?v=82';
-import { ResultLayers } from './results.js?v=82';
+import * as G from './geo.js?v=83';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=83';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=83';
+import { buildTrees, GrassField } from './vegetation.js?v=83';
+import { RoadNet, Driver, Walker } from './modes.js?v=83';
+import { vehicleKit } from './vehicles.js?v=83';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=83';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=83';
+import { LayerStack } from './layers.js?v=83';
+import { Survey } from './survey.js?v=83';
+import { Editor } from './editor.js?v=83';
+import { Atmos } from './atmos.js?v=83';
+import { NightLights } from './lights.js?v=83';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=83';
+import { Tactical, loadCatalog } from './tactical.js?v=83';
+import { LcTrainer } from './lctrain.js?v=83';
+import { Radar } from './radar.js?v=83';
+import { Globe } from './globe.js?v=83';
+import { SEASON } from './vegetation.js?v=83';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=83';
+import { makeCloudDome } from './skyclouds.js?v=83';
+import { EarthContext } from './earthctx.js?v=83';
+import { ResultLayers } from './results.js?v=83';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -118,7 +119,7 @@ export class World {
     this.controls = new OrbitControls(this.camera, r.domElement);
     this.controls.enableDamping = true; this.controls.maxPolarAngle = Math.PI * 0.49; this.controls.screenSpacePanning = true; this.controls.zoomToCursor = true; // zoom towards the point under the cursor
 
-    this.sky = new Sky(); this.sky.scale.setScalar(45000); sc.add(this.sky); this.cloudDome = makeCloudDome(this.uTime = { value: 0 }); this.cloudDome.scale.setScalar(30000); sc.add(this.cloudDome);
+    this.sky = new Sky(); this.sky.renderOrder = -10; this.sky.scale.setScalar(45000); sc.add(this.sky); this.cloudDome = makeCloudDome(this.uTime = { value: 0 }); this.cloudDome.scale.setScalar(30000); sc.add(this.cloudDome);
     const u = this.sky.material.uniforms; u.turbidity.value = 4; u.rayleigh.value = 2.2; u.mieCoefficient.value = 0.004; u.mieDirectionalG.value = 0.8;
     this.hemi = new THREE.HemisphereLight(0xdfeaf5, 0x5a6640, 1.0); sc.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xffffff, 3.2); this.sun.castShadow = true;
@@ -716,6 +717,7 @@ export class World {
     };
     this.controls.maxDistance = S * 3; this.controls.minDistance = 2;
     this.scene.fog.near = S * 1.2; this.scene.fog.far = S * 5;
+    (this.earthCtx = this.earthCtx || new EarthContext(this)).build();
     this.camera.far = S * 20; this.camera.updateProjectionMatrix(); this.sky.scale.setScalar(S * 12); this.cloudDome.scale.setScalar(S * 8);
     if (keepView) { this.camera.position.copy(keepView.p); this.controls.target.copy(keepView.t); this.controls.update(); }
     else this.goView('overview', true);
@@ -1116,6 +1118,7 @@ export class World {
     if (kind === 'shadows') this.sun.castShadow = on;
     if (kind === 'reflect') this.reflectOn = on;
     if (kind === 'traffic' && this.pm) for (const m of Object.values(this.pm)) m.visible = on;
+    if (kind === 'earth') { this.earthOn = on; if (this.earthCtx) this.earthCtx.setOn(on); }
     if (kind === 'detail') { this.terrainU.uDetailOn.value = on ? 1 : 0; this.grassOff = !on; }
   }
 
@@ -1197,7 +1200,13 @@ export class World {
     this.ensureUnderground(say).then(() => { this.layers.buildUnder(); this.onLayersReady && this.onLayersReady(); }).catch(e => console.warn(e));
     return this.layers;
   }
-  openGlobe() { if (!this.globe) { this.globe = new Globe(this); this.globe.onToggle = v => this.onGlobe && this.onGlobe(v); } this.globe.enter(); return this.globe; }
+  // back from the globe: start high over the area's real place on Earth, then glide down to the overview
+  arriveFromSpace() {
+    if (!this.D || !this.views || this.mode !== 'orbit' || !(this.earthCtx && this.earthCtx.group.visible)) return;
+    const v = this.views.overview, hc = v.target[1], S = this.extent || 2000; this.camera.position.set(0, hc + Math.max(7600, S * 6), Math.max(900, S * 0.6)); this.controls.target.set(0, hc, 0); this.controls.update();
+    this.flight = { t: 0, p0: this.camera.position.clone(), q0: this.controls.target.clone(), p1: new THREE.Vector3(...v.pos), q1: new THREE.Vector3(...v.target), dur: 3.2 };
+  }
+  openGlobe() { if (!this.globe) { this.globe = new Globe(this); this.globe.onToggle = v => { this.onGlobe && this.onGlobe(v); if (!v) this.arriveFromSpace(); }; } this.globe.enter(); return this.globe; }
   openRadar() { if (!this.radar) this.radar = new Radar(this); return this.radar; }
   async openTactical() { await loadCatalog(); if (!this.tactical) this.tactical = new Tactical(this); this.tactical.active = true; await this.tactical.rebuild(); return this.tactical; }
   openEditor() { if (!this.editor) { this.editor = new Editor(this); this.editor.rebuild(); } this.editor.active = true; return this.editor; }
@@ -1211,7 +1220,7 @@ export class World {
   }
   // flooded paddies at planting (needs Field Boundaries), straw stacks by the houses after the harvest
   async farmUpdate(fields) {
-    const RF = this._rf || (this._rf = await import('./ricefield.js?v=82')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
+    const RF = this._rf || (this._rf = await import('./ricefield.js?v=83')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
     for (const k of ['paddyMesh', 'hayMesh']) if (this[k]) { this.root.remove(this[k]); this[k].geometry.dispose(); this[k].material.dispose(); this[k] = null; }
     const F = this._farmFields || this.fields; if (this.seasonKey === 'planting' && F && F.length) { this.paddyMesh = RF.paddyWater(this, F); if (this.paddyMesh) this.root.add(this.paddyMesh); }
     if (this.seasonKey === 'harvested') { this.hayMesh = RF.hayStacks(this); if (this.hayMesh) this.root.add(this.hayMesh); }
@@ -1396,7 +1405,7 @@ export class World {
     } else if (this.mode === 'walk') { this.walker.step(dt, this.camera); focus = this.walker.pos; }
     else {
       if (this.flight) {
-        const fl = this.flight; fl.t = Math.min(1, fl.t + dt / 1.6); const e = fl.t * fl.t * (3 - 2 * fl.t);
+        const fl = this.flight; fl.t = Math.min(1, fl.t + dt / (fl.dur || 1.6)); const e = fl.t * fl.t * (3 - 2 * fl.t);
         this.camera.position.lerpVectors(fl.p0, fl.p1, e); this.controls.target.lerpVectors(fl.q0, fl.q1, e); if (fl.t >= 1) this.flight = null;
       }
       this.controls.update(); focus = this.controls.target;
@@ -1413,6 +1422,7 @@ export class World {
     this.sun.target.position.copy(focus); this.sun.position.copy(focus).addScaledVector(this.sunDir, half * 3);
     this.updateHud(focus, dt);
     if (this.trafficOn !== false) this.updatePeople(dt);
+    if (this.earthCtx) this.earthCtx.step();
     this.renderReflection(focus);
     this.renderer.render(this.scene, this.camera);
   }

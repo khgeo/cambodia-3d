@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=82">
+<link rel="stylesheet" href="css/app.css?v=83">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -119,6 +119,7 @@
         <label><input type="checkbox" data-k="buildings" checked><span>🏢 Buildings</span></label>
         <label title="Village houses placed where the image shows built-up land next to a road and OpenStreetMap has no buildings"><input type="checkbox" data-k="houses" checked><span>🏠 Houses from image</span></label>
         <label><input type="checkbox" data-k="traffic" checked><span>🚗 Traffic &amp; people</span></label>
+        <label title="The 3D area at its real place on Earth, with satellite imagery around it to the horizon and the whole planet when you zoom out. Untick to see the area alone."><input type="checkbox" data-k="earth" checked><span>🌍 Earth around the area</span></label>
         <label><input type="checkbox" data-k="detail" checked><span>🌾 Ground detail &amp; grass</span></label>
         <label><input type="checkbox" data-k="shadows" checked><span>🌗 Shadows</span></label>
         <label><input type="checkbox" data-k="reflect" checked><span>💧 Water reflections</span></label>
@@ -572,6 +573,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=82"></script>
+<script type="module" src="js/app.js?v=83"></script>
 </body>
 </html>
