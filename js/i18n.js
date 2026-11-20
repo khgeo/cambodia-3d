@@ -45,6 +45,7 @@ export const KM = {
   'Dwarf planet': 'ភពតឿ',
   'Moon': 'ព្រះច័ន្ទ',
   'Space probe': 'យានអវកាស',
+  'Distance from the Sun': 'ចម្ងាយពីព្រះអាទិត្យ', 'billion km': 'ពាន់លានគីឡូម៉ែត្រ', 'Speed': 'ល្បឿន', 'launched': 'បាញ់បង្ហោះ', 'Replay the journey from 1977': 'ចាក់ឡើងវិញនូវដំណើរតាំងពីឆ្នាំ ១៩៧៧', 'See the spacecraft': 'មើលយានអវកាស', 'Voyager 1': 'វ៉ូយ៉ាជឺ ១', 'Voyager 2': 'វ៉ូយ៉ាជឺ ២',
   'Galaxy': 'កាឡាក់ស៊ី',
   'Galaxy cluster': 'ចង្កោមកាឡាក់ស៊ី',
   'Star cluster': 'ចង្កោមផ្កាយ',

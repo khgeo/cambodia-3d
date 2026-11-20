@@ -5,7 +5,8 @@
 // directions and distances. The Milky Way, the other galaxies' shapes and the cosmic web are illustrations.
 // Frame: equatorial J2000 with y = celestial north (the globe's frame turned by the sidereal time).
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=80';
+import { t, lang } from './i18n.js?v=81';
+import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=81';
 
 const D2R = Math.PI / 180, AU = 1.495978707e8, LY = 9.4607e12, ER = 6371, OBL = 23.43928 * D2R;
 const rev = x => ((x % 360) + 360) % 360;
@@ -75,7 +76,7 @@ const DEEP = [ // name, RA, Dec, distance (ly), kind, size (ly), colour, facts, 
   ['Perseus Cluster', 49.95, 41.51, 2.4e8, 'gcluster', 3e6, '#ffe2b8', '', [5e20, 3e24]], ['Great Attractor', 243.6, -60.9, 2.2e8, 'gcluster', 5e6, '#ffd2a8', 'Pull of mass that our Local Group moves towards.', [5e20, 3e24]], ['Coma Cluster', 194.95, 27.98, 3.21e8, 'gcluster', 6e6, '#ffe2b8', '', [5e20, 3e24]],
   ['Shapley Supercluster', 201.9, -31.5, 6.5e8, 'gcluster', 2e7, '#ffd2a8', 'Largest concentration of galaxies nearby.', [1e21, 3e24]], ['Quasar 3C 273', 187.28, 2.05, 2.44e9, 'quasar', 1e5, '#9fd8ff', 'First quasar identified – a feeding black hole.', [3e21, 3e24]],
   ['GN-z11', 189.11, 62.24, 3.2e10, 'galaxy', 5000, '#ff9a8a', 'One of the most distant galaxies seen – light left it 13.4 billion years ago.', [1e23, 3e24]]];
-const PROBES = [['Voyager 1', 258.5, 12.2, 167, 'Launched 1977 – the farthest human-made object.'], ['Voyager 2', 301, -59.6, 140, 'Only probe to visit Uranus and Neptune.'], ['New Horizons', 290, -20.4, 62, 'Flew past Pluto in 2015.']];
+const PROBES = [['New Horizons', 290, -20.4, 62, 'Flew past Pluto in 2015.']];
 const SCALES = [[2e5, 'Earth'], [3e6, 'Earth and Moon'], [6e8, 'Inner planets'], [2e10, 'Solar System'], [3e14, 'Kuiper belt and Oort cloud'], [3e15, 'Nearest stars'], [2e17, 'Our neighbourhood in the Milky Way'], [3e18, 'Milky Way'], [3e20, 'Local Group'], [3e22, 'Cosmic web'], [Infinity, 'Observable universe']];
 
 // shared shader for point clouds: fixed pixel size, pushed onto a far shell instead of being clipped
@@ -134,6 +135,10 @@ export class Cosmos {
     this.helio = new THREE.Mesh(new THREE.SphereGeometry(120, 48, 24), new THREE.MeshBasicMaterial({ color: 0x4aa3ff, transparent: true, opacity: 0.05, depthWrite: false, side: THREE.BackSide })); sc.add(this.helio);
     // probes
     for (const [n, ra, dec, au, info] of PROBES) { const d = dirRD(ra, dec); this.addPoint({ id: n, name: n, kind: 'probe', col: '#9fffc6', fixed: d.map(v => v * au * AU), info, show: [3e9, 5e12], size: 5 }); }
+    // Voyager 1 and 2: 3D models on their real paths (launch, planet flybys, cruise to interstellar space)
+    { const T2 = t => (t / 864e5 + 2440587.5 - 2451545) / 36525, hAt = (n, t) => helio(EL[n], T2(t)); this.voy = {};
+      for (const id of Object.keys(VOYAGERS)) { const tr = makeTrack(id, hAt), V = tr.V, inner = voyagerModel(), m = new THREE.Group(); inner.scale.setScalar(0.1); m.add(inner); sc.add(m); sc.add(tr.line); this.voy[id] = tr;
+        this.addPoint({ id, name: id, km: V.km, kind: 'probe', col: V.col, R: 0.01, view: 0.026, mesh: m, info: V.info, show: [3e9, 5e12], size: 6, voy: tr }); } }
     this.ready = this.loadStars();
     // Milky Way (illustration): bar, bulge, four arms, in galactic coordinates, ly
     { const p = [], c = [], s = [], arm = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2], b = Math.tan(12 * D2R);
@@ -182,7 +187,7 @@ export class Cosmos {
     const T = (ms / 864e5 + 2440587.5 - 2451545) / 36525, P = this.pos; P.Sun = [0, 0, 0];
     for (const n of Object.keys(EL)) P[n] = helio(EL[n], T); const m = moonGeo(ms); P.Moon = [P.Earth[0] + m[0], P.Earth[1] + m[1], P.Earth[2] + m[2]];
     if (!this.galC) { const g = galDir(26000, 0, 0); this.galC = [g.x * LY, g.y * LY, g.z * LY]; }
-    for (const o of this.items) if (!o.body) P[o.id] = o.gal ? this.galC : o.fixed;
+    for (const o of this.items) if (!o.body) P[o.id] = o.voy ? o.voy.at(ms) : o.gal ? this.galC : o.fixed;
     return P;
   }
   sunEcef(ms = Date.now()) { const P = this.positions(ms), s = new THREE.Vector3(P.Sun[0] - P.Earth[0], P.Sun[1] - P.Earth[1], P.Sun[2] - P.Earth[2]).normalize(); return s.applyAxisAngle(new THREE.Vector3(0, 1, 0), -gmstDeg(ms) * D2R); }
@@ -202,12 +207,14 @@ export class Cosmos {
     for (const o of this.items) { const p = P[o.id]; if (!p) continue;
       let Lp = 1; if (o.mesh) { Lp = this.place(o.mesh, p, cam, S, o.R); if (o.id === 'Earth') { o.mesh.rotation.set(0, G, 0); o.mesh.visible = !bg; }
         else if (o.id === 'Moon') { const X = new THREE.Vector3(P.Earth[0] - p[0], P.Earth[1] - p[1], P.Earth[2] - p[2]).normalize(), Y = new THREE.Vector3(0, 1, 0).addScaledVector(X, -X.y).normalize(), Z = new THREE.Vector3().crossVectors(X, Y); o.mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, Z)); }
+        else if (o.voy) { const e = P.Earth, v = new THREE.Vector3(e[0] - p[0], e[1] - p[1], e[2] - p[2]).normalize(); o.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), v); o.mesh.visible = !bg; }
         else if (o.mesh.userData.pole && this.SPIN[o.id]) o.mesh.quaternion.copy(o.mesh.userData.pole).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (ms / 3.6e6 / this.SPIN[o.id]) % 1 * 2 * Math.PI)); }
       if (o.mark) { this.place(o.mark, p, cam, S); if (bg && o.id === 'Earth') { o.mark.visible = false; continue; } o.mark.visible = true; o.mark.material.uniforms.uOp.value = o.mesh ? Math.max(0, 1 - (o.R * S / Math.max(Lp, 1e-9)) / 0.006) : (o.show ? fade(o.show[0] / 30, o.show[0], D, o.show[1], o.show[1] * 30) : 1); }
       if (o.cloud) { this.place(o.cloud, p, cam, S, o.cloudR); o.cloud.material.uniforms.uOp.value = 0.75 * fade(o.cloudR * 2, o.cloudR * 30, D, 1e30, 1e31); } }
     this.place(this.sunLight, P.Sun, cam, S); this.g.U.sun.value.set(...(() => { const s = [P.Sun[0] - P.Earth[0], P.Sun[1] - P.Earth[1], P.Sun[2] - P.Earth[2]], L = Math.hypot(...s); const v = new THREE.Vector3(s[0] / L, s[1] / L, s[2] / L).applyAxisAngle(new THREE.Vector3(0, 1, 0), -G); return [v.x, v.y, v.z]; })());
     // orbits & belts (stored in AU, around the Sun)
     for (const l of this.orbits) { this.place(l, P.Sun, cam, S, AU); l.material.opacity = 0.5 * fade(3e6, 6e7, D, 3e11, 3e13); l.visible = l.material.opacity > 0.01; }
+    for (const id in this.voy) { const l = this.voy[id].line; this.place(l, P.Sun, cam, S, AU); this.voy[id].upTo(ms); l.material.opacity = 0.75 * fade(2e6, 3e7, D, 3e12, 3e13); l.visible = l.material.opacity > 0.01; }
     this.place(this.moonOrbit, P.Earth, cam, S, 384400); this.moonOrbit.material.opacity = 0.4 * fade(2e4, 2e5, D, 1e7, 2e8); this.moonOrbit.visible = this.moonOrbit.material.opacity > 0.01;
     for (const [b, lo, hi] of [[this.asteroids, 3e7, 2e11], [this.kuiper, 5e8, 5e12], [this.oort, 5e10, 2e15]]) { this.place(b, P.Sun, cam, S, AU); b.material.uniforms.uOp.value = 0.8 * fade(lo, lo * 20, D, hi / 30, hi); b.visible = b.material.uniforms.uOp.value > 0.01; }
     this.place(this.helio, P.Sun, cam, S, AU); this.helio.material.opacity = 0.06 * fade(3e9, 3e10, D, 3e12, 3e13); this.helio.visible = this.helio.material.opacity > 0.003;
@@ -223,6 +230,7 @@ export class Cosmos {
     if (this.fly) { const F = this.fly; F.t = Math.min(1, F.t + dt / F.dur); const e = F.t * F.t * (3 - 2 * F.t), to = this.pos[F.to] || F.b; F.cur = [0, 1, 2].map(i => F.a[i] + (to[i] - F.a[i]) * e);
       this.dist = Math.exp(Math.log(F.d0) + (Math.log(F.d1) - Math.log(F.d0)) * e + F.hump * Math.sin(Math.PI * e)); this.az = F.az0 + F.dAz * e; this.el = F.el0 + F.dEl * e; if (F.t >= 1) { this.focus = F.to; this.fly = null; } }
     if (this.autoSpin && !this.drag) this.az += dt * 0.03;
+    if (this.replaying && !this.fly) { if (this.focus !== 'Sun') this.replaying = null; else { const p = this.pos[this.replaying], r = Math.hypot(...p); if (!this.drag) this.dist += (Math.max(75 * AU, r * 2.6) - this.dist) * Math.min(1, dt * 1.5); if (this.tOff >= 0) { this.tOff = 0; this.rate = 1; this.replaying = null; } } }
     const D = this.draw(ms, false), cam = this.camKm, f = this.focusPos();
     this.cam.position.set(0, 0, 0); this.cam.up.set(0, 1, 0); this.cam.lookAt((f[0] - cam[0]) * this.S, (f[1] - cam[1]) * this.S, (f[2] - cam[2]) * this.S);
     const fo = this.item(this.focus), minD = fo ? fo.R * 1.15 : 10; this.cam.near = Math.max(0.0005, 10 * (this.dist - (fo && fo.mesh ? fo.R : 0)) / this.dist * 0.2); this.cam.far = 2e5; this.cam.updateProjectionMatrix();
@@ -260,7 +268,7 @@ export class Cosmos {
   exit() { const G = gmstDeg(Date.now()) * D2R, ce = Math.cos(this.el), v = new THREE.Vector3(ce * Math.sin(this.az), Math.sin(this.el), ce * Math.cos(this.az)).multiplyScalar(Math.max(this.dist, 2 * ER) / ER).applyAxisAngle(new THREE.Vector3(0, 1, 0), -G);
     this.active = false; this.fly = null; this.tOff = 0; this.rate = 0; this.uiBox.hidden = true; this.g.cam.position.copy(v.setLength(Math.min(7.4, v.length()))); this.g.cam.lookAt(0, 0, 0); this.g.ctl.enabled = true; this.g.ctl.update(); document.body.classList.remove('cosmos-on'); this.card(null); this.g.onCosmos && this.g.onCosmos(false); }
   goTo(id) { const o = this.item(id); if (!o) return; this.positions(this.now()); const a = this.focusPos().slice(), b = this.pos[id], sep = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), d0 = this.dist, d1 = Math.max(o.view, o.R * 3);
-    const hump = Math.max(0, Math.log(sep * 1.4 / Math.max(d0, d1))); let az1 = this.az, el1 = this.el; if (o.body && id !== 'Sun' && id !== 'Earth') { const s = new THREE.Vector3(-b[0], -b[1], -b[2]).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.6); az1 = Math.atan2(s.x, s.z); el1 = Math.max(-0.5, Math.min(0.5, Math.asin(s.y) + 0.25)); } // look at the sunlit side
+    const hump = Math.max(0, Math.log(sep * 1.4 / Math.max(d0, d1))); let az1 = this.az, el1 = this.el; if ((o.body || o.voy) && id !== 'Sun' && id !== 'Earth') { const s = new THREE.Vector3(-b[0], -b[1], -b[2]).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.6); az1 = Math.atan2(s.x, s.z); el1 = Math.max(-0.5, Math.min(0.5, Math.asin(s.y) + 0.25)); } // look at the sunlit side
     let dAz = ((az1 - this.az) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
     this.fly = { a, b, to: id, cur: a, t: 0, d0, d1, hump, dur: 2.2 + Math.min(4, hump * 0.35), az0: this.az, dAz, el0: this.el, dEl: el1 - this.el }; this.card(o); }
   events() {
@@ -279,7 +287,7 @@ export class Cosmos {
   ui() {
     const d = this.uiBox = document.createElement('div'); d.className = 'cosUI'; d.hidden = true;
     d.innerHTML = `<div class="cosTop"><input id="cosFind" placeholder="🔎 ${t('Planet, star, galaxy…')}" autocomplete="off"><div id="cosFound"></div></div>
-      <div class="cosJump">${[['Earth', '🌍'], ['Moon', '🌙'], ['Sun', '☀️'], ['Mars', '🔴'], ['Jupiter', '🟠'], ['Saturn', '🪐'], ['Alpha Centauri A', '⭐'], ['Milky Way', '🌌'], ['Andromeda Galaxy', '🌀'], ['Observable universe', '🔭']].map(([id, i]) => `<button data-go="${id}" title="${esc(t(id))}">${i}</button>`).join('')}</div>
+      <div class="cosJump">${[['Earth', '🌍'], ['Moon', '🌙'], ['Sun', '☀️'], ['Mars', '🔴'], ['Jupiter', '🟠'], ['Saturn', '🪐'], ['Voyager 1', '🛰️'], ['Alpha Centauri A', '⭐'], ['Milky Way', '🌌'], ['Andromeda Galaxy', '🌀'], ['Observable universe', '🔭']].map(([id, i]) => `<button data-go="${id}" title="${esc(t(id))}">${i}</button>`).join('')}</div>
       <div class="cosCard" id="cosCard" hidden></div>
       <div class="cosBottom"><div class="cosScale"><i id="cosBar"></i><span id="cosScaleT"></span><b id="cosLevel"></b></div>
         <div class="cosTime"><button data-rate="0" title="${t('Pause')}">⏸</button><button data-rate="1" title="${t('Real time')}">▶</button><button data-rate="3600">1 h/s</button><button data-rate="86400">1 ${t('day')}/s</button><button data-rate="2592000">1 ${t('month')}/s</button><button data-rate="31557600">1 ${t('year')}/s</button><button id="cosNow" title="${t('Now')}">⟲</button><span id="cosDate"></span></div>
@@ -300,8 +308,13 @@ export class Cosmos {
   updCard() { const o = this.cardO, c = this.uiBox.querySelector('#cosCard'); if (!o || c.hidden) return; const p = this.pos[o.id], e = this.pos.Earth, dk = p && e ? Math.hypot(p[0] - e[0], p[1] - e[1], p[2] - e[2]) : 0, lt = lightTime(dk);
     c.innerHTML = `<div class="cosCh"><b style="color:${o.col}">${esc(lang === 'km' && o.km ? o.km : t(o.name))}</b>${o.km && lang !== 'km' ? ` <span>${esc(o.km)}</span>` : ''}<button id="cosCardX">✕</button></div><div class="cosK">${t(this.kindName(o.kind))}</div>
       ${o.id !== 'Earth' && o.id !== 'Observable universe' ? `<div>📏 ${t('Distance from Earth')}: <b>${fmtKm(dk)}</b>${lt ? ` · ${t('light takes')} ${lt}` : ''}</div>` : ''}${o.body || o.kind === 'star' ? `<div>⭕ ${t('Radius')}: ${fmtKm(o.R)}${o.id !== 'Earth' ? ` (${(o.R / ER).toFixed(o.R / ER < 10 ? 2 : 0)} × ${t('Earth')})` : ''}</div>` : ''}
-      ${o.info ? `<div class="cosInfo">${esc(t(o.info))}</div>` : ''}`;
-    c.querySelector('#cosCardX').onclick = () => this.card(null); }
+      ${o.voy ? (() => { const s = this.pos.Sun, r = Math.hypot(p[0] - s[0], p[1] - s[1], p[2] - s[2]); return `<div>☀️ ${t('Distance from the Sun')}: <b>${fmtKm(r)}</b> (${(r / 1e9).toFixed(2)} ${t('billion km')})</div><div>🚀 ${t('Speed')}: ${o.voy.speed(this.now()).toFixed(1)} km/s · ${t('launched')} ${new Date(o.voy.V.launch).toISOString().slice(0, 10)}</div>`; })() : ''}
+      ${o.info ? `<div class="cosInfo">${esc(t(o.info))}</div>` : ''}${o.voy ? `<div class="cosVoy"><button id="cosReplay">▶ ${t('Replay the journey from 1977')}</button><button id="cosSee">🔍 ${t('See the spacecraft')}</button></div>` : ''}`;
+    c.querySelector('#cosCardX').onclick = () => this.card(null);
+    if (o.voy) { c.querySelector('#cosReplay').onclick = () => this.replay(o.id); c.querySelector('#cosSee').onclick = () => { this.tOff = 0; this.rate = 1; this.goTo(o.id); }; } }
+  replay(id) { // watch both Voyagers leave Earth and swing past the giant planets, one year per second
+    const V = this.voy[id].V; this.fly = null; this.tOff = V.launch - 30 * 864e5 - Date.now(); this.rate = 31557600 / 3; this.focus = 'Sun'; this.dist = 75 * AU; this.el = 0.55; this.az = 0.4; this.replaying = id;
+    this.uiBox.querySelectorAll('[data-rate]').forEach(x => x.classList.remove('on')); }
   hud(D) { this.cardT = (this.cardT || 0) + 1; if (this.cardT % 15 === 1) this.updCard(); const el = this.w.renderer.domElement, px = 120, km = 2 * this.dist * Math.tan(this.cam.fov * D2R / 2) * px / el.clientHeight;
     const n = Math.pow(10, Math.floor(Math.log10(km))), nice = [1, 2, 5].map(k => k * n).filter(v => v <= km).pop() || n; this.uiBox.querySelector('#cosBar').style.width = (nice / km * px).toFixed(0) + 'px'; this.uiBox.querySelector('#cosScaleT').textContent = fmtKm(nice);
     const fo = this.item(this.focus); this.uiBox.querySelector('#cosLevel').textContent = fo && fo.body && D < fo.R * 60 ? (lang === 'km' && fo.km ? fo.km : t(fo.name)) : t(SCALES.find(([v]) => D < v)[1]); const dt = new Date(this.now()); this.uiBox.querySelector('#cosDate').textContent = dt.toISOString().slice(0, 16).replace('T', ' ') + ' UTC'; }
