@@ -2,8 +2,8 @@
 // Above-ground layers (water, roads, plants, buildings, traffic) rise; derived map layers (land cover,
 // elevation, soil, geology) sink below the imagery surface. A level bar picks / isolates a layer.
 import * as THREE from 'three';
-import { UNITS, SOIL_CLASSES, geologyAt, soilAt } from './section.js?v=85';
-import { LC } from './landcover.js?v=85';
+import { UNITS, SOIL_CLASSES, geologyAt, soilAt } from './section.js?v=86';
+import { LC } from './landcover.js?v=86';
 
 export const LAYERS = [
   { id: 'traffic', short: 'Traffic & people', name: 'Traffic & people', c: '#ff8a3d', side: 1, on: true },
@@ -250,7 +250,7 @@ export class LayerStack {
     o.roads = [w.roadMesh, w.railMesh, w.bridgeMesh].filter(Boolean);
     o.buildings = [w.buildingsMesh, w.housesMesh, w.editor && w.editor.group].filter(Boolean);
     o.trees = [...(w.treeMeshes || []), w.grass && w.grass.group].filter(Boolean);
-    o.traffic = [...(w.vehMeshes || []).flatMap(g => [g.paint, g.fixed]), ...Object.values(w.pm || {})].filter(Boolean);
+    o.traffic = [...(w.vehMeshes || []).flatMap(g => g.all || [g.paint, g.fixed]), ...Object.values(w.pm || {})].filter(Boolean);
     for (const k in this.slab || {}) o[k] = [this.slab[k]];
     if (w.results) for (const r of w.results.list) o[r.id] = w.results.parts(r);
     for (const L of LAYERS) for (const m of o[L.id] || []) if (m.userData.base == null) m.userData.base = m.position.y;

@@ -5,29 +5,31 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=85';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=85';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=85';
-import { buildTrees, GrassField } from './vegetation.js?v=85';
-import { RoadNet, Driver, Walker } from './modes.js?v=85';
-import { vehicleKit } from './vehicles.js?v=85';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=85';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=85';
-import { LayerStack } from './layers.js?v=85';
-import { Survey } from './survey.js?v=85';
-import { Editor } from './editor.js?v=85';
-import { Atmos } from './atmos.js?v=85';
-import { NightLights } from './lights.js?v=85';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=85';
-import { Tactical, loadCatalog } from './tactical.js?v=85';
-import { LcTrainer } from './lctrain.js?v=85';
-import { Radar } from './radar.js?v=85';
-import { Globe } from './globe.js?v=85';
-import { SEASON } from './vegetation.js?v=85';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=85';
-import { makeCloudDome } from './skyclouds.js?v=85';
-import { EarthContext } from './earthctx.js?v=85';
-import { ResultLayers } from './results.js?v=85';
+import * as G from './geo.js?v=86';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=86';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=86';
+import { buildTrees, GrassField } from './vegetation.js?v=86';
+import { RoadNet, Driver, Walker } from './modes.js?v=86';
+import { vehicleKit } from './vehicles.js?v=86';
+import { loadCarPack } from './carpack.js?v=86';
+import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=86';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=86';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=86';
+import { LayerStack } from './layers.js?v=86';
+import { Survey } from './survey.js?v=86';
+import { Editor } from './editor.js?v=86';
+import { Atmos } from './atmos.js?v=86';
+import { NightLights } from './lights.js?v=86';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=86';
+import { Tactical, loadCatalog } from './tactical.js?v=86';
+import { LcTrainer } from './lctrain.js?v=86';
+import { Radar } from './radar.js?v=86';
+import { Globe } from './globe.js?v=86';
+import { SEASON } from './vegetation.js?v=86';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=86';
+import { makeCloudDome } from './skyclouds.js?v=86';
+import { EarthContext } from './earthctx.js?v=86';
+import { ResultLayers } from './results.js?v=86';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -136,7 +138,7 @@ export class World {
     this.reflRT = new THREE.WebGLRenderTarget(512, 512, { type: THREE.HalfFloatType }); this.mirrorCam = new THREE.PerspectiveCamera(); this.reflectOn = true;
     this.reflU = { uRefl: { value: this.reflRT.texture }, uTexMat: { value: new THREE.Matrix4() }, uReflOn: { value: 0 } };
     this.uTime = this.uTime || { value: 0 };
-    this.kit = vehicleKit();
+    this.kit = vehicleKit(); loadCarPack(); // start fetching the real car models now; traffic waits for them
     this.root = new THREE.Group(); sc.add(this.root);
     this.mode = 'orbit'; this.walker = new Walker(this);
     this.setSun(38, true);
@@ -434,6 +436,7 @@ export class World {
     this.clearGeometry();
     const exag = opts.exaggeration ?? 1, smoothOn = opts.smooth !== false;
     if (!D.exclude0) { D.exclude0 = D.exclude.slice(); D.bmask0 = this.bmask.slice(); } else { D.exclude.set(D.exclude0); this.bmask.set(D.bmask0); }
+    const LMs = landmarksIn(this.F, D); clearFootprints(D, LMs); // real models of landmarks (Angkor Wat) take their place
     const { W, H, X0, Z0, X1, Z1, S, nx, nz, dx, dz, raw, hmin } = D, R = nx + 1;
     const rnd = G.mulberry32(Math.round(D.aoi.w * 1e4 + D.aoi.s * 1e3));
     D.stats.exag = exag;
@@ -705,7 +708,7 @@ export class World {
     this.grass = new GrassField(vctx, this.uTime, this.mobile); this.root.add(this.grass.group);
 
     /* 7. traffic */
-    if (opts.traffic !== false) { say('Adding traffic…'); this.buildTraffic(rnd); }
+    if (opts.traffic !== false) { say('Adding traffic…'); this.cars = await Promise.race([loadCarPack(), new Promise(r => setTimeout(() => r(null), 20000))]); this.buildTraffic(rnd); }
     say('Adding people and cattle…'); this.netRoadsForPeople = netRoads; this.buildPeople(rnd);
 
     /* 8. views */
@@ -718,6 +721,7 @@ export class World {
     this.controls.maxDistance = S * 3; this.controls.minDistance = 2;
     this.scene.fog.near = S * 1.2; this.scene.fog.far = S * 5;
     (this.earthCtx = this.earthCtx || new EarthContext(this)).build();
+    this.landmarks = []; if (LMs.length) { const root = this.root; placeLandmarks(this, LMs).then(r => { if (this.root === root) this.landmarks = r; this.onLandmarks && this.onLandmarks(r); }); }
     this.camera.far = S * 20; this.camera.updateProjectionMatrix(); this.sky.scale.setScalar(S * 12); this.cloudDome.scale.setScalar(S * 8);
     if (keepView) { this.camera.position.copy(keepView.p); this.controls.target.copy(keepView.t); this.controls.update(); }
     else this.goView('overview', true);
@@ -903,7 +907,7 @@ export class World {
     const cap = this.mobile ? 500 : 1600, want = [];
     for (const ln of this.lanesForTraffic) { const L = ln.pts[ln.pts.length - 1].s, n = Math.floor(L / 1000 * (PER_KM[ln.cls] || 2) * (ln.urban ? 1.6 : 1) + rnd()); for (let k = 0; k < n; k++) want.push(ln); }
     const list = want.length > cap ? want.filter(() => rnd() < cap / want.length) : want;
-    const types = Object.keys(this.kit), slots = Object.fromEntries(types.map(t => [t, []]));
+    const types0 = Object.keys(this.kit), slots = Object.fromEntries(types0.map(t => [t, []]));
     this.vehicles = [];
     const lanesIdx = new Map(this.lanesForTraffic.map((l, i) => [l, i]));
     for (const ln of list) {
@@ -912,6 +916,9 @@ export class World {
       else if (ln.cls <= 8) t = r < 0.38 ? 'moto' : r < 0.5 ? 'moto2' : r < 0.68 ? 'car' : r < 0.8 ? 'pickup' : r < 0.9 ? 'tuktuk' : 'truck';
       else t = r < (ln.urban ? 0.45 : 0.55) ? 'moto' : r < 0.68 ? 'moto2' : r < 0.8 ? 'car' : r < 0.87 ? 'pickup' : r < 0.96 ? 'tuktuk' : 'truck';
       if (ln.st.w < 4 && (t === 'truck' || t === 'bus')) t = 'moto';
+      // real car models where loaded: Cambodian roads are mostly SUVs, pickups, sedans and minivans
+      if (this.cars && (t === 'car' || (t === 'pickup' && rnd() < 0.6))) { const C = this.cars, pool = t === 'pickup' ? ['Pickup', 'Offroad'] : ['Sedan', 'Sedan', 'SUV', 'SUV', 'minivan', 'Hatchback', 'Wagon', 'Compact', 'Coupe', 'Offroad', 'Sport'], nm = pool[(rnd() * pool.length) | 0];
+        if (C[nm]) { t = 'gc_' + nm; if (!this.kit[t]) { this.kit[t] = { parts: C[nm].parts, len: C[nm].len, palette: [0xf2f2f0, 0xf2f2f0, 0xf2f2f0, 0xe8e8e4, 0x1c1e22, 0x1c1e22, 0x9aa1a8, 0x9aa1a8, 0x8b1e1e, 0x23518f, 0xc8c3b6, 0x5c6066, 0x6b4a2b] }; slots[t] = []; } } }
       const dir = ln.oneway ? 1 : (rnd() < 0.5 ? 1 : -1), src = dir > 0 ? ln.pts : ln.pts.slice().reverse(), hw = ln.st.w / 2;
       let off;
       if (ln.oneway) off = (ln.st.lanes > 1 ? (((rnd() * ln.st.lanes) | 0) + 0.5) / ln.st.lanes * 2 - 1 : 0) * (hw - 0.6);
@@ -928,8 +935,11 @@ export class World {
       slots[t].push(v); this.vehicles.push(v);
     }
     this.vehMeshes = [];
-    for (const t of types) {
+    for (const t of Object.keys(slots)) {
       const n = slots[t].length; if (!n) continue; const k = this.kit[t];
+      if (k.parts) { const c = new THREE.Color(), all = k.parts.map(p => { const m = new THREE.InstancedMesh(p.geo, p.mat, n); if (p.paint) slots[t].forEach((v, i) => m.setColorAt(i, c.set(k.palette[(rnd() * k.palette.length) | 0])));
+          m.castShadow = !p.mat.transparent; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.frustumCulled = false; this.root.add(m); return m; });
+        this.vehMeshes.push({ paint: all[0], fixed: all[1] || all[0], all, list: slots[t] }); continue; }
       const paint = new THREE.InstancedMesh(k.paint, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.3, metalness: 0.5, side: THREE.DoubleSide }), n);
       const fixed = new THREE.InstancedMesh(k.fixed, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.5, metalness: 0.2 }), n);
       const c = new THREE.Color(); slots[t].forEach((v, i) => paint.setColorAt(i, c.set(k.palette[(rnd() * k.palette.length) | 0])));
@@ -988,9 +998,9 @@ export class World {
         v.fwd.copy(ahead).sub(v.pos).normalize();
         if (v.lat) { const lx = v.fwd.z, lz = -v.fwd.x, n = Math.hypot(lx, lz) || 1; v.pos.x += lx / n * v.lat; v.pos.z += lz / n * v.lat; v.pos.y = Math.max(v.pos.y, this.hAt(v.pos.x, v.pos.z) + 0.1); }
         const steer = v.passing ? 0.12 : v.lat > 0.05 ? -0.12 : 0;
-        d.position.copy(v.pos); look.copy(v.pos).add(v.fwd); d.lookAt(look); if (steer) d.rotateY(steer); d.updateMatrix(); g.paint.setMatrixAt(i, d.matrix); g.fixed.setMatrixAt(i, d.matrix);
+        d.position.copy(v.pos); look.copy(v.pos).add(v.fwd); d.lookAt(look); if (steer) d.rotateY(steer); d.updateMatrix(); if (g.all) for (const m of g.all) m.setMatrixAt(i, d.matrix); else { g.paint.setMatrixAt(i, d.matrix); g.fixed.setMatrixAt(i, d.matrix); }
       });
-      g.paint.instanceMatrix.needsUpdate = g.fixed.instanceMatrix.needsUpdate = true;
+      for (const m of g.all || [g.paint, g.fixed]) m.instanceMatrix.needsUpdate = true;
     }
   }
 
@@ -1115,7 +1125,7 @@ export class World {
     if (kind === 'trees') (this.treeMeshes || []).forEach(m => m.visible = on);
     if (kind === 'buildings' && this.buildingsMesh) this.buildingsMesh.visible = on;
     if (kind === 'houses' && this.housesMesh) this.housesMesh.visible = on;
-    if (kind === 'traffic') { this.trafficOn = on; (this.vehMeshes || []).forEach(g => g.paint.visible = g.fixed.visible = on); }
+    if (kind === 'traffic') { this.trafficOn = on; (this.vehMeshes || []).forEach(g => (g.all || [g.paint, g.fixed]).forEach(m => m.visible = on)); }
     if (kind === 'shadows') this.sun.castShadow = on;
     if (kind === 'reflect') this.reflectOn = on;
     if (kind === 'traffic' && this.pm) for (const m of Object.values(this.pm)) m.visible = on;
@@ -1221,7 +1231,7 @@ export class World {
   }
   // flooded paddies at planting (needs Field Boundaries), straw stacks by the houses after the harvest
   async farmUpdate(fields) {
-    const RF = this._rf || (this._rf = await import('./ricefield.js?v=85')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
+    const RF = this._rf || (this._rf = await import('./ricefield.js?v=86')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
     for (const k of ['paddyMesh', 'hayMesh']) if (this[k]) { this.root.remove(this[k]); this[k].geometry.dispose(); this[k].material.dispose(); this[k] = null; }
     const F = this._farmFields || this.fields; if (this.seasonKey === 'planting' && F && F.length) { this.paddyMesh = RF.paddyWater(this, F); if (this.paddyMesh) this.root.add(this.paddyMesh); }
     if (this.seasonKey === 'harvested') { this.hayMesh = RF.hayStacks(this); if (this.hayMesh) this.root.add(this.hayMesh); }
