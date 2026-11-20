@@ -5,29 +5,29 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=83';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=83';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=83';
-import { buildTrees, GrassField } from './vegetation.js?v=83';
-import { RoadNet, Driver, Walker } from './modes.js?v=83';
-import { vehicleKit } from './vehicles.js?v=83';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=83';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=83';
-import { LayerStack } from './layers.js?v=83';
-import { Survey } from './survey.js?v=83';
-import { Editor } from './editor.js?v=83';
-import { Atmos } from './atmos.js?v=83';
-import { NightLights } from './lights.js?v=83';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=83';
-import { Tactical, loadCatalog } from './tactical.js?v=83';
-import { LcTrainer } from './lctrain.js?v=83';
-import { Radar } from './radar.js?v=83';
-import { Globe } from './globe.js?v=83';
-import { SEASON } from './vegetation.js?v=83';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=83';
-import { makeCloudDome } from './skyclouds.js?v=83';
-import { EarthContext } from './earthctx.js?v=83';
-import { ResultLayers } from './results.js?v=83';
+import * as G from './geo.js?v=84';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=84';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=84';
+import { buildTrees, GrassField } from './vegetation.js?v=84';
+import { RoadNet, Driver, Walker } from './modes.js?v=84';
+import { vehicleKit } from './vehicles.js?v=84';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=84';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=84';
+import { LayerStack } from './layers.js?v=84';
+import { Survey } from './survey.js?v=84';
+import { Editor } from './editor.js?v=84';
+import { Atmos } from './atmos.js?v=84';
+import { NightLights } from './lights.js?v=84';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=84';
+import { Tactical, loadCatalog } from './tactical.js?v=84';
+import { LcTrainer } from './lctrain.js?v=84';
+import { Radar } from './radar.js?v=84';
+import { Globe } from './globe.js?v=84';
+import { SEASON } from './vegetation.js?v=84';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=84';
+import { makeCloudDome } from './skyclouds.js?v=84';
+import { EarthContext } from './earthctx.js?v=84';
+import { ResultLayers } from './results.js?v=84';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -1220,7 +1220,7 @@ export class World {
   }
   // flooded paddies at planting (needs Field Boundaries), straw stacks by the houses after the harvest
   async farmUpdate(fields) {
-    const RF = this._rf || (this._rf = await import('./ricefield.js?v=83')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
+    const RF = this._rf || (this._rf = await import('./ricefield.js?v=84')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
     for (const k of ['paddyMesh', 'hayMesh']) if (this[k]) { this.root.remove(this[k]); this[k].geometry.dispose(); this[k].material.dispose(); this[k] = null; }
     const F = this._farmFields || this.fields; if (this.seasonKey === 'planting' && F && F.length) { this.paddyMesh = RF.paddyWater(this, F); if (this.paddyMesh) this.root.add(this.paddyMesh); }
     if (this.seasonKey === 'harvested') { this.hayMesh = RF.hayStacks(this); if (this.hayMesh) this.root.add(this.hayMesh); }
