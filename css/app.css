@@ -708,3 +708,4 @@ body.ride-on #toolDock,body.ride-on .catBtn,body.ride-on #hud,body.ride-on .rpan
 .cosLabels span.con{color:#9fbcf0;font-weight:500;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
 #cosCon.on{background:#25457a}
 .cosLabels span.cstar{color:#fff;font-weight:500;font-size:12px;transform:none}
+#polyBtns[hidden]{display:none}#polyBtns button{flex:1;padding:6px 4px}

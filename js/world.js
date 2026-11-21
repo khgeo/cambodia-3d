@@ -5,31 +5,31 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=91';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=91';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=91';
-import { buildTrees, GrassField } from './vegetation.js?v=91';
-import { RoadNet, Driver, Walker } from './modes.js?v=91';
-import { vehicleKit } from './vehicles.js?v=91';
-import { loadCarPack } from './carpack.js?v=91';
-import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=91';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=91';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=91';
-import { LayerStack } from './layers.js?v=91';
-import { Survey } from './survey.js?v=91';
-import { Editor } from './editor.js?v=91';
-import { Atmos } from './atmos.js?v=91';
-import { NightLights } from './lights.js?v=91';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=91';
-import { Tactical, loadCatalog } from './tactical.js?v=91';
-import { LcTrainer } from './lctrain.js?v=91';
-import { Radar } from './radar.js?v=91';
-import { Globe } from './globe.js?v=91';
-import { SEASON } from './vegetation.js?v=91';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=91';
-import { makeCloudDome } from './skyclouds.js?v=91';
-import { EarthContext } from './earthctx.js?v=91';
-import { ResultLayers } from './results.js?v=91';
+import * as G from './geo.js?v=92';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=92';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=92';
+import { buildTrees, GrassField } from './vegetation.js?v=92';
+import { RoadNet, Driver, Walker } from './modes.js?v=92';
+import { vehicleKit } from './vehicles.js?v=92';
+import { loadCarPack } from './carpack.js?v=92';
+import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=92';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=92';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=92';
+import { LayerStack } from './layers.js?v=92';
+import { Survey } from './survey.js?v=92';
+import { Editor } from './editor.js?v=92';
+import { Atmos } from './atmos.js?v=92';
+import { NightLights } from './lights.js?v=92';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=92';
+import { Tactical, loadCatalog } from './tactical.js?v=92';
+import { LcTrainer } from './lctrain.js?v=92';
+import { Radar } from './radar.js?v=92';
+import { Globe } from './globe.js?v=92';
+import { SEASON } from './vegetation.js?v=92';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=92';
+import { makeCloudDome } from './skyclouds.js?v=92';
+import { EarthContext } from './earthctx.js?v=92';
+import { ResultLayers } from './results.js?v=92';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -81,6 +81,11 @@ class Frame {
 }
 function loadImage(url) { return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = rej; im.src = url; }); }
 async function pool(items, n, fn) { let i = 0; const run = async () => { while (i < items.length) { const k = i++; await fn(items[k], k); } }; await Promise.all(Array.from({ length: n }, run)); }
+// a polygon area: white inside, black outside, over the bounding box (the terrain shader cuts the outside away)
+function polyMask(D) { const c = document.createElement('canvas'); if (!D.poly) { c.width = c.height = 2; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, 2, 2); }
+  else { const k = Math.min(2048 / D.W, 2048 / D.H, 2); c.width = Math.max(2, Math.round(D.W * k)); c.height = Math.max(2, Math.round(D.H * k)); const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#fff'; g.beginPath();
+    D.poly.forEach(([x, z], i) => { const px = (x - D.X0) * k, pz = (z - D.Z0) * k; i ? g.lineTo(px, pz) : g.moveTo(px, pz); }); g.closePath(); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.flipY = false; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false; return t; }
 function pointInRings(x, z, rings) {
   let inside = false;
   for (const r of rings) for (let i = 0, j = r.length - 1; i < r.length; j = i++) {
@@ -254,6 +259,20 @@ export class World {
       }
       for (const p of parts) for (const c of G.clipLine(p, X0, Z0, X1, Z1)) roads.push({ ...r, id, pts: c, st: roadStyle(r.cls, r.surf, r.lanes, r.wdm, r.flags) });
     }
+    // a polygon area (drawn, or a commune): keep only what lies inside it
+    if (aoi.poly && aoi.poly.length >= 3) {
+      const PL = aoi.poly.map(toXZ), inside = (x, z) => { let c = false; for (let i = 0, j = PL.length - 1; i < PL.length; j = i++) { const [xi, zi] = PL[i], [xj, zj] = PL[j]; if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c; } return c; };
+      const runs = pts => { const out = []; let cur = []; const put = p => { if (inside(p[0], p[1])) cur.push(p); else { if (cur.length > 1) out.push(cur); cur = []; } };
+        for (let k = 0; k < pts.length - 1; k++) { const a = pts[k], b = pts[k + 1], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 4)); for (let q = 0; q < n; q++) put(q ? [a[0] + (b[0] - a[0]) * q / n, a[1] + (b[1] - a[1]) * q / n] : a); }
+        if (pts.length) put(pts[pts.length - 1]); if (cur.length > 1) out.push(cur); return out; };
+      const cen = ring => ring.reduce((s, p) => [s[0] + p[0] / ring.length, s[1] + p[1] / ring.length], [0, 0]);
+      const R2 = []; for (const r of roads) for (const c of runs(r.pts)) R2.push({ ...r, pts: c }); roads.length = 0; roads.push(...R2);
+      const rl2 = rails.flatMap(runs); rails.length = 0; rails.push(...rl2);
+      const ww2 = waterways.flatMap(w => runs(w.pts).map(c => ({ ...w, pts: c }))); waterways.length = 0; waterways.push(...ww2);
+      const b2 = buildings.filter(b => inside(...cen(b.ring))); buildings.length = 0; buildings.push(...b2);
+      // water areas stay whole (a river along the edge); the water shader cuts them at the polygon
+      D.poly = PL; D.inPoly = inside;
+    }
     roads.sort((a, b) => RANK[a.cls] - RANK[b.cls]);
     Object.assign(D, { roads, rails, waterways, landuse, buildings }); D.stats.roads = roads.length; this.views = null; this.U = null; this.section = null; if (this.survey) { this.survey.verts = []; this.survey.points = []; this.survey.n = 0; this.survey.target = null; } if (this.layers) { this.layers.ioYears = null; this.layers.flood = null; this.layers.t = this.layers.target = 0; this.layers.stop(); }
 
@@ -351,7 +370,7 @@ export class World {
         const k = cls[Math.min(gh - 1, ((z - Z0) / C) | 0) * gw + Math.min(gw - 1, ((x - X0) / C) | 0)];
         if (k === 1) wet++; else if (k === 2 || k === 3) green++;
       }
-      if (area < 2500 || !n || wet / n >= 0.15 || green / n < 0.55) keptWater.push(rings);
+      if (area < 2500 || area > 150000 || !n || wet / n >= 0.15 || green / n < 0.55) keptWater.push(rings); // big rivers and lakes always stay (silty river water can look green)
     }
     D.waterPolys = keptWater; D.stats.waterDropped = waterPolys.length - keptWater.length;
     const wctx = rast();
@@ -397,9 +416,10 @@ export class World {
     this.terrainU = {
       uSplat: { value: splatTex }, uGrid: { value: new THREE.Vector4(X0, Z0, gw * C, gh * C) }, uTexel: { value: new THREE.Vector2(1 / img.width, 1 / img.height) },
       uGrass: { value: this.detail.grass }, uRice: { value: this.detail.rice }, uSoil: { value: this.detail.soil }, uGravel: { value: this.detail.gravel }, uDetailOn: { value: 1 }, uSeason: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uPoly: { value: polyMask(D) }, uPolyOn: { value: D.poly ? 1 : 0 }, uPolyG: { value: new THREE.Vector4(X0, Z0, W, H) },
     };
     this.terrainMat = makeTerrainMaterial(this.texSat, this.terrainU);
-    this.waterU = { uHgt: { value: null }, uGrid: { value: new THREE.Vector4() }, uImg: this.uniforms.uImg, uImgA: this.uniforms.uImgA, uTime: this.uTime, ...this.reflU };
+    this.waterU = { uHgt: { value: null }, uGrid: { value: new THREE.Vector4() }, uImg: this.uniforms.uImg, uImgA: this.uniforms.uImgA, uTime: this.uTime, ...this.reflU, uPoly: this.terrainU.uPoly, uPolyOn: this.terrainU.uPolyOn, uPolyG: this.terrainU.uPolyG };
     this.waterMat = makeWaterMaterial(this.waterNormal, this.waterU);
     return D;
   }
@@ -436,7 +456,8 @@ export class World {
     this.clearGeometry();
     const exag = opts.exaggeration ?? 1, smoothOn = opts.smooth !== false;
     if (!D.exclude0) { D.exclude0 = D.exclude.slice(); D.bmask0 = this.bmask.slice(); } else { D.exclude.set(D.exclude0); this.bmask.set(D.bmask0); }
-    const LMs = landmarksIn(this.F, D); clearFootprints(D, LMs); // real models of landmarks (Angkor Wat) take their place
+    const LMs = landmarksIn(this.F, D); clearFootprints(D, LMs);
+    if (D.inPoly) { const { mw, mh, MR } = D; for (let j = 0; j < mh; j++) for (let i = 0; i < mw; i++) if (!D.inPoly(D.X0 + (i + 0.5) * MR, D.Z0 + (j + 0.5) * MR)) D.exclude[j * mw + i] = 1; } // real models of landmarks (Angkor Wat) take their place
     const { W, H, X0, Z0, X1, Z1, S, nx, nz, dx, dz, raw, hmin } = D, R = nx + 1;
     const rnd = G.mulberry32(Math.round(D.aoi.w * 1e4 + D.aoi.s * 1e3));
     D.stats.exag = exag;
@@ -590,10 +611,12 @@ export class World {
       const edge = pts => { for (let k = 0; k < pts.length - 1; k++) { const [ax, az] = pts[k], [bx, bz] = pts[k + 1], ha = hAt(ax, az), hb = hAt(bx, bz);
         sp.push(ax, ha, az, bx, hb, bz, ax, bottom, az, bx, hb, bz, bx, bottom, bz, ax, bottom, az); for (const c of [top, top, bot, top, bot, bot]) scol.push(c.r, c.g, c.b); } };
       const line = (ax, az, bx, bz, n) => Array.from({ length: n + 1 }, (_, k) => [ax + (bx - ax) * k / n, az + (bz - az) * k / n]);
-      edge(line(X0, Z1, X1, Z1, nx)); edge(line(X1, Z1, X1, Z0, nz)); edge(line(X1, Z0, X0, Z0, nx)); edge(line(X0, Z0, X0, Z1, nz));
+      if (D.poly) { const P = D.poly, n = P.length, area = P.reduce((a, p, i) => a + p[0] * P[(i + 1) % n][1] - P[(i + 1) % n][0] * p[1], 0), Q = area > 0 ? P : P.slice().reverse(); // outward-facing, same winding as the box
+        for (let i = 0; i < n; i++) { const a = Q[i], b = Q[(i + 1) % n]; edge(line(a[0], a[1], b[0], b[1], Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / dx)))); } }
+      else { edge(line(X0, Z1, X1, Z1, nx)); edge(line(X1, Z1, X1, Z0, nz)); edge(line(X1, Z0, X0, Z0, nx)); edge(line(X0, Z0, X0, Z1, nz)); }
       const sg = new THREE.BufferGeometry(); sg.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); sg.setAttribute('color', new THREE.Float32BufferAttribute(scol, 3)); sg.computeVertexNormals();
       this.sidesMesh = new THREE.Mesh(sg, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide })); this.root.add(this.sidesMesh);
-      const bp = new THREE.Mesh(new THREE.PlaneGeometry(W, H).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2e241c })); bp.position.y = bottom; this.root.add(bp); this.bottom = bottom; this.basePlate = bp;
+      const bp = new THREE.Mesh(D.poly ? new THREE.ShapeGeometry(new THREE.Shape(D.poly.map(([x, z]) => new THREE.Vector2(x, -z)))).rotateX(-Math.PI / 2) : new THREE.PlaneGeometry(W, H).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2e241c, side: THREE.DoubleSide })); bp.position.y = bottom; this.root.add(bp); this.bottom = bottom; this.basePlate = bp;
       // height texture for water depth shading
       const hf = new Uint16Array(Hg.length); for (let i = 0; i < Hg.length; i++) hf[i] = THREE.DataUtils.toHalfFloat(Hg[i]);
       const ht = new THREE.DataTexture(hf, R, nz + 1, THREE.RedFormat, THREE.HalfFloatType); ht.magFilter = ht.minFilter = THREE.LinearFilter; ht.needsUpdate = true;
@@ -1198,10 +1221,10 @@ export class World {
   applySideGeology() {
     if (!this.U || !this.D) return; const D = this.D, e = this.exag ?? 1;
     if (this.sideWalls) this.sideWalls.forEach(m => this.root.remove(m));
-    const corners = [[D.X0, D.Z0 + D.H], [D.X0 + D.W, D.Z0 + D.H], [D.X0 + D.W, D.Z0], [D.X0, D.Z0], [D.X0, D.Z0 + D.H]];
+    const corners = D.poly ? [...D.poly, D.poly[0]] : [[D.X0, D.Z0 + D.H], [D.X0 + D.W, D.Z0 + D.H], [D.X0 + D.W, D.Z0], [D.X0, D.Z0], [D.X0, D.Z0 + D.H]];
     this.sideWalls = [];
-    for (let k = 0; k < 4; k++) {
-      const A = { x: corners[k][0], z: corners[k][1] }, B = { x: corners[k + 1][0], z: corners[k + 1][1] }, n = Math.min(320, Math.max(40, Math.round(Math.hypot(B.x - A.x, B.z - A.z) / 6)));
+    for (let k = 0; k < corners.length - 1; k++) {
+      const A = { x: corners[k][0], z: corners[k][1] }, B = { x: corners[k + 1][0], z: corners[k + 1][1] }, n = Math.min(320, Math.max(D.poly ? 4 : 40, Math.round(Math.hypot(B.x - A.x, B.z - A.z) / 6)));
       const m = wallMesh(this, sampleLine(this, this.U, A, B, n), this.bottom, e); this.root.add(m); this.sideWalls.push(m);
     }
     if (this.sidesMesh) this.sidesMesh.visible = false;
@@ -1231,7 +1254,7 @@ export class World {
   }
   // flooded paddies at planting (needs Field Boundaries), straw stacks by the houses after the harvest
   async farmUpdate(fields) {
-    const RF = this._rf || (this._rf = await import('./ricefield.js?v=91')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
+    const RF = this._rf || (this._rf = await import('./ricefield.js?v=92')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
     for (const k of ['paddyMesh', 'hayMesh']) if (this[k]) { this.root.remove(this[k]); this[k].geometry.dispose(); this[k].material.dispose(); this[k] = null; }
     const F = this._farmFields || this.fields; if (this.seasonKey === 'planting' && F && F.length) { this.paddyMesh = RF.paddyWater(this, F); if (this.paddyMesh) this.root.add(this.paddyMesh); }
     if (this.seasonKey === 'harvested') { this.hayMesh = RF.hayStacks(this); if (this.hayMesh) this.root.add(this.hayMesh); }

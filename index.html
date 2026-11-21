@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=91">
+<link rel="stylesheet" href="css/app.css?v=92">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -36,13 +36,14 @@
     </div>
     <label class="lbl">Area of interest</label>
     <div class="seg" id="aoiMode">
-      <button data-v="tap" class="on">Tap to place</button><button data-v="box">Draw box</button>
+      <button data-v="tap" class="on">Tap to place</button><button data-v="box">Draw box</button><button data-v="poly">Draw polygon</button><button data-v="commune">Commune</button>
     </div>
     <div class="row">
       <span>Square size</span>
       <select id="aoiSize"><option value="0.5">0.5 km</option><option value="1">1 km</option><option value="2" selected>2 km</option><option value="3">3 km</option><option value="4">4 km</option></select>
     </div>
     <div id="aoiInfo" class="info">Tap the map to place an area.</div>
+    <div class="row" id="polyBtns" hidden><button id="polyUndo">↶ Undo point</button><button id="polyDone" class="primary" style="margin:0">✔ Finish polygon</button><button id="polyClear">✕</button></div>
     <button id="build" class="primary" disabled>Build 3D landscape ▶</button>
     <button id="return3d" class="primary" hidden style="background:#2a6f4f">Return to 3D view ▶</button>
     <div class="legend">
@@ -574,6 +575,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=91"></script>
+<script type="module" src="js/app.js?v=92"></script>
 </body>
 </html>
