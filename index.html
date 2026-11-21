@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=94">
+<link rel="stylesheet" href="css/app.css?v=95">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -124,6 +124,8 @@
         <label><input type="checkbox" data-k="detail" checked><span>🌾 Ground detail &amp; grass</span></label>
         <label><input type="checkbox" data-k="shadows" checked><span>🌗 Shadows</span></label>
         <label><input type="checkbox" data-k="reflect" checked><span>💧 Water reflections</span></label>
+        <label title="Soft glow around the sun and lights, warmer light and richer colours, like a film or a game"><input type="checkbox" id="lookOn" checked><span>🎬 Cinematic look</span></label>
+        <label title="Soft dark shading where walls meet the ground, under roofs and trees. Needs a good graphics card."><input type="checkbox" id="aoOn"><span>🌑 Contact shadows (ambient occlusion)</span></label>
       </div>
       <div id="resultSec" hidden><label class="lbl">Result layers</label><div id="resultList"></div><p class="tip">Maps made by the apps stay here after you close them. They also appear in 🗂️ Layers.</p></div>
     </section>
@@ -574,6 +576,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=94"></script>
+<script type="module" src="js/app.js?v=95"></script>
 </body>
 </html>

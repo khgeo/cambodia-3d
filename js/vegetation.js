@@ -1,17 +1,37 @@
 // Trees (leafy species, sugar & coconut palms, bushes) placed from imagery canopy, and a near-camera
 // field of grass, rice and forest understory that follows the viewer.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=94';
-import { mulberry32 } from './geo.js?v=94';
-import { makeGrassMaterial } from './shaders.js?v=94';
-import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=94';
-import { FARM, riceHill, sennaGeo, bananaGeo, lilyGeo } from './ricefield.js?v=94';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=95';
+import { mulberry32 } from './geo.js?v=95';
+import { makeGrassMaterial } from './shaders.js?v=95';
+import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=95';
+import { FARM, riceHill, sennaGeo, bananaGeo, lilyGeo } from './ricefield.js?v=95';
 
 let TEX = null;
 const texs = () => TEX || (TEX = foliageTextures());
+export const WIND = { value: 0 }; // time for the wind, set by the world each frame
+// leaves and fronds sway in the wind: more at the top of the plant, each plant in its own rhythm (shadows sway with them)
+function windy(m, key) {
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uWind = WIND;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float uWind;').replace('#include <begin_vertex>', `#include <begin_vertex>
+#ifdef USE_INSTANCING
+vec3 wp = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
+#else
+vec3 wp = vec3(0.0);
+#endif
+float wh = max(position.y, 0.0), wph = wp.x * 0.11 + wp.z * 0.07;
+float gust = 0.6 + 0.4 * sin(uWind * 0.35 + wp.x * 0.004);
+transformed.x += (sin(uWind * 1.3 + wph) * 0.025 + sin(uWind * 3.7 + position.x * 2.1 + wph) * 0.012) * wh * gust;
+transformed.z += (sin(uWind * 1.1 + wph * 1.3) * 0.018 + cos(uWind * 3.3 + position.z * 2.3 + wph) * 0.01) * wh * gust;
+transformed.y += sin(uWind * 4.1 + position.x * 3.0 + wph) * 0.008 * wh * gust;`);
+  };
+  m.customProgramCacheKey = () => key;
+  return m;
+}
 function leafMat(map) {
-  const m = new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true, roughness: 0.85 });
-  m.userData.depth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.5 });
+  const m = windy(new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, vertexColors: true, roughness: 0.85 }), 'leaf-wind');
+  m.userData.depth = windy(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.5 }), 'leaf-wind-depth');
   return m;
 }
 const solidMat = (side = THREE.FrontSide) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, side });
@@ -71,7 +91,7 @@ export function instTrees(L, ctx) {
     sugarA: { solidDS: sugarPalmGeo(1) }, sugarB: { solidDS: sugarPalmGeo(2) }, coco: { solidDS: coconut() },
   };
   const meshes = [], d = new THREE.Object3D(), col = new THREE.Color(), ref = new THREE.Color(0x4f7d32);
-  const lm = leafMat(T.leaf), sm = solidMat(), sds = solidMat(THREE.DoubleSide), cm = solidMat();
+  const lm = leafMat(T.leaf), sm = solidMat(), sds = windy(solidMat(THREE.DoubleSide), 'palm-wind'), cm = solidMat();
   for (const [kind, list] of Object.entries(L)) {
     if (!list || !list.length) continue;
     const g = kinds[kind], parts = [], tint = [];
@@ -141,11 +161,37 @@ export class GrassField {
     const vm = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, side: THREE.DoubleSide });
     const ex = (geo, N) => ({ parts: [mk(geo, vm, N)], cap: N }); this.extra = { senna: ex(sennaGeo(), Math.ceil(260 * sc)), banana: ex(bananaGeo(), Math.ceil(160 * sc)), lily: ex(lilyGeo(), Math.ceil(220 * sc)) };
     for (const k in this.extra) this.extra[k].parts[0].castShadow = k !== 'lily';
-    this.center = new THREE.Vector3(1e9, 0, 1e9);
+    this.nearParts = this.group.children.slice();
+    // far grass: bigger, simpler clumps from the edge of the near grass out to ~140 m, so fields and verges look full from the air too
+    this.NF = mobile ? 7000 : 24000; this.RF = mobile ? 85 : 140;
+    this.far = new THREE.InstancedMesh(bladeTuft(5, 0.4, 0.05, 0.4, 5, 0x5f7f36, 0xc8d888), mat, this.NF);
+    this.far.count = 0; this.far.frustumCulled = false; this.far.receiveShadow = true; this.group.add(this.far);
+    this.center = new THREE.Vector3(1e9, 0, 1e9); this.farCenter = new THREE.Vector3(1e9, 0, 1e9);
+  }
+  updateFar(target) {
+    this.farCenter.copy(target);
+    const { X0, Z0, W, H, C, gw, gh, cls, splatRice, mask, mw, mh, MR, pxAt, hAt } = this.ctx, FM = FARM.mask;
+    const hash = (i, j) => { const h = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return h - Math.floor(h); };
+    const R0 = Math.min(48, Math.sqrt(this.N * 0.16 / Math.PI)) * 0.75, RF = this.RF, sp = 1.15, d = new THREE.Object3D(), col = new THREE.Color();
+    let n = 0;
+    for (let j = Math.floor((target.z - RF) / sp); j <= Math.ceil((target.z + RF) / sp) && n < this.NF; j++) for (let i = Math.floor((target.x - RF) / sp); i <= Math.ceil((target.x + RF) / sp) && n < this.NF; i++) {
+      const rx = i * sp + (hash(i + 7, j) - .5) * sp, rz = j * sp + (hash(i, j + 7) - .5) * sp, r = Math.hypot(rx - target.x, rz - target.z);
+      if (r > RF || r < R0 || rx <= X0 || rz <= Z0 || rx >= X0 + W || rz >= Z0 + H) continue;
+      if (mask[Math.min(mh - 1, ((rz - Z0) / MR) | 0) * mw + Math.min(mw - 1, ((rx - X0) / MR) | 0)]) continue;
+      const ci = Math.min(gw - 1, ((rx - X0) / C) | 0), cj = Math.min(gh - 1, ((rz - Z0) / C) | 0), k = cls[cj * gw + ci];
+      if (FM ? FM.at(rx, rz) : (k === 3 && splatRice[cj * gw + ci] > 0)) continue; // rice fields: the ground texture shows the rice from afar
+      const hs = hash(i, j), dens = k === 3 ? 0.7 : k === 2 ? 0.3 : k === 4 ? 0.06 : k === 5 ? 0.08 : 0.18; if (hs > dens) continue;
+      const fin = Math.min(1, (r - R0) / 8), fout = Math.min(1, (RF - r) / (RF * 0.35)); // fade in after the near grass, shrink away at the far edge
+      d.position.set(rx, hAt(rx, rz) - 0.03, rz); d.rotation.set(0, hs * 40, 0); d.scale.setScalar((1.1 + hash(i + 3, j) * 0.9) * fin * fout * 1.6); d.updateMatrix(); this.far.setMatrixAt(n, d.matrix);
+      const [cr, cg, cb] = pxAt(rx, rz); col.setRGB(cr / 255, cg / 255, cb / 255, THREE.SRGBColorSpace).multiplyScalar(2.0).lerp(GRASS, 0.3); this.far.setColorAt(n, col); n++;
+    }
+    this.far.count = n; this.far.instanceMatrix.needsUpdate = true; if (this.far.instanceColor) this.far.instanceColor.needsUpdate = true;
   }
   update(target, camDist) {
-    const show = camDist < 260; this.group.visible = show; if (!show) return;
-    if (target.distanceTo(this.center) < 5) return;
+    const show = camDist < 650, near = camDist < 260; this.group.visible = show; if (!show) return;
+    for (const m of this.nearParts) m.visible = near;
+    if (target.distanceTo(this.farCenter) > 12) this.updateFar(target);
+    if (!near || target.distanceTo(this.center) < 5) return;
     this.center.copy(target);
     const { X0, Z0, W, H, C, gw, gh, cls, splatRice, mask, mw, mh, MR, pxAt, hAt } = this.ctx;
     const R = Math.min(48, Math.sqrt(this.N * 0.16 / Math.PI)), d = new THREE.Object3D(), col = new THREE.Color();
