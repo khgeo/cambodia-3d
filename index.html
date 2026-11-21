@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=92">
+<link rel="stylesheet" href="css/app.css?v=93">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -121,6 +121,8 @@
         <label><input type="checkbox" data-k="buildings" checked><span>🏢 Buildings</span></label>
         <label title="Village houses placed where the image shows built-up land next to a road and OpenStreetMap has no buildings"><input type="checkbox" data-k="houses" checked><span>🏠 Houses from image</span></label>
         <label><input type="checkbox" data-k="traffic" checked><span>🚗 Traffic &amp; people</span></label>
+        <div class="seg" id="quality" title="Fast: lighter for phones and older laptops · Best: sharpest, needs a good graphics card"><button data-v="fast">⚡ Fast</button><button data-v="balanced">⚖ Balanced</button><button data-v="best">✨ Best</button></div>
+        <label title="When you look at a place beyond the edge of the 3D area, the 3D landscape is built again around it"><input type="checkbox" id="autoStream" checked><span>🧭 Follow me: build 3D where I go</span></label>
         <label title="The 3D area at its real place on Earth, with satellite imagery around it to the horizon and the whole planet when you zoom out. Untick to see the area alone."><input type="checkbox" data-k="earth" checked><span>🌍 Earth around the area</span></label>
         <label><input type="checkbox" data-k="detail" checked><span>🌾 Ground detail &amp; grass</span></label>
         <label><input type="checkbox" data-k="shadows" checked><span>🌗 Shadows</span></label>
@@ -289,8 +291,9 @@
   <div id="globePanel" class="rpanel" hidden>
     <div class="row lphead"><b>🌍 Whole Earth</b><span id="globeHint" class="hint"></span><button id="globeMin" title="Hide / show">▴</button></div>
     <div id="globeContent">
+      <div class="row"><input id="gq" type="search" placeholder="🔎 Search a place in Cambodia…" autocomplete="off" style="flex:1"></div><div id="gres" class="results"></div>
       <div class="row"><button id="globeBack" class="primary" style="margin:0">⤵ Back to my 3D area</button></div>
-      <div class="svhelp">Drag to turn the Earth, wheel to zoom. Zoom right down onto your area to go back into it.</div>
+      <div class="svhelp">Drag to turn the Earth, wheel to zoom. Zoom down anywhere (below about 8 km) and the 3D landscape is built there. Move on and it follows you.</div>
       <div class="gchk">
         <label><input type="checkbox" data-g="night" checked> 🌗 Day &amp; night (real sun now)</label>
         <label><input type="checkbox" data-g="clouds" checked> ☁️ Clouds (live, satellites)</label>
@@ -575,6 +578,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=92"></script>
+<script type="module" src="js/app.js?v=93"></script>
 </body>
 </html>

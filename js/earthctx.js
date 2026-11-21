@@ -88,12 +88,12 @@ export class EarthContext {
     return { m, t, z, ready: false, busy: false, used: 0, ctr: new THREE.Vector3(...ctr), half: 40075016 * Math.cos(c[1] * D2R) / 2 ** z * 0.72, x, y, P0: P(la0, lo0), P1: P(la1, lo1) };
   }
   tiles(cam) {
-    const w = this.w, D = w.D, F = w.F, now = ++this.tick, want = [], pos = cam.position, maxZ = 18;
+    const w = this.w, D = w.D, F = w.F, now = ++this.tick, want = [], pos = cam.position, maxZ = this.maxZ || 18, budget = this.budget || 520; // quality setting
     const inside = T => D && Math.min(T.P0[0], T.P1[0]) > D.X0 + 3 && Math.max(T.P0[0], T.P1[0]) < D.X0 + D.W - 3 && Math.min(T.P0[2], T.P1[2]) > D.Z0 + 3 && Math.max(T.P0[2], T.P1[2]) < D.Z0 + D.H - 3;
     const get = (z, x, y) => { const k = z + '/' + x + '/' + y; let T = this.T.get(k); if (!T) { T = this.tileMesh(z, x, y); this.T.set(k, T); this.group.add(T.m); } return T; };
     const walk = (z, x, y) => { const T = get(z, x, y); T.used = now; if (z > 12 && inside(T)) return;
       const d = Math.max(1, T.ctr.distanceTo(pos) - T.half), size = T.half / 0.72;
-      if (z < maxZ && size / d > 0.62 && want.length < 520) { for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) walk(z + 1, 2 * x + dx, 2 * y + dy); }
+      if (z < maxZ && size / d > 0.62 && want.length < budget) { for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) walk(z + 1, 2 * x + dx, 2 * y + dy); }
       else want.push(T); };
     // roots: z9 tiles over ±300 km of the area
     const z0 = 9, dLat = 300e3 / 110574, dLon = 300e3 / (111320 * Math.cos(F.lat0 * D2R));
