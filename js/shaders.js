@@ -130,9 +130,8 @@ export function makeTerrainMaterial(map, u) {
       .replace('#include <project_vertex>', '#include <project_vertex>\nvWT = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vWT; uniform sampler2D uSplat, uGrass, uRice, uSoil, uGravel; uniform vec4 uGrid; uniform vec2 uTexel; uniform float uDetailOn; uniform vec4 uSeason; uniform sampler2D uPoly; uniform float uPolyOn; uniform vec4 uPolyG;`)
+varying vec3 vWT; uniform sampler2D uSplat, uGrass, uRice, uSoil, uGravel; uniform vec4 uGrid; uniform vec2 uTexel; uniform float uDetailOn; uniform vec4 uSeason;`)
       .replace('#include <map_fragment>', `
-if (uPolyOn > 0.5 && texture2D(uPoly, vec2((vWT.x - uPolyG.x) / uPolyG.z, (vWT.z - uPolyG.y) / uPolyG.w)).r < 0.5) discard; // outside a polygon area
 vec4 sat = texture2D(map, vMapUv);
 vec3 col = sat.rgb;
 float dist = length(vWT - cameraPosition);
@@ -164,7 +163,7 @@ if (k > 0.002) {
 }
 diffuseColor.rgb *= col;`);
   };
-  m.customProgramCacheKey = () => 'terrain-v5';
+  m.customProgramCacheKey = () => 'terrain-v4';
   return m;
 }
 
@@ -178,9 +177,8 @@ export function makeWaterMaterial(normalMap, u) {
       .replace('#include <project_vertex>', '#include <project_vertex>\nvWW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vWW; uniform sampler2D uHgt, uImg, uRefl; uniform vec4 uGrid, uImgA; uniform float uTime, uReflOn; uniform mat4 uTexMat; uniform sampler2D uPoly; uniform float uPolyOn; uniform vec4 uPolyG;`)
+varying vec3 vWW; uniform sampler2D uHgt, uImg, uRefl; uniform vec4 uGrid, uImgA; uniform float uTime, uReflOn; uniform mat4 uTexMat;`)
       .replace('#include <map_fragment>', `
-if (uPolyOn > 0.5 && texture2D(uPoly, vec2((vWW.x - uPolyG.x) / uPolyG.z, (vWW.z - uPolyG.y) / uPolyG.w)).r < 0.5) discard; // outside a polygon area
 vec2 suv = vec2((vWW.x - uGrid.x) / uGrid.z, (vWW.z - uGrid.y) / uGrid.w);
 float depth = vWW.y - texture2D(uHgt, suv).r;
 vec3 img = texture2D(uImg, vec2(uImgA.x * vWW.x + uImgA.y, uImgA.z * vWW.z + uImgA.w)).rgb;
@@ -201,7 +199,7 @@ col += vec3(0.22) * foam;
 diffuseColor.rgb = col * (1.0 - reflK);`)
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += reflAdd;');
   };
-  m.customProgramCacheKey = () => 'water-v5';
+  m.customProgramCacheKey = () => 'water-v4';
   return m;
 }
 
