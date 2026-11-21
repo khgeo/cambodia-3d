@@ -72,35 +72,35 @@ function moonPhase(g, x, y, r, ph, waxing) {
 }
 /* all-sky horizon chart (zenith in the centre, north up, east LEFT – as you see the sky lying on your back) */
 export function drawChart(cv, S, lat, lon, date, o = {}) {
-  const g = cv.getContext('2d'), W = cv.width, H = cv.height, R = Math.min(W, H) / 2 - 34, cx = W / 2, cy = H / 2 + 6, sky = skyNow(S, lat, lon, date), lang = o.lang || 'both';
+  const u = o.px || 1, few = !!o.small, g = cv.getContext('2d'), W = cv.width, H = cv.height, R = Math.min(W, H) / 2 - (few ? 24 : 34) * u, cx = W / 2, cy = H / 2 + 6 * u, sky = skyNow(S, lat, lon, date), lang = o.lang || 'both';
   const P = (alt, az) => { const r = R * Math.tan((90 - alt) * D2R / 2) / Math.tan(45 * D2R); return [cx - Math.sin(az * D2R) * r, cy - Math.cos(az * D2R) * r]; };
   const sunAlt = sky.body.Sun.alt, night = sunAlt < -12, twi = Math.max(0, Math.min(1, (sunAlt + 18) / 24));
   g.fillStyle = '#0b1220'; g.fillRect(0, 0, W, H);
   const bg = g.createRadialGradient(cx, cy, 0, cx, cy, R); bg.addColorStop(0, `rgb(${10 + 60 * twi},${18 + 80 * twi},${40 + 120 * twi})`); bg.addColorStop(1, `rgb(${20 + 90 * twi},${30 + 100 * twi},${60 + 120 * twi})`);
   g.save(); g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fillStyle = bg; g.fill(); g.clip();
   // grid: altitude 30/60, azimuth every 45°
-  g.strokeStyle = 'rgba(140,170,210,.18)'; g.lineWidth = 1; for (const a of [30, 60]) { g.beginPath(); for (let az = 0; az <= 360; az += 3) { const [x, y] = P(a, az); az ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
+  g.strokeStyle = 'rgba(140,170,210,.18)'; g.lineWidth = u; for (const a of [30, 60]) { g.beginPath(); for (let az = 0; az <= 360; az += 3) { const [x, y] = P(a, az); az ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
   for (let az = 0; az < 360; az += 45) { const [x, y] = P(0, az); g.beginPath(); g.moveTo(cx, cy); g.lineTo(x, y); g.stroke(); }
   // constellation lines
-  g.strokeStyle = 'rgba(120,170,255,.45)'; g.lineWidth = 1.1;
+  g.strokeStyle = 'rgba(120,170,255,.5)'; g.lineWidth = 1.1 * u;
   for (const segs of Object.values(S.lines)) for (const seg of segs) { g.beginPath(); let started = false; for (const [ra, dec] of seg) { const [alt, az] = sky.hor(ra, dec); if (alt < -2) { started = false; continue; } const [x, y] = P(alt, az); started ? g.lineTo(x, y) : g.moveTo(x, y); started = true; } g.stroke(); }
   // stars
   const lim = o.maglim || 5.5;
-  for (const s of sky.stars) { if (s.alt < 0 || s.mag > lim) continue; const [x, y] = P(s.alt, s.az), r = Math.max(0.6, (lim + 1 - s.mag) * 0.75), [cr, cg, cb] = bvColor(s.bv); g.fillStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${night ? 1 : 0.45 + 0.55 * (1 - twi)})`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  for (const s of sky.stars) { if (s.alt < 0 || s.mag > lim) continue; const [x, y] = P(s.alt, s.az), r = Math.max(0.6, (lim + 1 - s.mag) * 0.75) * u, [cr, cg, cb] = bvColor(s.bv); g.fillStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},${night ? 1 : 0.45 + 0.55 * (1 - twi)})`; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
   // star names (brightest) and constellation names
-  g.font = '11px system-ui'; g.fillStyle = 'rgba(220,230,255,.85)'; for (const s of sky.stars) { const nm = S.names[s.id]; if (!nm || s.alt < 5 || s.mag > 2.2) continue; const [x, y] = P(s.alt, s.az); g.fillText(nm, x + 5, y - 4); }
-  g.font = '600 11.5px "Noto Sans Khmer", system-ui'; g.textAlign = 'center';
-  for (const [id, en, ra, dec, rank] of S.cons) { if (rank > 2 && !S.km[id]) continue; const [alt, az] = sky.hor(ra, dec); if (alt < 8) continue; const [x, y] = P(alt, az), k = S.km[id]; g.fillStyle = k ? 'rgba(255,214,120,.95)' : 'rgba(150,190,255,.8)'; g.fillText(lang === 'km' && k ? k : lang === 'both' && k ? `${k} · ${en}` : en, x, y); }
+  g.font = `${11 * u}px system-ui`; g.fillStyle = 'rgba(220,230,255,.85)'; for (const s of sky.stars) { const nm = S.names[s.id]; if (!nm || s.alt < 5 || s.mag > (few ? 0.9 : 2.2)) continue; const [x, y] = P(s.alt, s.az); g.fillText(nm, x + 5 * u, y - 4 * u); }
+  g.font = `600 ${11.5 * u}px "Noto Sans Khmer", system-ui`; g.textAlign = 'center';
+  for (const [id, en, ra, dec, rank] of S.cons) { if (few ? rank > 1 : (rank > 2 && !S.km[id])) continue; const [alt, az] = sky.hor(ra, dec); if (alt < 8) continue; const [x, y] = P(alt, az), k = S.km[id]; g.fillStyle = k ? 'rgba(255,214,120,.95)' : 'rgba(150,190,255,.8)'; g.fillText(lang === 'km' && k ? k : lang === 'both' && k && !few ? `${k} · ${en}` : (few && lang !== 'en' && k ? k : en), x, y); }
   // Moon and planets (Sun if above the horizon)
   for (const [k, b] of Object.entries(sky.body)) { if (b.alt < 0) continue; const [x, y] = P(b.alt, b.az), col = { Sun: '#ffd84a', Moon: '#f4f1e6', Mars: '#ff7a4a', Venus: '#fff6c9', Jupiter: '#ffe2b0', Saturn: '#f0d58a', Mercury: '#d8cfc0' }[k] || '#cde';
-    const r = k === 'Sun' ? 11 : k === 'Moon' ? 9 : Math.max(3, 5 - b.mag * 0.8); g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+    const r = (k === 'Sun' ? 11 : k === 'Moon' ? 9 : Math.max(3, 5 - b.mag * 0.8)) * u; g.fillStyle = col; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
     if (k === 'Moon') moonPhase(g, x, y, r, b.phase, b.waxing);
-    g.font = '600 12px "Noto Sans Khmer", system-ui'; g.textAlign = 'left'; g.fillStyle = col; g.fillText(lang === 'km' ? BODY_KM[k] : lang === 'both' ? `${BODY_KM[k]} ${k}` : k, x + r + 4, y + 4); }
+    g.font = `600 ${12 * u}px "Noto Sans Khmer", system-ui`; g.textAlign = 'left'; g.fillStyle = col; g.fillText(lang === 'km' ? BODY_KM[k] : lang === 'both' && !few ? `${BODY_KM[k]} ${k}` : k, x + r + 4 * u, y + 4 * u); }
   g.restore();
   // horizon ring and directions
-  g.strokeStyle = '#7f95ad'; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.stroke();
-  const DIRS = lang === 'en' ? ['N', 'E', 'S', 'W'] : lang === 'km' ? ['ជើង', 'កើត', 'ត្បូង', 'លិច'] : ['ជើង N', 'កើត E', 'ត្បូង S', 'លិច W'];
-  g.font = '700 14px "Noto Sans Khmer", system-ui'; g.fillStyle = '#ffd27a'; g.textAlign = 'center'; g.textBaseline = 'middle'; [0, 90, 180, 270].forEach((az, k) => { const [x, y] = P(-9, az); g.fillText(DIRS[k], x, y); });
+  g.strokeStyle = '#7f95ad'; g.lineWidth = 2 * u; g.beginPath(); g.arc(cx, cy, R, 0, 7); g.stroke();
+  const DIRS = lang === 'en' || (few && lang !== 'km') ? ['N', 'E', 'S', 'W'] : lang === 'km' ? ['ជើង', 'កើត', 'ត្បូង', 'លិច'] : ['ជើង N', 'កើត E', 'ត្បូង S', 'លិច W'];
+  g.font = `700 ${14 * u}px "Noto Sans Khmer", system-ui`; g.fillStyle = '#ffd27a'; g.textAlign = 'center'; g.textBaseline = 'middle'; [0, 90, 180, 270].forEach((az, k) => { const [x, y] = P(few ? -5.5 : -9, az); g.fillText(DIRS[k], x, y); });
   g.textBaseline = 'alphabetic';
   return sky;
 }

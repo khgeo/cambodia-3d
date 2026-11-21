@@ -1,7 +1,7 @@
 // Rice SOS Mapper (port of the Rice SOS Mapper 2.1 QGIS plugin): rice planting date / start of season from the
 // Sentinel-1 VH time series in Google Earth Engine (RIICE convention: each rice pixel's class is the S1 date on
 // which its season started). Same detection rule and defaults as the plugin.
-import { evaluate } from './gee.js?v=89';
+import { evaluate } from './gee.js?v=90';
 
 export const DEFAULTS = { orbit: 'DESCENDING', min_grow_days: 30, post_days: 110, smooth_days: 7, near_days: 18, flood_db: -19, rise_db: 5, peak_db: -18.5, scale: 20, mask_worldcover: true, mask_water: true, mask_slope: true, cleanup_m: 0, mmu_px: 0 };
 const RAMP = ['ff00ff', '9900ff', '2200ff', '0055aa', '009966', '00dd33', '99ff00', 'ffff00', 'ff9900', 'ff0000'];

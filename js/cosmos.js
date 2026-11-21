@@ -5,9 +5,9 @@
 // directions and distances. The Milky Way, the other galaxies' shapes and the cosmic web are illustrations.
 // Frame: equatorial J2000 with y = celestial north (the globe's frame turned by the sidereal time).
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=89';
-import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=89';
-import { loadConArt, buildConstellations } from './conart.js?v=89';
+import { t, lang } from './i18n.js?v=90';
+import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=90';
+import { loadConArt, buildConstellations } from './conart.js?v=90';
 
 const D2R = Math.PI / 180, AU = 1.495978707e8, LY = 9.4607e12, ER = 6371, OBL = 23.43928 * D2R;
 const rev = x => ((x % 360) + 360) % 360;

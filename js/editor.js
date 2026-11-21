@@ -2,9 +2,9 @@
 // Features are kept in lon/lat in this browser (localStorage), rebuilt whenever the scene is rebuilt,
 // drivable (new roads join the Drive network) and exportable / importable as GeoJSON.
 import * as THREE from 'three';
-import { RoadNet } from './modes.js?v=89';
-import { instTrees } from './vegetation.js?v=89';
-import { makeBuildingMaterial } from './shaders.js?v=89';
+import { RoadNet } from './modes.js?v=90';
+import { instTrees } from './vegetation.js?v=90';
+import { makeBuildingMaterial } from './shaders.js?v=90';
 
 const KEY = 'cambodia3d.edits.v1';
 export const ROAD_TYPES = {

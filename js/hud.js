@@ -42,10 +42,30 @@ export class Hud {
       this.w.teleport(x, z); e.preventDefault(); e.stopPropagation();
     });
   }
+  // Esri imagery tiles at the zoom that fits the window (0.3–4 m per screen pixel), cached; roads drawn on top
+  tiles(ctx, cx, cz, win, winZ, S, T, dpr) {
+    const F = this.w.F; if (!F) return; const lat0 = F.lat(cz), mpp = win / (S * dpr), z = Math.max(10, Math.min(19, Math.round(Math.log2(156543.03 * Math.cos(lat0 * Math.PI / 180) / mpp))));
+    const tx = lon => (lon + 180) / 360 * 2 ** z, ty = lat => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z; };
+    const lonOf = x => x / 2 ** z * 360 - 180, latOf = y => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / 2 ** z))) * 180 / Math.PI;
+    const toPx = (lon, lat) => [(F.x(lon) - (cx - win / 2)) / win * S, (F.z(lat) - (cz - winZ / 2)) / winZ * T];
+    const x0 = Math.floor(tx(F.lon(cx - win / 2))), x1 = Math.floor(tx(F.lon(cx + win / 2))), y0 = Math.floor(ty(F.lat(cz - winZ / 2))), y1 = Math.floor(ty(F.lat(cz + winZ / 2)));
+    if ((x1 - x0 + 1) * (y1 - y0 + 1) > 30) return; const C = this.tc || (this.tc = new Map()); let all = true;
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const k = z + '/' + x + '/' + y; let im = C.get(k);
+      if (!im) { im = new Image(); im.crossOrigin = 'anonymous'; im.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`; C.set(k, im); if (C.size > 300) C.delete(C.keys().next().value); }
+      if (!im.complete || !im.naturalWidth) { all = false; continue; }
+      const [ax, ay] = toPx(lonOf(x), latOf(y)), [bx, by] = toPx(lonOf(x + 1), latOf(y + 1)); ctx.drawImage(im, ax, ay, bx - ax + 0.4, by - ay + 0.4); }
+    // roads over the imagery
+    const R = this.w.net && this.w.net.roads; if (!R) return; ctx.lineCap = ctx.lineJoin = 'round';
+    const X0 = cx - win / 2, Z0 = cz - winZ / 2;
+    for (const r of R) { const c = r.cls; ctx.strokeStyle = c <= 4 ? 'rgba(255,154,74,.85)' : c <= 10 ? 'rgba(255,224,138,.8)' : 'rgba(255,255,255,.55)'; ctx.lineWidth = Math.max(1, Math.min(6, (r.hw || 3) * 2 / win * S * 0.6));
+      ctx.beginPath(); let on = false; for (const p of r.pts) { const x = (p.x - X0) / win * S, y = (p.z - Z0) / winZ * T; on ? ctx.lineTo(x, y) : ctx.moveTo(x, y); on = true; } ctx.stroke(); }
+  }
   draw() {
     const w = this.w, h = w.hud, D = w.D, mc = w.miniCanvas;
     if (this.root.hidden || !D || !mc || h.lat === undefined) return;
-    const cv = this.canvas, ctx = cv.getContext('2d'), S = cv.width, T = cv.height;
+    // sharp on hi-DPI screens: draw at the real pixel density, in 260 × 163 drawing units
+    const cv = this.canvas, ctx = cv.getContext('2d'), S = 260, T = 163, dpr = Math.min(3, (cv.clientWidth || S) / S * (window.devicePixelRatio || 1));
+    if (cv.width !== Math.round(S * dpr)) { cv.width = Math.round(S * dpr); cv.height = Math.round(T * dpr); } ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     // window size in metres: whole AOI in orbit view, close-up when walking/driving (tap ⊕ to change)
     const auto = h.mode === 'walk' ? 260 : h.mode === 'drive' ? 700 : Math.max(D.W, D.H) * 1.2;
     const win = [auto, 200, 600, Math.max(D.W, D.H) * 1.6][this.zoom];
@@ -54,6 +74,7 @@ export class Hud {
     ctx.fillStyle = '#26303a'; ctx.fillRect(0, 0, S, T);
     const k = mc.width / D.W, sx = (cx - win / 2 - D.X0) * k, sy = (cz - winZ / 2 - D.Z0) * (mc.height / D.H);
     ctx.drawImage(mc, sx, sy, win * k, winZ * (mc.height / D.H), 0, 0, S, T);
+    this.tiles(ctx, cx, cz, win, winZ, S, T, dpr); // full-resolution satellite tiles over it, with the roads
     const toPx = (x, z) => [(x - (cx - win / 2)) / win * S, (z - (cz - winZ / 2)) / winZ * T];
     // view cone + position arrow
     const [px, py] = toPx(h.x, h.z), hd = h.heading * Math.PI / 180, fov = Math.min(1.6, (h.fov || 60) * Math.PI / 180 / 2);
