@@ -29,6 +29,8 @@ export function mgrsParse(txt) { // → { zone, north, E, N } or null
   return { zone, north: bandLat >= 0, E, N };
 }
 
+function blank(im) { try { const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'); g.drawImage(im, 0, 0, 16, 16); const d = g.getImageData(0, 0, 16, 16).data; let grey = 0;
+  for (let i = 0; i < d.length; i += 4) { const r = d[i], gg = d[i + 1], b = d[i + 2]; if (Math.abs(r - gg) < 6 && Math.abs(gg - b) < 6 && r > 185 && r < 235) grey++; } return grey > 200; } catch (e) { return false; } }
 export class Hud {
   constructor(root, world) {
     this.w = world; this.root = root; this.canvas = root.querySelector('canvas'); this.text = root.querySelector('.hudtext');
@@ -42,17 +44,22 @@ export class Hud {
       this.w.teleport(x, z); e.preventDefault(); e.stopPropagation();
     });
   }
+  // Esri's placeholder tile is flat light grey with a little text: nearly all pixels the same grey
+  // (checked on a small copy; needs the tile to be readable, which Esri allows)
+  // eslint-disable-next-line
   // Esri imagery tiles at the zoom that fits the window (0.3–4 m per screen pixel), cached; roads drawn on top
   tiles(ctx, cx, cz, win, winZ, S, T, dpr) {
-    const F = this.w.F; if (!F) return; const lat0 = F.lat(cz), mpp = win / (S * dpr), z = Math.max(10, Math.min(19, Math.round(Math.log2(156543.03 * Math.cos(lat0 * Math.PI / 180) / mpp))));
+    const F = this.w.F; if (!F) return; const lat0 = F.lat(cz), mpp = win / (S * dpr), z = Math.max(10, Math.min(this.maxZ || 19, Math.round(Math.log2(156543.03 * Math.cos(lat0 * Math.PI / 180) / mpp))));
     const tx = lon => (lon + 180) / 360 * 2 ** z, ty = lat => { const r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z; };
     const lonOf = x => x / 2 ** z * 360 - 180, latOf = y => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / 2 ** z))) * 180 / Math.PI;
     const toPx = (lon, lat) => [(F.x(lon) - (cx - win / 2)) / win * S, (F.z(lat) - (cz - winZ / 2)) / winZ * T];
     const x0 = Math.floor(tx(F.lon(cx - win / 2))), x1 = Math.floor(tx(F.lon(cx + win / 2))), y0 = Math.floor(ty(F.lat(cz - winZ / 2))), y1 = Math.floor(ty(F.lat(cz + winZ / 2)));
     if ((x1 - x0 + 1) * (y1 - y0 + 1) > 30) return; const C = this.tc || (this.tc = new Map()); let all = true;
     for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) { const k = z + '/' + x + '/' + y; let im = C.get(k);
-      if (!im) { im = new Image(); im.crossOrigin = 'anonymous'; im.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`; C.set(k, im); if (C.size > 300) C.delete(C.keys().next().value); }
-      if (!im.complete || !im.naturalWidth) { all = false; continue; }
+      if (!im) { im = new Image(); im.crossOrigin = 'anonymous'; const zz = z;
+        im.onload = () => { if (blank(im)) { im.bad = true; this.maxZ = Math.min(this.maxZ || 19, zz - 1); } }; // "Map data not yet available": no imagery this close here
+        im.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`; C.set(k, im); if (C.size > 300) C.delete(C.keys().next().value); }
+      if (!im.complete || !im.naturalWidth || im.bad) { all = false; continue; }
       const [ax, ay] = toPx(lonOf(x), latOf(y)), [bx, by] = toPx(lonOf(x + 1), latOf(y + 1)); ctx.drawImage(im, ax, ay, bx - ax + 0.4, by - ay + 0.4); }
     // roads over the imagery
     const R = this.w.net && this.w.net.roads; if (!R) return; ctx.lineCap = ctx.lineJoin = 'round';

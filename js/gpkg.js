@@ -2,8 +2,8 @@
 // image houses, contours, spot heights, place names, survey points and parcels, your digitized features, the
 // tactical overlay) in EPSG:4326, the satellite image and the 13-class land cover as raster tiles (EPSG:3857),
 // and a QGIS style for each layer saved as its default (layer_styles), so the layers open styled.
-import { LC } from './landcover.js?v=90';
-import { terrainData } from './topomap.js?v=90';
+import { LC } from './landcover.js?v=91';
+import { terrainData } from './topomap.js?v=91';
 
 let SQL = null;
 async function sqljs() {
@@ -145,7 +145,7 @@ export async function exportGeoPackage(world, say = () => {}, opts = {}) {
   // tactical overlay: TacMap symbols (SVG with param() colours) coloured by side
   const tc = world.tactical;
   if (tc && tc.features.length) {
-    const { CAT } = await (await import('./tactical.js?v=90')).loadCatalog(), feats = tc.features.filter(q => tc.inAOI(q)), base = q => ({ code: q.code, side: q.side, label: q.label || '', name_en: CAT.catalog[q.code].en, name_km: CAT.catalog[q.code].km, color: tc.color(q.side, q.code) });
+    const { CAT } = await (await import('./tactical.js?v=91')).loadCatalog(), feats = tc.features.filter(q => tc.inAOI(q)), base = q => ({ code: q.code, side: q.side, label: q.label || '', name_en: CAT.catalog[q.code].en, name_km: CAT.catalog[q.code].km, color: tc.color(q.side, q.code) });
     const svgs = {}; for (const q of feats.filter(q => q.geom === 'point')) if (!svgs[q.code]) { try { svgs[q.code] = btoa(unescape(encodeURIComponent(await (await fetch('tac/svg/' + CAT.catalog[q.code].svg)).text()))); } catch (e) { } }
     const svgSym = c => `<layer class="SvgMarker" enabled="1" pass="0" locked="0">${opt({ name: 'base64:' + svgs[c], size: 7, size_unit: 'MM', color: '255,255,255,255', outline_color: '232,23,61,255', outline_width: 0.6, outline_width_unit: 'MM', vertical_anchor_point: '2' })}${ddColor('outlineColor', 'color')}</layer>`;
     cnt.tacP = layer('tactical_points', 'Tactical symbols', 1, [['code', 'TEXT'], ['side', 'TEXT'], ['label', 'TEXT'], ['name_en', 'TEXT'], ['name_km', 'TEXT'], ['color', 'TEXT'], ['rings_m', 'TEXT'], ['direction_deg', 'REAL']],

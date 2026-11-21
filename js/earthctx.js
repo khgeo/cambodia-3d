@@ -13,6 +13,8 @@ const img = u => new Promise((ok, bad) => { const i = new Image(); i.crossOrigin
 const tx = (lon, z) => (lon + 180) / 360 * 2 ** z, ty = (lat, z) => (1 - Math.log(Math.tan(lat * D2R) + 1 / Math.cos(lat * D2R)) / Math.PI) / 2 * 2 ** z;
 const lonOf = (x, z) => x / 2 ** z * 360 - 180, latOf = (y, z) => Math.atan(Math.sinh(Math.PI * (1 - 2 * y / 2 ** z))) / D2R;
 
+function blank(im) { try { const c = document.createElement('canvas'); c.width = c.height = 16; const g = c.getContext('2d'); g.drawImage(im, 0, 0, 16, 16); const d = g.getImageData(0, 0, 16, 16).data; let n = 0;
+  for (let i = 0; i < d.length; i += 4) { const r = d[i], gg = d[i + 1], b = d[i + 2]; if (Math.abs(r - gg) < 6 && Math.abs(gg - b) < 6 && r > 185 && r < 235) n++; } return n > 200; } catch (e) { return false; } }
 export class EarthContext {
   constructor(w) {
     this.w = w; this.on = true; this.group = new THREE.Group(); this.group.visible = false; w.scene.add(this.group);
@@ -105,7 +107,7 @@ export class EarthContext {
     queue.sort((a, b) => (Math.min(a.z, 10) - Math.min(b.z, 10)) * 1e9 + a.ctr.distanceTo(pos) - b.ctr.distanceTo(pos)); // coarse first so there is never a hole, then nearest
     this.loading = this.loading || 0;
     for (const T of queue) { if (this.loading >= 12) break; if (T.busy || T.failed) continue; T.busy = true; this.loading++;
-      img(ESRI(T.z, T.x, T.y)).then(i => { T.t.image = i; T.t.needsUpdate = true; T.ready = true; }).catch(() => { T.failed = true; }).finally(() => { T.busy = false; this.loading--; }); }
+      img(ESRI(T.z, T.x, T.y)).then(i => { if (blank(i)) { T.failed = true; return; } T.t.image = i; T.t.needsUpdate = true; T.ready = true; }) /* 'Map data not yet available' tiles: keep the parent */.catch(() => { T.failed = true; }).finally(() => { T.busy = false; this.loading--; }); }
     // forget tiles not used for a while
     if (this.T.size > 500) for (const [k, T] of this.T) { if (now - T.used > 40 && !T.busy && T.z > z0) { this.group.remove(T.m); T.m.geometry.dispose(); T.t.dispose(); T.m.material.dispose(); this.T.delete(k); } }
   }
