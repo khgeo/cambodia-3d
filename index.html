@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=97">
+<link rel="stylesheet" href="css/app.css?v=98">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -74,6 +74,7 @@
       <button id="layersBtn" data-cat="explore" data-tip="Layers: pull apart &amp; explore">🗂️</button>
       <button id="navBtn" data-cat="explore" data-tip="3D GPS navigation: routes, turn-by-turn, lanes, traffic-light countdowns">🚘</button>
       <button id="rideBtn" data-cat="explore" data-tip="Indoor ride: pedal your exercise bike (Bluetooth) and ride these roads on the TV">🚴</button>
+      <button id="ghBtn" data-cat="explore" data-tip="Geography in hand: place profile, time machine, what if, rain, access, worksheets, field trip">🎒</button>
       <button id="placeBtn" data-cat="explore" data-tip="Place info: names, photos, details of any place">📍</button>
       <button id="skyBtn" data-cat="explore" data-tip="Night sky: stars, planets &amp; star chart (StarChart)">🌌</button>
       <button id="globeBtn" data-cat="explore" data-tip="Whole Earth: where this area is, live clouds, wind, satellites, flights">🌍</button>
@@ -420,6 +421,74 @@
       <div id="mnLog" class="mnlog"></div>
     </div>
   </div>
+  <div id="ghPanel" class="rpanel gpanel" hidden>
+    <div class="row lphead"><b>🎒 Geography in hand</b><span id="ghHint" class="hint"></span><button id="ghMin" title="Hide / show">▴</button><button id="ghClose" title="Close">✕</button></div>
+    <div>
+      <div class="ghTabs" id="ghTabs"><button data-v="profile" class="on">📋 Place</button><button data-v="time">⏳ Time</button><button data-v="whatif">🌊 What if</button><button data-v="rain">💧 Rain</button><button data-v="access">🚶 Access</button><button data-v="sheet">📝 Worksheet</button><button data-v="trip">📱 Field trip</button></div>
+      <div id="ghStatus" class="svhelp ghStatus"></div>
+      <section data-gh="profile">
+        <div class="svhelp">Tap any place on the 3D landscape: height, slope, land, soil, rock, climate, villages, services and where its rain goes, read for you as a fieldwork sheet.</div>
+        <div id="ghProfOut"></div>
+        <div class="row" id="ghProfBtns" hidden><button id="ghProfPrint">🖨 Print fieldwork sheet</button><button id="ghProfSheet">📝 Worksheet for this place</button></div>
+      </section>
+      <section data-gh="time" hidden>
+        <div class="svhelp">How this area changed: land cover maps every year since 2017 (Esri | Impact Observatory, Sentinel-2) and forest lost each year since 2001 (Hansen Global Forest Change). For the real images of each date use 🕰️ Change detection.</div>
+        <button id="ghTmLoad" class="primary eirun">⏳ Load the story of change</button>
+        <div id="ghTmBox" hidden>
+          <div class="row"><button id="ghTmPlay">▶ Play</button><b id="ghTmYear" class="ghYear">2025</b></div>
+          <input id="ghTmSlider" type="range" min="2001" max="2025" value="2025" step="1" style="width:100%">
+          <div class="seg" id="ghTmMode"><button data-v="both" class="on">Land cover + forest loss</button><button data-v="loss">Forest loss only</button></div>
+          <div class="ghLegend"><span><i style="background:#c4281b"></i>Built area</span><span><i style="background:#e49635"></i>Crops</span><span><i style="background:#397d49"></i>Trees</span><span><i style="background:#419bdf"></i>Water</span><span><i style="background:#e3e2c3"></i>Rangeland</span><span><i style="background:#ff2840"></i>Forest lost by this year</span></div>
+          <div id="ghTmStory" class="ghText"></div><img id="ghTmChart" class="ghChart" alt="">
+        </div>
+      </section>
+      <section data-gh="whatif" hidden>
+        <div class="seg" id="ghWiMode"><button data-v="flood" class="on">🌊 River or lake rises</button><button data-v="rain">🌧️ Heavy rain</button></div>
+        <div id="ghWiFlood"><label>Water rises by <b id="ghWiFv">2</b> m</label><input id="ghWiF" type="range" min="0" max="12" step="0.25" value="2" style="width:100%"></div>
+        <div id="ghWiRain" hidden><label>Rain in one storm: <b id="ghWiRv">150</b> mm</label><input id="ghWiR" type="range" min="50" max="400" step="10" value="150" style="width:100%"></div>
+        <div id="ghWiOut"></div>
+        <div class="svhelp">Simple models on the terrain heights: the flood fills every place lower than the new water level; heavy rain fills the low spots where water cannot drain away. Houses that get wet turn yellow. A first look, not a flood forecast.</div>
+      </section>
+      <section data-gh="rain" hidden>
+        <div class="svhelp">Blue lines: where water collects into streams. Tap any place to drop rain there: watch it run downhill, and see its catchment (all the land that drains to that spot).</div>
+        <div id="ghRainOut"></div>
+      </section>
+      <section data-gh="access" hidden>
+        <div class="gpgrid"><label>To the nearest<select id="ghAcKind"><option value="school">🏫 School</option><option value="health">🏥 Health centre / hospital</option><option value="market">🛒 Market</option><option value="wat">🛕 Wat</option></select></label>
+          <label>Travel by<select id="ghAcMode"><option value="walk">🚶 Walking</option><option value="moto">🛵 Motorbike</option><option value="car">🚗 Car</option></select></label></div>
+        <button id="ghAcRun" class="primary eirun">▶ Show travel time from every house</button>
+        <div id="ghAcOut"></div>
+      </section>
+      <section data-gh="sheet" hidden>
+        <div class="svhelp">A printable worksheet for this area (A4), with a map from above, a 3D view, facts and questions, in the language of the app. Print it or save as PDF for a class without computers.</div>
+        <label>Title<input id="ghShTitle" placeholder="Geography worksheet" style="flex:1"></label>
+        <div class="ghChecks"><label><input type="checkbox" id="ghShPhys" checked> Land and soil</label><label><input type="checkbox" id="ghShLand" checked> Land use and houses</label><label><input type="checkbox" id="ghShWater" checked> Climate, water and floods</label><label><input type="checkbox" id="ghShSett" checked> Villages and services</label><label><input type="checkbox" id="ghShChange"> Change over time (load ⏳ Time first)</label></div>
+        <div class="ghChecks"><label><input type="checkbox" id="ghShFacts" checked> Include a short description</label><label><input type="checkbox" id="ghShKey" checked> Answer key on a separate page</label><label><input type="checkbox" id="ghShHere"> For the place I tapped (📋 Place), not the centre</label></div>
+        <button id="ghShRun" class="primary eirun">📝 Make worksheet</button>
+      </section>
+      <section data-gh="trip" hidden>
+        <div class="ghSub">Teacher: plan the stops</div>
+        <div class="row"><button id="ghTrAdd">➕ Add a stop (tap the map)</button><button id="ghTrLink">🔗 Copy trip link</button></div>
+        <div id="ghTrForm" hidden><input id="ghTrTitle" placeholder="Stop name, e.g. Rice fields by the canal" style="width:100%;margin-bottom:4px"><textarea id="ghTrTask" rows="2" placeholder="Task for the students, e.g. What is the land used for? Take a photo." style="width:100%"></textarea><div class="row"><button id="ghTrSave" class="primary">Save stop</button><button id="ghTrCancel">Cancel</button></div></div>
+        <div id="ghTrStops" class="ghList"></div>
+        <div class="ghSub">Students: on the field trip</div>
+        <div class="row"><button id="ghTrGps" class="primary">📡 Start GPS</button><label><input type="checkbox" id="ghTrFollow" checked> Follow me</label></div>
+        <div class="row"><button id="ghTrSim">🧪 Practise: tap the map to stand there</button></div>
+        <div id="ghTrMe" class="svhelp"></div>
+        <div id="ghTrCard" class="ghCard" hidden></div>
+        <div id="ghTrObsForm">
+          <label>Your name<input id="ghTrWho" style="flex:1"></label>
+          <label>What is here?<select id="ghTrLu" style="flex:1"><option value="rice">🌾 Rice field</option><option value="trees">🌳 Trees / forest</option><option value="houses">🏠 Houses / village</option><option value="water">💧 Water</option><option value="bare">🟫 Bare soil</option><option value="road">🛣️ Road</option><option value="other">❓ Other</option></select></label>
+          <textarea id="ghTrNote" rows="2" placeholder="What do you see?" style="width:100%"></textarea>
+          <label>📷 Photo<input id="ghTrPhoto" type="file" accept="image/*" capture="environment"></label>
+          <button id="ghTrRec" class="primary eirun">💾 Save observation here</button>
+        </div>
+        <div id="ghTrObs" class="svhelp"></div>
+        <div class="row"><button id="ghTrExport">⬇ Export (GeoJSON)</button><button id="ghTrImport">⬆ Import class files</button><button id="ghTrClear">🗑 Clear</button></div>
+        <input id="ghTrFile" type="file" accept=".geojson,.json,application/geo+json" multiple hidden>
+      </section>
+    </div>
+  </div>
   <div id="urbanPanel" class="rpanel gpanel" hidden>
     <div class="row lphead"><b>🏙️ Urban Analytics</b><span id="uaHint" class="hint"></span><button id="uaMin" title="Hide / show">▴</button><button id="uaClose" title="Close">✕</button></div>
     <div>
@@ -577,6 +646,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=97"></script>
+<script type="module" src="js/app.js?v=98"></script>
 </body>
 </html>
