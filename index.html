@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=100">
+<link rel="stylesheet" href="css/app.css?v=102">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -74,7 +74,7 @@
       <button id="layersBtn" data-cat="explore" data-tip="Layers: pull apart &amp; explore">🗂️</button>
       <button id="navBtn" data-cat="explore" data-tip="3D GPS navigation: routes, turn-by-turn, lanes, traffic-light countdowns">🚘</button>
       <button id="rideBtn" data-cat="explore" data-tip="Indoor ride: pedal your exercise bike (Bluetooth) and ride these roads on the TV">🚴</button>
-      <button id="ghBtn" data-cat="explore" data-tip="Geography in hand: place profile, time machine, what if, rain, access, worksheets, field trip">🎒</button>
+      <button id="ghBtn" data-cat="explore" data-tip="Geography in hand: place profile, time machine, what if, rain, access, area report, field trip">🎒</button>
       <button id="placeBtn" data-cat="explore" data-tip="Place info: names, photos, details of any place">📍</button>
       <button id="skyBtn" data-cat="explore" data-tip="Night sky: stars, planets &amp; star chart (StarChart)">🌌</button>
       <button id="globeBtn" data-cat="explore" data-tip="Whole Earth: where this area is, live clouds, wind, satellites, flights">🌍</button>
@@ -424,12 +424,12 @@
   <div id="ghPanel" class="rpanel gpanel" hidden>
     <div class="row lphead"><b>🎒 Geography in hand</b><span id="ghHint" class="hint"></span><button id="ghMin" title="Hide / show">▴</button><button id="ghClose" title="Close">✕</button></div>
     <div>
-      <div class="ghTabs" id="ghTabs"><button data-v="profile" class="on">📋 Place</button><button data-v="time">⏳ Time</button><button data-v="whatif">🌊 What if</button><button data-v="rain">💧 Rain</button><button data-v="access">🚶 Access</button><button data-v="sheet">📝 Worksheet</button><button data-v="trip">📱 Field trip</button></div>
+      <div class="ghTabs" id="ghTabs"><button data-v="profile" class="on">📋 Place</button><button data-v="time">⏳ Time</button><button data-v="whatif">🌊 What if</button><button data-v="rain">💧 Rain</button><button data-v="access">🚶 Access</button><button data-v="sheet">📄 Report</button><button data-v="trip">📱 Field trip</button></div>
       <div id="ghStatus" class="svhelp ghStatus"></div>
       <section data-gh="profile">
         <div class="svhelp">Tap any place on the 3D landscape: height, slope, land, soil, rock, climate, villages, services and where its rain goes, read for you as a fieldwork sheet.</div>
         <div id="ghProfOut"></div>
-        <div class="row" id="ghProfBtns" hidden><button id="ghProfPrint">🖨 Print fieldwork sheet</button><button id="ghProfSheet">📝 Worksheet for this place</button></div>
+        <div class="row" id="ghProfBtns" hidden><button id="ghProfPrint">🖨 Print fieldwork sheet</button><button id="ghProfSheet">📄 Report for this place</button></div>
       </section>
       <section data-gh="time" hidden>
         <div class="svhelp">How this area changed: land cover maps every year since 2017 (Esri | Impact Observatory, Sentinel-2) and forest lost each year since 2001 (Hansen Global Forest Change). For the real images of each date use 🕰️ Change detection.</div>
@@ -460,11 +460,11 @@
         <div id="ghAcOut"></div>
       </section>
       <section data-gh="sheet" hidden>
-        <div class="svhelp">A printable worksheet for this area (A4), with a map from above, a 3D view, facts and questions, in the language of the app. Print it or save as PDF for a class without computers.</div>
-        <label>Title<input id="ghShTitle" placeholder="Geography worksheet" style="flex:1"></label>
-        <div class="ghChecks"><label><input type="checkbox" id="ghShPhys" checked> Land and soil</label><label><input type="checkbox" id="ghShLand" checked> Land use and houses</label><label><input type="checkbox" id="ghShWater" checked> Climate, water and floods</label><label><input type="checkbox" id="ghShSett" checked> Villages and services</label><label><input type="checkbox" id="ghShChange"> Change over time (load ⏳ Time first)</label></div>
-        <div class="ghChecks"><label><input type="checkbox" id="ghShFacts" checked> Include a short description</label><label><input type="checkbox" id="ghShKey" checked> Answer key on a separate page</label><label><input type="checkbox" id="ghShHere"> For the place I tapped (📋 Place), not the centre</label></div>
-        <button id="ghShRun" class="primary eirun">📝 Make worksheet</button>
+        <div class="svhelp">A geographical study report of the 3D area, ready to print or save as PDF: location, physical geography (relief, slope, streams, soil, rock, climate, land cover), human geography (settlement pattern, population, roads, services), flood exposure and change over time, with maps, charts and the data sources. In the language of the app.</div>
+        <label>Title<input id="ghShTitle" placeholder="Geographical study of the area" style="flex:1"></label>
+        <label>Student / group<input id="ghShAuthor" style="flex:1"></label>
+        <div class="ghChecks"><label><input type="checkbox" id="ghShPhys" checked> Physical geography</label><label><input type="checkbox" id="ghShHum" checked> Human geography</label><label><input type="checkbox" id="ghShHaz" checked> Flood exposure</label><label><input type="checkbox" id="ghShChange" checked> Change over time (if ⏳ Time is loaded)</label><label><input type="checkbox" id="ghShNotes"> Space for field notes and discussion</label><label><input type="checkbox" id="ghShHere"> Centred on the place I tapped (📋 Place)</label></div>
+        <button id="ghShRun" class="primary eirun">📄 Make the report</button>
       </section>
       <section data-gh="trip" hidden>
         <div class="ghSub">Teacher: plan the stops</div>
@@ -646,6 +646,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=100"></script>
+<script type="module" src="js/app.js?v=102"></script>
 </body>
 </html>

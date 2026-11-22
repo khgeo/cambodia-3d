@@ -53,17 +53,18 @@ export function usdaTexture(sand, silt, clay) {
 
 /* ---------------- loading ---------------- */
 function loadImg(url) { return new Promise((res, rej) => { const im = new Image(); im.crossOrigin = 'anonymous'; im.onload = () => res(im); im.onerror = rej; im.src = url; }); }
-export async function loadUnderground(world, say) {
+export async function loadUnderground(world, say, opt = {}) {
   const a = world.D.aoi, pad = 0.01, U = { soil: {}, geo: null, soilOk: false };
   // geology raster crop (data/geology.png: unit id per 0.002° cell, rasterised from the ODC 2006 map)
   try {
-    const im = await loadImg('data/geology.png?v=100');
+    const im = await loadImg('data/geology.png?v=102');
     const x0 = Math.max(0, Math.floor((a.w - pad - GEO.w) / GEO.res)), x1 = Math.min(im.width, Math.ceil((a.e + pad - GEO.w) / GEO.res));
     const y0 = Math.max(0, Math.floor((GEO.n - (a.n + pad)) / GEO.res)), y1 = Math.min(im.height, Math.ceil((GEO.n - (a.s - pad)) / GEO.res));
     const c = document.createElement('canvas'); c.width = x1 - x0; c.height = y1 - y0; const ctx = c.getContext('2d', { willReadFrequently: true });
     ctx.imageSmoothingEnabled = false; ctx.drawImage(im, x0, y0, c.width, c.height, 0, 0, c.width, c.height);
     U.geo = { x0, y0, w: c.width, h: c.height, d: ctx.getImageData(0, 0, c.width, c.height).data };
   } catch (e) { console.warn('geology', e); }
+  if (opt.noSoil) return U;
   // SoilGrids WCS (GeoTIFF, EPSG:4326) for the AOI: sand, silt, clay, SOC at 6 depths
   say && say('Loading soil profiles (ISRIC SoilGrids)…');
   try {

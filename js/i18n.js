@@ -45,7 +45,7 @@ export const KM = {
   'Dwarf planet': 'ភពតឿ',
   'Moon': 'ព្រះច័ន្ទ',
   'Space probe': 'យានអវកាស',
-  'Geography in hand: place profile, time machine, what if, rain, access, worksheets, field trip': 'ភូមិសាស្ត្រក្នុងដៃ៖ ព័ត៌មានទីកន្លែង ម៉ាស៊ីនពេលវេលា ចុះបើ ទឹកភ្លៀង ការធ្វើដំណើរ សន្លឹកកិច្ចការ ទស្សនកិច្ចសិក្សា',
+  'Geography in hand: place profile, time machine, what if, rain, access, area report, field trip': 'ភូមិសាស្ត្រក្នុងដៃ៖ ព័ត៌មានទីកន្លែង ម៉ាស៊ីនពេលវេលា ចុះបើ ទឹកភ្លៀង ការធ្វើដំណើរ របាយការណ៍តំបន់ ទស្សនកិច្ចសិក្សា',
   '⚡ Power poles & wires': '⚡ បង្គោល និងខ្សែភ្លើង',
   '🎬 Cinematic look': '🎬 រូបភាពបែបភាពយន្ត', '🌑 Contact shadows (ambient occlusion)': '🌑 ស្រមោលប៉ះ (ambient occlusion)',
   'Soft glow around the sun and lights, warmer light and richer colours, like a film or a game': 'ពន្លឺស្រទន់ជុំវិញព្រះអាទិត្យ និងភ្លើង ពន្លឺកក់ក្ដៅ និងពណ៌ឆ្អៅជាងមុន ដូចភាពយន្ត ឬហ្គេម',

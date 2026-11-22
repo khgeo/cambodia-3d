@@ -2,7 +2,7 @@
 // 1 Place profile · 2 Time machine · 3 What if (flood, heavy rain) · 4 Where does the rain go · 5 Access to services
 // 6 Worksheet maker · 7 Field trip (GPS, stops, observations)
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=100';
+import { t, lang } from './i18n.js?v=102';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -84,12 +84,18 @@ export class GeoHand {
     const H = this.hydro(), path = this.flowPath(x, z); P.flow = path.info;
     // in parallel: admin names, soil & geology, climate, villages and services nearby
     const [adm, U, clim, near] = await Promise.all([
-      import('./placeinfo.js?v=100').then(m => m.adminAt(lat, lon)).catch(() => null),
-      this.U ? Promise.resolve(this.U) : Promise.race([import('./section.js?v=100').then(async m => { this.SM = m; this.U = await m.loadUnderground(this.w, s => this.say(t(s))); return this.U; }), new Promise(r => setTimeout(() => r(null), 25000))]).catch(() => null), // soil and rock (SoilGrids can be slow)
+      import('./placeinfo.js?v=102').then(m => m.adminAt(lat, lon)).catch(() => null),
+      this.underground().catch(() => null), // rock from the bundled map at once; soil (SoilGrids, can be slow) when it comes
       this.climate(lat, lon), this.nearby(lon, lat)]);
     P.adm = adm; P.clim = clim; P.near = near;
     if (U && this.SM) { const gk = this.SM.geologyAt(U, lon, lat), gu = this.SM.UNITS[gk]; P.geo = gu ? gu.n : null; const s = this.SM.soilAt(U, lon, lat, 0); P.soil = s.cls !== 'No data' ? s : null; }
     void H; this.data.profile = P; return P;
+  }
+  async underground() {
+    if (this.U && this.U.soilOk) return this.U; const m = this.SM || (this.SM = await import('./section.js?v=102'));
+    if (!this.Ug) this.Ug = await m.loadUnderground(this.w, null, { noSoil: true });
+    if (!this.soilJob) this.soilJob = m.loadUnderground(this.w, s => this.say(t(s))).then(U => { this.U = U; return U; }).catch(() => null);
+    const U = await Promise.race([this.soilJob, new Promise(r => setTimeout(() => r(null), 20000))]); return U || this.Ug;
   }
   async climate(lat, lon) {
     const key = lat.toFixed(2) + ',' + lon.toFixed(2); this._clim = this._clim || {}; if (this._clim[key]) return this._clim[key];
@@ -139,7 +145,7 @@ export class GeoHand {
     return cv;
   }
   profileHTML(P) {
-    const row = (k, v) => v ? `<tr><td>${t(k)}</td><td>${v}</td></tr>` : '', nm = o => o ? esc(km() ? (o.nk || o.ne) : (o.ne || o.nk)) + ` <small>${n0(o.d / 1000, 1)} ${U('km')}</small>` : '';
+    const row = (k, v) => v ? `<tr><td>${t(k)}</td><td>${v}</td></tr>` : '', nm = o => o ? (esc(km() ? (o.nk || o.ne) : (o.ne || o.nk)) || (km() ? 'មិនមានឈ្មោះ' : 'name not mapped')) + ` <small>${n0(o.d / 1000, 1)} ${U('km')}</small>` : '';
     const A = P.adm, N = P.near || {};
     return `<div class="ghText">${this.profileText(P).map(esc).join(' ')}</div>
       <table class="ghTab">${row('Province / district / commune', A ? esc(km() ? `${A.pro_km || A.pro_en} / ${A.dis_km || A.dis_en} / ${A.com_km || A.com_en}` : `${A.pro_en} / ${A.dis_en} / ${A.com_en}`) : '')}
@@ -190,19 +196,26 @@ export class GeoHand {
   waterBase() { const D = this.D, H = this.hydro(); let lo = Infinity; for (let k = 0; k < H.N; k++) lo = Math.min(lo, D.raw[k]); const water = []; const NX = H.NX;
     for (let k = 0; k < H.N; k += 3) { const x = D.X0 + (k % NX) * D.dx, z = D.Z0 + ((k / NX) | 0) * D.dz; if (this.clsAt(x, z) === 1) water.push(D.raw[k]); }
     water.sort((a, b) => a - b); return water.length > 30 ? water[Math.floor(water.length * 0.5)] : lo; }
+  floodMask(lvl) { // cells below the level that the water can reach: grown from the water (or the low edge of the area)
+    const D = this.D, H = this.hydro(), NX = H.NX, NZ = H.NZ, fl = new Uint8Array(H.N), q = [];
+    for (let k = 0; k < H.N; k++) { if (D.raw[k] >= lvl) continue; const i = k % NX, j = (k / NX) | 0, x = D.X0 + i * D.dx, z = D.Z0 + j * D.dz; if (this.clsAt(x, z) === 1) { fl[k] = 1; q.push(k); } }
+    if (!q.length) for (let k = 0; k < H.N; k++) { const i = k % NX, j = (k / NX) | 0; if ((i === 0 || j === 0 || i === NX - 1 || j === NZ - 1) && D.raw[k] < lvl) { fl[k] = 1; q.push(k); } }
+    for (let h = 0; h < q.length; h++) { const k = q[h], i = k % NX, j = (k / NX) | 0; for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const ii = i + a, jj = j + b; if (ii < 0 || jj < 0 || ii >= NX || jj >= NZ) continue; const n = jj * NX + ii; if (!fl[n] && D.raw[n] < lvl) { fl[n] = 1; q.push(n); } } }
+    return fl;
+  }
   flood(rise) {
     const D = this.D, H = this.hydro(), base = this.waterBase(), lvl = base + rise, NX = H.NX;
-    const fl = new Uint8Array(H.N); for (let k = 0; k < H.N; k++) if (D.raw[k] < lvl) fl[k] = 1;
+    const fl = this.floodMask(lvl);
     this.clear(); this.overlay(this.gridCanvas(k => fl[k] ? [30, 110, 230, Math.min(230, 90 + (lvl - D.raw[k]) * 40)] : null));
     const flAt = (x, z) => { const i = Math.round((x - D.X0) / D.dx), j = Math.round((z - D.Z0) / D.dz); return i >= 0 && j >= 0 && i < NX && j < H.NZ && fl[j * NX + i]; };
     return this.impacts(flAt, lvl, base);
   }
-  async impacts(flAt, lvl, base) {
-    const D = this.D, UM = this.UM || (this.UM = await import('./urban.js?v=100')), B = UM.buildingsOf(this.w), vals = B.map(b => flAt(b.x, b.z) ? 1 : 0), nb = vals.reduce((a, b) => a + b, 0);
-    if (nb) UM.paint(this.w, B, vals.map(v => v ? 1 : 0.15), 0, 1); // flooded houses in yellow, the others dark
+  async impacts(flAt, lvl, base, paint = true) {
+    const D = this.D, UM = this.UM || (this.UM = await import('./urban.js?v=102')), B = UM.buildingsOf(this.w), vals = B.map(b => flAt(b.x, b.z) ? 1 : 0), nb = vals.reduce((a, b) => a + b, 0);
+    if (nb && paint) UM.paint(this.w, B, vals.map(v => v ? 1 : 0.15), 0, 1); // flooded houses in yellow, the others dark
     let roadKm = 0; for (const r of this.w.net ? this.w.net.roads : []) for (let i = 1; i < r.pts.length; i++) { const a = r.pts[i - 1], b = r.pts[i]; if (flAt((a.x + b.x) / 2, (a.z + b.z) / 2)) roadKm += Math.hypot(b.x - a.x, b.z - a.z) / 1000; }
     let crop = 0, cells = 0; for (let j = 0; j < D.gh; j++) for (let i = 0; i < D.gw; i++) { const x = D.X0 + (i + 0.5) * D.C, z = D.Z0 + (j + 0.5) * D.C; if (D.cls[j * D.gw + i] === 3 && flAt(x, z)) crop++; if (flAt(x, z)) cells++; }
-    const r = { lvl, base, houses: nb, people: Math.round(nb * 4.3), roadKm, cropHa: crop * D.C * D.C / 1e4, areaHa: cells * D.C * D.C / 1e4, total: B.length }; this.data.flood = r; return r;
+    const r = { lvl, base, houses: nb, people: Math.round(nb * 4.3), roadKm, cropHa: crop * D.C * D.C / 1e4, areaHa: cells * D.C * D.C / 1e4, total: B.length }; if (paint) this.data.flood = r; return r;
   }
   heavyRain(mm) { // where the water stays: low spots that fill up (depressions), deeper with more rain
     const D = this.D, H = this.hydro(), depth = new Float32Array(H.N), NX = H.NX, scale = mm / 100;
@@ -214,7 +227,7 @@ export class GeoHand {
 
   /* ================= 5. Access to services ================= */
   async access(kind, mode) {
-    const D = this.D, F = this.F, UM = this.UM || (this.UM = await import('./urban.js?v=100')), a = D.aoi, pad = 0.03, bb = [a.w - pad, a.s - pad, a.e + pad, a.n + pad];
+    const D = this.D, F = this.F, UM = this.UM || (this.UM = await import('./urban.js?v=102')), a = D.aoi, pad = 0.03, bb = [a.w - pad, a.s - pad, a.e + pad, a.n + pad];
     const KINDS = { school: ['school', 'kindergarten', 'college', 'university'], health: ['hospital', 'clinic', 'doctors', 'health_post'], market: ['marketplace'], wat: ['place_of_worship'] };
     const key = bb.join(','); if (!this._poi || this._poi.key !== key) { this.say(t('Finding schools, health centres and markets…'));
       const pts = []; const jobs = [];
@@ -238,7 +251,7 @@ export class GeoHand {
 
   /* ================= 2. Time machine ================= */
   async timeMachine(say) {
-    if (this.TM && this.TM.aoi === this.D.aoi) return this.TM; const D = this.D, a = D.aoi, LCm = await import('./landcover.js?v=100'), LY = await import('./layers.js?v=100');
+    if (this.TM && this.TM.aoi === this.D.aoi) return this.TM; const D = this.D, a = D.aoi, LCm = await import('./landcover.js?v=102'), LY = await import('./layers.js?v=102');
     const years = LY.IO_YEARS, io = {};
     let n = 0; await Promise.all(years.map(async y => { const r = await LCm.loadIO(a, D.W, D.H, y); if (r) io[y] = r; say(`${t('Loading land cover maps')} ${++n}/${years.length}`); }));
     const stats = {}; for (const [y, r] of Object.entries(io)) { const c = {}; for (const v of r.d) c[v] = (c[v] || 0) + 1; const ha = D.W * D.H / 1e4 / r.d.length; stats[y] = Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v * ha])); }
@@ -274,58 +287,104 @@ export class GeoHand {
 
   /* ================= 6. Worksheet maker ================= */
   snapshot(kind) { const w = this.w, D = this.D, cam = w.camera, ct = w.controls, p0 = cam.position.clone(), q0 = ct.target.clone(); w.flight = null;
-    if (kind === 'top') { cam.position.set(0, D.S * 1.15, 0.01); ct.target.set(0, 0, 0); } else { cam.position.set(-D.S * 0.55, D.S * 0.45, D.S * 0.62); ct.target.set(0, 0, 0); }
-    ct.update(); w.frame(); const url = w.renderer.domElement.toDataURL('image/jpeg', 0.85); cam.position.copy(p0); ct.target.copy(q0); ct.update(); return url; }
-  async worksheet(opt, win) {
-    const D = this.D, F = this.F, P = this.data.profile && opt.here ? this.data.profile : await this.profile(0, 0), topImg = this.snapshot('top'), obImg = this.snapshot('oblique'), K = km();
-    const Q = [], mc = (q, right, wrong) => { const opts = [right, ...wrong].map(String); for (let i = opts.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [opts[i], opts[j]] = [opts[j], opts[i]]; } Q.push({ q, opts, a: opts.indexOf(String(right)) }); };
-    const open = (q, a, lines = 3) => Q.push({ q, a, lines });
-    const elev = Math.round(P.elev), top = P.lc[0] ? lcName(P.lc[0][0]) : '';
-    const topics = opt.topics;
-    if (topics.includes('physical')) {
-      mc(K ? 'តើទីតាំងនេះមានកម្ពស់ប្រហែលប៉ុន្មានពីនីវ៉ូទឹកសមុទ្រ?' : 'About how high is this place above sea level?', `${elev} m`, [`${elev + 20 + Math.round(Math.random() * 20)} m`, `${Math.max(1, Math.round(elev / 3))} m`, `${elev * 4 + 50} m`]);
-      mc(K ? 'តើដីនៅទីនេះមានរាងបែបណា?' : 'What is the land like here?', P.slope < 2 ? (K ? 'រាបស្មើ' : 'Flat') : P.slope < 8 ? (K ? 'ជម្រាលតិច' : 'Gently sloping') : (K ? 'ជម្រាលចោត' : 'Steep'), P.slope < 2 ? (K ? ['ជម្រាលចោត', 'ភ្នំខ្ពស់'] : ['Steep', 'High mountains']) : (K ? ['រាបស្មើ', 'ជាទន្លេ'] : ['Flat', 'A river']));
-      if (P.soil) open(K ? `ដីខាងលើនៅទីនេះជាដី ${t(P.soil.cls)}។ តើដីប្រភេទនេះសមស្របសម្រាប់ដំណាំអ្វី? ហេតុអ្វី?` : `The topsoil here is ${P.soil.cls.toLowerCase()}. Which crops suit this soil, and why?`, K ? 'ចម្លើយផ្សេងៗ៖ ដីឥដ្ឋរក្សាទឹកបានល្អ សមស្របនឹងស្រូវ…' : 'Open answer: clay holds water, which suits rice; sandy soil drains fast…');
-      open(K ? 'គូររូបព្រួញលើផែនទីខាងលើ ដើម្បីបង្ហាញទិសដែលទឹកភ្លៀងហូរ។' : 'Draw arrows on the map to show which way rain water flows.', P.flow ? (K ? `ទឹកហូរទៅទិស${P.flow.dir}` : `Water flows to the ${P.flow.dir}`) : '', 2);
+    if (kind === 'top') { cam.position.set(0, D.S * 1.3, 0.01); ct.target.set(0, 0, 0); } else { cam.position.set(-D.S * 0.55, D.S * 0.45, D.S * 0.62); ct.target.set(0, 0, 0); }
+    ct.update(); w.frame(); const cv = w.renderer.domElement; let url;
+    if (kind === 'top') { const s = Math.min(cv.width, cv.height), c = document.createElement('canvas'); c.width = c.height = Math.min(1000, s); c.getContext('2d').drawImage(cv, (cv.width - s) / 2, (cv.height - s) / 2, s, s, 0, 0, c.width, c.height); url = c.toDataURL('image/jpeg', 0.88); }
+    else url = cv.toDataURL('image/jpeg', 0.85);
+    cam.position.copy(p0); ct.target.copy(q0); ct.update(); return url; }
+  /* whole-area figures for the report: relief, slope, land cover, water, settlement, roads, services, flood exposure */
+  async areaStats() {
+    const D = this.D, F = this.F, H = this.hydro(), NX = H.NX, R = D.raw;
+    let lo = Infinity, hi = -Infinity, sum = 0; for (let k = 0; k < H.N; k++) { lo = Math.min(lo, R[k]); hi = Math.max(hi, R[k]); sum += R[k]; }
+    const sl = [0, 0, 0, 0]; for (let j = 1; j < H.NZ - 1; j++) for (let i = 1; i < NX - 1; i++) { const k = j * NX + i, gx = (R[k + 1] - R[k - 1]) / (2 * D.dx), gz = (R[k + NX] - R[k - NX]) / (2 * D.dz), a = Math.atan(Math.hypot(gx, gz)) * 180 / Math.PI; sl[a < 2 ? 0 : a < 8 ? 1 : a < 15 ? 2 : 3]++; }
+    const slT = sl.reduce((a, b) => a + b, 0) || 1, lc = {}; for (const v of D.cls) if (v) lc[v] = (lc[v] || 0) + 1; const lcT = Object.values(lc).reduce((a, b) => a + b, 0) || 1;
+    const areaKm2 = D.W * D.H / 1e6, UM = this.UM || (this.UM = await import('./urban.js?v=102')), B = UM.buildingsOf(this.w);
+    const roads = { main: 0, local: 0, track: 0 }; for (const r of this.w.net ? this.w.net.roads : []) { let L = 0; for (let i = 1; i < r.pts.length; i++) L += Math.hypot(r.pts[i].x - r.pts[i - 1].x, r.pts[i].z - r.pts[i - 1].z); roads[r.cls <= 10 ? 'main' : r.cls <= 14 ? 'local' : 'track'] += L / 1000; }
+    const st = this.streams(); let stKm = 0; for (const [a, b] of st) stKm += Math.hypot(b[0] - a[0], b[1] - a[1]) / 1000;
+    // settlement pattern: Clark–Evans nearest-neighbour index of the houses (R < 1 clustered, ≈ 1 random, > 1 dispersed)
+    let nni = null; if (B.length >= 20) { const cell = 30, g = new Map(); B.forEach((b, i) => { const k = Math.floor(b.x / cell) + ',' + Math.floor(b.z / cell); (g.get(k) || g.set(k, []).get(k)).push(i); });
+      let s = 0; for (const b of B) { let best = Infinity; for (let r = 1; r <= 4 && best === Infinity; r++) for (let u = -r; u <= r; u++) for (let v = -r; v <= r; v++) for (const j of g.get((Math.floor(b.x / cell) + u) + ',' + (Math.floor(b.z / cell) + v)) || []) { const o = B[j]; if (o === b) continue; const d = Math.hypot(o.x - b.x, o.z - b.z); if (d < best) best = d; } s += best === Infinity ? 0 : best; }
+      nni = (s / B.length) / (0.5 / Math.sqrt(B.length / (D.W * D.H))); }
+    const a = D.aoi, places = await this.nearby((a.w + a.e) / 2, (a.s + a.n) / 2), inA = o => true; void inA;
+    const flood = []; const base = this.waterBase(); for (const rise of [1, 2, 3]) { const lvl = base + rise, fm = this.floodMask(lvl), flAt = (x, z) => { const i = Math.round((x - D.X0) / D.dx), j = Math.round((z - D.Z0) / D.dz); return i >= 0 && j >= 0 && i < NX && j < H.NZ && fm[j * NX + i] === 1; }; flood.push([rise, await this.impacts(flAt, lvl, base, false)]); }
+    return { lo, hi, mean: sum / H.N, slope: sl.map(v => v / slT * 100), lc: Object.entries(lc).map(([k, n]) => [+k, n / lcT * 100]).sort((x, y) => y[1] - x[1]), areaKm2, houses: B.length, density: B.length / areaKm2, people: Math.round(B.length * 4.3), roads, stKm, nni, places, flood, base };
+  }
+  reliefMap(px = 760) { // hypsometric tints with hillshade, streams in blue
+    const D = this.D, H = this.hydro(), NX = H.NX, NZ = H.NZ, R = D.raw; let lo = Infinity, hi = -Infinity; for (const v of R) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    const RAMP = [[0, [86, 150, 90]], [0.25, [160, 190, 110]], [0.5, [225, 215, 150]], [0.75, [200, 150, 95]], [1, [150, 100, 75]]];
+    const col = t => { for (let i = 1; i < RAMP.length; i++) if (t <= RAMP[i][0]) { const [t0, a] = RAMP[i - 1], [t1, b] = RAMP[i], f = (t - t0) / (t1 - t0); return a.map((v, k) => v + (b[k] - v) * f); } return RAMP[RAMP.length - 1][1]; };
+    const c = document.createElement('canvas'); c.width = NX; c.height = NZ; const g = c.getContext('2d'), im = g.createImageData(NX, NZ), ex = 3;
+    for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const k = j * NX + i, gx = (R[j * NX + Math.min(NX - 1, i + 1)] - R[j * NX + Math.max(0, i - 1)]) / (2 * D.dx) * ex, gz = (R[Math.min(NZ - 1, j + 1) * NX + i] - R[Math.max(0, j - 1) * NX + i]) / (2 * D.dz) * ex;
+      const sh = Math.max(0, (-gx * -0.5 + -gz * -0.6 + 0.62) / Math.sqrt(gx * gx + gz * gz + 1)) * 1.35, cc = col((R[k] - lo) / Math.max(1, hi - lo)); im.data.set([cc[0] * sh, cc[1] * sh, cc[2] * sh, 255].map(v => Math.min(255, v)), k * 4); }
+    g.putImageData(im, 0, 0); const o = document.createElement('canvas'), s = px / Math.max(NX, NZ); o.width = Math.round(NX * s); o.height = Math.round(NZ * s); const og = o.getContext('2d'); og.drawImage(c, 0, 0, o.width, o.height);
+    og.strokeStyle = '#1f6fd1'; og.lineCap = 'round'; for (const [a, b, ha] of this.streams()) { og.lineWidth = Math.min(4, 0.8 + Math.log10(ha)); og.beginPath(); og.moveTo((a[0] - D.X0) / D.dx * s, (a[1] - D.Z0) / D.dz * s); og.lineTo((b[0] - D.X0) / D.dx * s, (b[1] - D.Z0) / D.dz * s); og.stroke(); }
+    this.mapFrame(og, o.width, o.height); return { url: o.toDataURL('image/jpeg', 0.9), lo, hi };
+  }
+  lcMap(px = 760) { const D = this.D, c = document.createElement('canvas'); c.width = D.gw; c.height = D.gh; const g = c.getContext('2d'), im = g.createImageData(D.gw, D.gh);
+    for (let k = 0; k < D.cls.length; k++) { const L = LC[D.cls[k]]; const hx = L ? L[2] : '#9a9a9a'; im.data.set([parseInt(hx.slice(1, 3), 16), parseInt(hx.slice(3, 5), 16), parseInt(hx.slice(5, 7), 16), 255], k * 4); }
+    g.putImageData(im, 0, 0); const o = document.createElement('canvas'), s = px / Math.max(D.gw, D.gh); o.width = Math.round(D.gw * s); o.height = Math.round(D.gh * s); const og = o.getContext('2d'); og.imageSmoothingEnabled = false; og.drawImage(c, 0, 0, o.width, o.height);
+    // roads and houses on top
+    const sx = o.width / D.W, sz = o.height / D.H; og.strokeStyle = 'rgba(40,40,40,.8)'; og.lineWidth = 1.2; for (const r of this.w.net ? this.w.net.roads : []) { og.beginPath(); r.pts.forEach((p, i) => { const x = (p.x - D.X0) * sx, y = (p.z - D.Z0) * sz; i ? og.lineTo(x, y) : og.moveTo(x, y); }); og.stroke(); }
+    this.mapFrame(og, o.width, o.height); return o.toDataURL('image/png'); }
+  mapFrame(g, W, H) { const D = this.D, len = [50, 100, 200, 250, 500, 1000, 2000].reduce((b, v) => v <= D.W / 4 ? v : b, 50), px = len / D.W * W;
+    g.fillStyle = 'rgba(255,255,255,.85)'; g.fillRect(W - px - 30, H - 34, px + 22, 26); g.fillStyle = '#111'; g.fillRect(W - px - 20, H - 16, px, 4); g.font = 'bold 12px system-ui'; g.fillText(len >= 1000 ? len / 1000 + ' km' : len + ' m', W - px - 20, H - 20);
+    g.fillStyle = 'rgba(255,255,255,.85)'; g.beginPath(); g.arc(24, 28, 17, 0, 7); g.fill(); g.fillStyle = '#111'; g.beginPath(); g.moveTo(24, 13); g.lineTo(31, 34); g.lineTo(24, 29); g.lineTo(17, 34); g.closePath(); g.fill(); g.font = 'bold 10px system-ui'; g.fillText('N', 21, 44 > H ? H : 44); }
+  async report(opt, win) {
+    const D = this.D, F = this.F, K = km(), say = this.say, A0 = this.data.profile && opt.here ? this.data.profile : null;
+    say(t('Reading the area…')); const P = A0 || await this.profile(0, 0); say(t('Measuring the area…')); const S = await this.areaStats(); say(t('Drawing the maps…'));
+    const top = this.snapshot('top'), ob = this.snapshot('oblique'), rel = this.reliefMap(), lcm = this.lcMap(), A = P.adm;
+    const tt = (en, kh) => K ? kh : en, sec = opt.sections, U2 = v => n0(v, 1);
+    const place = A ? (K ? `ឃុំ ${A.com_km || A.com_en} ស្រុក ${A.dis_km || A.dis_en} ខេត្ត ${A.pro_km || A.pro_en}` : `${A.com_en} commune, ${A.dis_en} district, ${A.pro_en} province`) : '';
+    const tbl = rows => `<table>${rows.filter(r => r && r[1] != null && r[1] !== '').map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table>`;
+    const bar = (list) => `<div class="bars">${list.map(([lab, p, c]) => `<div><span>${lab}</span><i style="width:${Math.max(1, p)}%;background:${c}"></i><b>${n0(p)}%</b></div>`).join('')}</div>`;
+    const nni = S.nni, pat = nni == null ? '' : nni < 0.8 ? tt('clustered', 'ប្រមូលផ្ដុំ') : nni < 1.2 ? tt('random', 'ចៃដន្យ') : tt('dispersed', 'រាយប៉ាយ');
+    const vill = (S.places.villages || []).filter(v => v.d < Math.max(D.W, D.H) * 0.6).slice(0, 12).map(v => esc(K ? (v.nk || v.ne) : (v.ne || v.nk))).filter(Boolean);
+    let h = '', n = 0; const H2 = (en, kh) => `<h2>${++n}. ${tt(en, kh)}</h2>`;
+    h += H2('Location', 'ទីតាំង') + `<p>${esc(this.profileText(P)[0])}</p>` + tbl([[tt('Administrative unit', 'រដ្ឋបាល'), esc(place)], [tt('Centre', 'ចំណុចកណ្ដាល'), `${F.lat0.toFixed(5)}°N ${F.lon0.toFixed(5)}°E`], [tt('Study area', 'តំបន់សិក្សា'), `${U2(D.W / 1000)} × ${U2(D.H / 1000)} ${U('km')} (${U2(S.areaKm2)} ${U('km')}²)`], [tt('Villages in and around', 'ភូមិក្នុង និងជុំវិញ'), vill.join(', ')]])
+      + `<div class="imgs"><figure><img src="${top}"><figcaption>${tt('Satellite view from above, north at the top', 'រូបភាពផ្កាយរណបពីលើ ទិសខាងជើងនៅខាងលើ')}</figcaption></figure><figure><img src="${ob}"><figcaption>${tt('3D view of the study area', 'ទិដ្ឋភាព 3D នៃតំបន់សិក្សា')}</figcaption></figure></div>`;
+    if (sec.includes('physical')) {
+      h += H2('Physical geography', 'ភូមិសាស្ត្ររូបវិទ្យា');
+      h += `<h3>${tt('Relief and landforms', 'ទម្រង់ដី')}</h3>` + tbl([[tt('Lowest / highest / mean elevation', 'កម្ពស់ទាបបំផុត / ខ្ពស់បំផុត / មធ្យម'), `${n0(S.lo)} / ${n0(S.hi)} / ${n0(S.mean)} ${U('m')}`], [tt('Local relief', 'ភាពខុសគ្នានៃកម្ពស់'), `${n0(S.hi - S.lo)} ${U('m')}`]])
+        + bar([[tt('Flat (< 2°)', 'រាបស្មើ (< ២°)'), S.slope[0], '#7fb069'], [tt('Gentle (2–8°)', 'ជម្រាលតិច (២–៨°)'), S.slope[1], '#e6c86e'], [tt('Moderate (8–15°)', 'ជម្រាលមធ្យម (៨–១៥°)'), S.slope[2], '#d9894a'], [tt('Steep (> 15°)', 'ជម្រាលចោត (> ១៥°)'), S.slope[3], '#a8493a']])
+        + `<figure class="one"><img src="${rel.url}"><figcaption>${tt('Relief map: green low, brown high', 'ផែនទីទម្រង់ដី៖ បៃតង = ទាប ត្នោត = ខ្ពស់')} (${n0(rel.lo)}–${n0(rel.hi)} ${U('m')}) · ${tt('blue: streams from the terrain', 'ខៀវ៖ អូរពីទម្រង់ដី')}</figcaption></figure>`;
+      h += `<h3>${tt('Water', 'ធនធានទឹក')}</h3><p>${tt(`Streams traced from the terrain run for about ${U2(S.stKm)} km in the area (drainage density ${U2(S.stKm / S.areaKm2)} km/km²).`, `អូរដែលតាមដានពីទម្រង់ដីមានប្រវែងប្រហែល ${U2(S.stKm)} គ.ម ក្នុងតំបន់ (ដង់ស៊ីតេបណ្ដាញទឹក ${U2(S.stKm / S.areaKm2)} គ.ម/គ.ម²)។`)} ${P.flow ? esc(this.profileText(P).slice(-1)[0]) : ''}</p>`;
+      h += `<h3>${tt('Soil and rock', 'ដី និងថ្ម')}</h3>` + tbl([[tt('Topsoil at the centre', 'ដីស្រទាប់លើនៅកណ្ដាល'), P.soil ? `${esc(t(P.soil.cls))} (${t('sand')} ${n0(P.soil.sand)}% · ${t('clay')} ${n0(P.soil.clay)}%)` : tt('no data', 'គ្មានទិន្នន័យ')], [tt('Geology', 'ភូគព្ភសាស្ត្រ'), P.geo ? esc(t(P.geo)) : tt('no data', 'គ្មានទិន្នន័យ')]]);
+      if (P.clim) h += `<h3>${tt('Climate', 'អាកាសធាតុ')}</h3><p>${esc(this.profileText(P).find(l => /°C/.test(l)) || '')}</p><figure class="one"><img src="${this.climateChart(P.clim, 700, 230).toDataURL()}"><figcaption>${tt('Monthly rain (bars) and mean temperature (line), 2015–2024', 'ទឹកភ្លៀងប្រចាំខែ (ជួរឈរ) និងសីតុណ្ហភាពមធ្យម (ខ្សែ) ២០១៥–២០២៤')}</figcaption></figure>`;
+      h += `<h3>${tt('Land cover', 'គម្របដី')}</h3>` + bar(S.lc.map(([k, p]) => [esc(lcName(k)), p, LC[k][2]])) + `<figure class="one"><img src="${lcm}"><figcaption>${tt('Land cover classified from the satellite image, with roads', 'គម្របដីចាត់ថ្នាក់ពីរូបភាពផ្កាយរណប និងផ្លូវ')}</figcaption></figure>`;
     }
-    if (topics.includes('landuse')) {
-      mc(K ? 'តើការប្រើប្រាស់ដីណាដែលមានច្រើនជាងគេក្នុងរង្វង់ ៥០០ ម៉ែត្រ?' : 'Which land cover is most common within 500 m?', top, Object.keys(LC).map(Number).filter(k => !P.lc[0] || k !== P.lc[0][0]).slice(0, 3).map(lcName));
-      open(K ? 'ចូរពិពណ៌នាពីរបៀបដែលប្រជាជននៅទីនេះប្រើប្រាស់ដី។ ផ្ដល់ឧទាហរណ៍ពីរ។' : 'Describe how people here use the land. Give two examples.', K ? `ឧទាហរណ៍៖ ${top} …` : `For example: ${top.toLowerCase()} …`);
-      mc(K ? 'តើមានផ្ទះប្រហែលប៉ុន្មានក្នុងរង្វង់ ១ គ.ម?' : 'About how many houses are within 1 km?', n0(P.houses), [n0(Math.round(P.houses * 3 + 40)), n0(Math.max(2, Math.round(P.houses / 4))), n0(Math.round(P.houses * 10 + 500))]);
+    if (sec.includes('human')) {
+      h += H2('Human geography', 'ភូមិសាស្ត្រមនុស្ស');
+      h += `<h3>${tt('Settlement and population', 'ការតាំងទីលំនៅ និងប្រជាជន')}</h3>` + tbl([[tt('Buildings', 'អគារ'), n0(S.houses)], [tt('Building density', 'ដង់ស៊ីតេអគារ'), `${n0(S.density)} / ${U('km')}²`], [tt('Population (estimate, 4.3 people per building)', 'ប្រជាជន (ប៉ាន់ស្មាន ៤,៣ នាក់ក្នុងមួយអគារ)'), `≈ ${n0(S.people)}`],
+        [tt('Settlement pattern (nearest-neighbour index R)', 'លំនាំការតាំងទីលំនៅ (សន្ទស្សន៍ R)'), nni == null ? '' : `R = ${n0(nni, 2)} → ${pat}`]]);
+      h += `<h3>${tt('Transport', 'ការដឹកជញ្ជូន')}</h3>` + tbl([[tt('Main roads', 'ផ្លូវធំ'), `${U2(S.roads.main)} ${U('km')}`], [tt('Local roads', 'ផ្លូវតូច'), `${U2(S.roads.local)} ${U('km')}`], [tt('Tracks and paths', 'ផ្លូវលំ'), `${U2(S.roads.track)} ${U('km')}`], [tt('Road density', 'ដង់ស៊ីតេផ្លូវ'), `${U2((S.roads.main + S.roads.local + S.roads.track) / S.areaKm2)} ${U('km')}/${U('km')}²`]]);
+      const N = P.near || {}, nm = o => o ? `${esc(K ? (o.nk || o.ne) : (o.ne || o.nk)) || tt('name not mapped', 'មិនមានឈ្មោះ')} (${U2(o.d / 1000)} ${U('km')})` : tt('none found within 4.5 km', 'រកមិនឃើញក្នុង ៤,៥ គ.ម');
+      h += `<h3>${tt('Services', 'សេវាសាធារណៈ')}</h3>` + tbl([[tt('Schools within 4.5 km', 'សាលារៀនក្នុង ៤,៥ គ.ម'), n0((N.schools || []).length)], [tt('Nearest school', 'សាលារៀនជិតបំផុត'), nm((N.schools || [])[0])], [tt('Health centres within 4.5 km', 'មណ្ឌលសុខភាពក្នុង ៤,៥ គ.ម'), n0((N.health || []).length)], [tt('Nearest health centre', 'មណ្ឌលសុខភាពជិតបំផុត'), nm((N.health || [])[0])], [tt('Wats within 4.5 km', 'វត្តក្នុង ៤,៥ គ.ម'), n0((N.wats || []).length)], [tt('Nearest market', 'ផ្សារជិតបំផុត'), nm((N.markets || [])[0])]]);
+      if (this.data.access) { const r = this.data.access; h += `<p>${tt(`Access (${r.kind}, ${r.mode}): ${n0(r.within / Math.max(1, r.houses) * 100)}% of buildings are within ${r.lim} min; median ${U2(r.median)} min.`, `ការធ្វើដំណើរ៖ អគារ ${n0(r.within / Math.max(1, r.houses) * 100)}% ស្ថិតក្នុង ${n0(r.lim)} នាទី មធ្យមភាគ ${U2(r.median)} នាទី។`)}</p>`; }
     }
-    if (topics.includes('water')) {
-      if (P.clim) { const wet = P.clim.R.indexOf(Math.max(...P.clim.R)), dry = P.clim.R.indexOf(Math.min(...P.clim.R));
-        mc(K ? 'តើខែណាដែលមានភ្លៀងច្រើនជាងគេ?' : 'Which month has the most rain?', month(wet), [month(dry), month((wet + 4) % 12), month((wet + 7) % 12)]);
-        open(K ? `ទឹកភ្លៀងប្រចាំឆ្នាំ ${n0(P.clim.year)} ម.ម។ តើរដូវវស្សា និងរដូវប្រាំងមានឥទ្ធិពលលើការធ្វើស្រែយ៉ាងដូចម្ដេច?` : `The yearly rain is about ${n0(P.clim.year)} mm. How do the wet and dry seasons affect farming here?`, K ? 'ចម្លើយផ្សេងៗ៖ ដាំស្រូវរដូវវស្សា…' : 'Open answer: rice is planted with the rains…'); }
-      const FL = this.data.flood; if (FL && FL.lvl != null && FL.houses > 0) open(K ? `ប្រសិនបើទឹកឡើង ${n0(FL.lvl - FL.base, 1)} ម៉ែត្រ ផ្ទះប្រហែល ${n0(FL.houses)} នឹងលិចទឹក។ តើប្រជាជនអាចត្រៀមខ្លួនយ៉ាងដូចម្ដេច?` : `If the water rises ${n0(FL.lvl - FL.base, 1)} m, about ${n0(FL.houses)} houses flood. How can people prepare?`, K ? 'ចម្លើយផ្សេងៗ៖ ផ្ទះខ្ពស់ (ផ្ទះឈើលើសសរ)…' : 'Open answer: houses on stilts, raised roads, early warning…');
-      else open(K ? 'ហេតុអ្វីបានជាផ្ទះជាច្រើននៅកម្ពុជាសង់លើសសរ? តើវាជួយយ៉ាងដូចម្ដេចពេលមានទឹកជំនន់?' : 'Why are many Cambodian houses built on stilts? How does this help in a flood?', K ? 'ចម្លើយផ្សេងៗ៖ ការពារទឹកជំនន់ ខ្យល់ចេញចូល ទុកសម្ភារៈ…' : 'Open answer: safe from floods, cooler air, space for tools and animals…');
+    if (sec.includes('hazard')) {
+      h += H2('Flood exposure', 'ការប្រឈមនឹងទឹកជំនន់') + `<p>${tt(`If the water rises above its normal level (≈ ${n0(S.base)} m above sea level):`, `ប្រសិនបើទឹកឡើងលើសនីវ៉ូធម្មតា (≈ ${n0(S.base)} ម ពីនីវ៉ូទឹកសមុទ្រ)៖`)}</p>`
+        + `<table class="grid"><tr><th>${tt('Rise', 'ទឹកឡើង')}</th><th>${tt('Buildings', 'អគារ')}</th><th>${tt('People (est.)', 'ប្រជាជន (ប៉ាន់ស្មាន)')}</th><th>${tt('Roads', 'ផ្លូវ')}</th><th>${tt('Rice & grass', 'ស្រែ និងវាលស្មៅ')}</th><th>${tt('Land', 'ដី')}</th></tr>`
+        + S.flood.map(([rise, r]) => `<tr><td>+${n0(rise)} ${U('m')}</td><td>${n0(r.houses)}</td><td>${n0(r.people)}</td><td>${U2(r.roadKm)} ${U('km')}</td><td>${U2(r.cropHa)} ${U('ha')}</td><td>${U2(r.areaHa)} ${U('ha')}</td></tr>`).join('') + '</table>'
+        + `<p class="note">${tt('Terrain model: places lower than the new level that the water can reach from the river or lake are flooded. A first estimate, not a forecast; dykes and drains are not in the terrain.', 'គំរូលើកម្ពស់ដី៖ កន្លែងដែលទាបជាងនីវ៉ូថ្មី ហើយទឹកពីទន្លេ ឬបឹងអាចហូរទៅដល់ ត្រូវរាប់ថាលិចទឹក។ ជាការប៉ាន់ស្មានដំបូង មិនមែនការព្យាករណ៍ទេ ទំនប់ និងប្រឡាយមិនមាននៅក្នុងទម្រង់ដីទេ។')}</p>`;
     }
-    if (topics.includes('settlement')) {
-      const N = P.near || {}, sch = N.schools && N.schools[0], hc = N.health && N.health[0];
-      if (sch) mc(K ? 'តើសាលារៀនជិតបំផុតនៅឆ្ងាយប្រហែលប៉ុន្មាន?' : 'About how far is the nearest school?', `${n0(sch.d / 1000, 1)} km`, [`${n0(sch.d / 1000 * 3 + 2, 1)} km`, `${n0(sch.d / 1000 * 8 + 6, 1)} km`, `${n0(sch.d / 1000 + 12, 1)} km`]);
-      if (hc) open(K ? `មណ្ឌលសុខភាពជិតបំផុតនៅឆ្ងាយ ${n0(hc.d / 1000, 1)} គ.ម។ តើចម្ងាយនេះជាបញ្ហាសម្រាប់នរណាខ្លះ?` : `The nearest health centre is ${n0(hc.d / 1000, 1)} km away. For whom is this distance a problem?`, K ? 'ចម្លើយផ្សេងៗ៖ មនុស្សចាស់ ស្ត្រីមានផ្ទៃពោះ…' : 'Open answer: old people, pregnant women, families without a moto…');
-      open(K ? 'ហេតុអ្វីបានជាភូមិនៅទីនេះតាំងនៅតាមផ្លូវ ឬមាត់ទឹក?' : 'Why are the villages here along the road or the water?', K ? 'ចម្លើយផ្សេងៗ៖ ងាយធ្វើដំណើរ ទឹកប្រើប្រាស់…' : 'Open answer: easy travel, water for drinking and farming…');
-    }
-    if (topics.includes('change') && this.TM) { const L = this.tmStory(); if (L.length) open((K ? 'ពិនិត្យតួលេខខាងក្រោម។ តើទីនេះបានផ្លាស់ប្ដូរយ៉ាងដូចម្ដេច? ហេតុអ្វី?\n' : 'Look at these figures. How has this place changed, and why?\n') + L.join('\n'), K ? 'ចម្លើយផ្សេងៗ' : 'Open answer', 4); }
-    const ttl = opt.title || (K ? 'សន្លឹកកិច្ចការភូមិសាស្ត្រ' : 'Geography worksheet'), A = P.adm, place = A ? (K ? `${A.com_km || A.com_en} · ${A.dis_km || A.dis_en} · ${A.pro_km || A.pro_en}` : `${A.com_en} · ${A.dis_en} · ${A.pro_en}`) : `${F.lat0.toFixed(4)}°N ${F.lon0.toFixed(4)}°E`;
-    const qh = Q.map((q, i) => `<div class="q"><b>${i + 1}.</b> ${esc(q.q).replace(/\n/g, '<br>')}${q.opts ? `<div class="opts">${q.opts.map((o, k) => `<span>${'ABCD'[k]}. ${esc(o)}</span>`).join('')}</div>` : '<div class="lines">' + '<i></i>'.repeat(q.lines || 3) + '</div>'}</div>`).join('');
-    const ans = Q.map((q, i) => `<div><b>${i + 1}.</b> ${q.opts ? 'ABCD'[q.a] + '. ' + esc(q.opts[q.a]) : esc(q.a)}</div>`).join('');
-    const html = `<!DOCTYPE html><html lang="${K ? 'km' : 'en'}"><head><meta charset="utf-8"><title>${esc(ttl)}</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;700&display=swap" rel="stylesheet"><style>
-      @page{size:A4;margin:14mm} body{font-family:"Noto Sans Khmer",system-ui,sans-serif;color:#111;font-size:12.5pt;line-height:1.55;max-width:182mm;margin:auto}
-      h1{font-size:18pt;margin:0} .meta{display:flex;justify-content:space-between;border-bottom:2px solid #333;padding-bottom:4px;margin-bottom:8px;font-size:10.5pt}
-      .imgs{display:grid;grid-template-columns:1fr 1fr;gap:6px} .imgs img{width:100%;border:1px solid #888} .cap{font-size:9pt;color:#444}
-      .facts{background:#f3f1ea;border:1px solid #ccc;padding:6px 10px;margin:8px 0;font-size:11pt} .q{margin:10px 0;break-inside:avoid} .opts{display:grid;grid-template-columns:1fr 1fr;gap:2px 20px;margin:4px 0 0 18px}
-      .lines i{display:block;border-bottom:1px dotted #777;height:24px} .ans{break-before:page} .src{font-size:8.5pt;color:#555;margin-top:10px} .name{margin:6px 0 10px}
-      @media screen{body{padding:16px}.bar{position:sticky;top:0;background:#fffbe6;padding:6px;border:1px solid #e0c060;margin-bottom:10px}} @media print{.bar{display:none}}
-    </style></head><body><div class="bar"><button onclick="print()">🖨 ${K ? 'បោះពុម្ព / រក្សាទុក PDF' : 'Print / save as PDF'}</button></div>
-    <h1>${esc(ttl)}</h1><div class="meta"><span>📍 ${esc(place)}</span><span>${new Date().toLocaleDateString(K ? 'km-KH' : 'en-GB')}</span></div>
-    <div class="name">${K ? 'ឈ្មោះ' : 'Name'}: ............................................ ${K ? 'ថ្នាក់' : 'Class'}: ............</div>
-    <div class="imgs"><div><img src="${topImg}"><div class="cap">${K ? 'ផែនទីពីលើ (ទិសខាងជើងនៅខាងលើ)' : 'Map from above (north at the top)'} · ${n0(D.W / 1000, 1)} × ${n0(D.H / 1000, 1)} km</div></div><div><img src="${obImg}"><div class="cap">${K ? 'ទិដ្ឋភាព 3D' : '3D view'}</div></div></div>
-    ${opt.facts ? `<div class="facts">${this.profileText(P).map(esc).join(' ')}</div>` : ''}${qh}
-    ${opt.key ? `<div class="ans"><h2>${K ? 'ចម្លើយ (សម្រាប់គ្រូ)' : 'Answer key (for the teacher)'}</h2>${ans}</div>` : ''}
-    <div class="src">${K ? 'បង្កើតដោយ Cambodia 3D · ក្រុមស្រាវជ្រាវ និងអភិវឌ្ឍន៍ព័ត៌មានភូមិសាស្ត្រ RUPP' : 'Made with Cambodia 3D · Geoinformatics and Research Lab, RUPP'} · OpenStreetMap, Esri, SoilGrids, Open-Meteo</div></body></html>`;
-    if (win) { win.document.open(); win.document.write(html); win.document.close(); }
-    return { html, n: Q.length };
+    if (sec.includes('change') && this.TM) { h += H2('Change over time', 'ការផ្លាស់ប្ដូរតាមពេលវេលា') + '<ul>' + this.tmStory().map(l => `<li>${esc(l)}</li>`).join('') + `</ul><figure class="one"><img src="${this.tmChart(700, 220).toDataURL()}"><figcaption>${tt('Land cover area by year (red built, orange crops, green trees, blue water)', 'ផ្ទៃគម្របដីតាមឆ្នាំ (ក្រហម សំណង់ ទឹកក្រូច ដំណាំ បៃតង ដើមឈើ ខៀវ ទឹក)')}</figcaption></figure>`; }
+    if (opt.notes) h += H2('Field notes and discussion', 'កំណត់ត្រាវាល និងការពិភាក្សា') + '<div class="notes">' + '<i></i>'.repeat(10) + '</div>';
+    h += H2('Data and methods', 'ទិន្នន័យ និងវិធីសាស្ត្រ') + `<p class="note">${tt('Terrain: AWS Terrain Tiles; imagery: Esri World Imagery; roads, buildings and places: OpenStreetMap; land cover: classified from the image in the app (and Esri | Impact Observatory for change); soil: ISRIC SoilGrids; geology: Open Development Cambodia; climate: Open-Meteo ERA5 2015–2024; forest loss: Hansen Global Forest Change. Streams and catchments from depression-filled terrain (D8). Population estimated from building counts. All figures are automatic estimates for study and should be checked in the field.', 'ទម្រង់ដី៖ AWS Terrain Tiles · រូបភាព៖ Esri World Imagery · ផ្លូវ អគារ និងទីកន្លែង៖ OpenStreetMap · គម្របដី៖ ចាត់ថ្នាក់ពីរូបភាពក្នុងកម្មវិធី (និង Esri | Impact Observatory សម្រាប់ការផ្លាស់ប្ដូរ) · ដី៖ ISRIC SoilGrids · ភូគព្ភសាស្ត្រ៖ Open Development Cambodia · អាកាសធាតុ៖ Open-Meteo ERA5 ២០១៥–២០២៤ · ព្រៃបាត់បង់៖ Hansen Global Forest Change។ អូរ និងអាងទឹកពីទម្រង់ដីដែលបំពេញទីទាប (D8)។ ប្រជាជនប៉ាន់ស្មានពីចំនួនអគារ។ តួលេខទាំងអស់ជាការប៉ាន់ស្មានដោយស្វ័យប្រវត្តិសម្រាប់ការសិក្សា ហើយគួរពិនិត្យនៅទីវាល។')}</p>`;
+    const ttl = opt.title || tt('Geographical study of the area', 'ការសិក្សាភូមិសាស្ត្រនៃតំបន់');
+    const html = `<!DOCTYPE html><html lang="${K ? 'km' : 'en'}"><head><meta charset="utf-8"><title>${esc(ttl)}</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;700&family=Noto+Serif+Khmer:wght@600&display=swap" rel="stylesheet"><style>
+      @page{size:A4;margin:16mm 15mm} body{font-family:"Noto Sans Khmer",system-ui,sans-serif;color:#1a1a1a;font-size:11pt;line-height:1.6;max-width:180mm;margin:auto}
+      .cover{border-bottom:3px solid #1f4e79;margin-bottom:10px;padding-bottom:6px} .cover h1{font-family:"Noto Serif Khmer",Georgia,serif;font-size:20pt;color:#1f4e79;margin:0} .cover .sub{color:#444} .cover .by{font-size:9.5pt;color:#555;margin-top:4px}
+      h2{font-size:14pt;color:#1f4e79;border-bottom:1px solid #c9d6e3;margin:18px 0 6px;break-after:avoid} h3{font-size:11.5pt;margin:12px 0 4px;color:#2b4a63;break-after:avoid}
+      table{border-collapse:collapse;width:100%;margin:4px 0 8px;font-size:10pt} td,th{border-bottom:1px solid #ddd;padding:3px 6px;text-align:left;vertical-align:top} td:first-child{color:#444;width:45%} table.grid td:first-child{width:auto} th{background:#eef3f8}
+      .imgs{display:grid;grid-template-columns:1fr 1fr;gap:8px} figure{margin:6px 0;break-inside:avoid} figure img{width:100%;border:1px solid #999} figure.one img{max-height:120mm;object-fit:contain} figcaption{font-size:8.5pt;color:#555}
+      .bars div{display:grid;grid-template-columns:42% 1fr 40px;align-items:center;gap:6px;font-size:10pt;margin:2px 0} .bars i{display:block;height:11px;border-radius:3px} .bars b{font-weight:600;text-align:right}
+      .note{font-size:9pt;color:#555} .notes i{display:block;border-bottom:1px dotted #888;height:26px} @media screen{body{padding:14px}.bar{position:sticky;top:0;background:#fffbe6;padding:6px;border:1px solid #e0c060;margin-bottom:10px}} @media print{.bar{display:none}}
+    </style></head><body><div class="bar"><button onclick="print()">🖨 ${tt('Print / save as PDF', 'បោះពុម្ព / រក្សាទុក PDF')}</button></div>
+    <div class="cover"><h1>${esc(ttl)}</h1><div class="sub">📍 ${esc(place || `${F.lat0.toFixed(4)}°N ${F.lon0.toFixed(4)}°E`)}</div>
+    <div class="by">${opt.author ? esc(opt.author) + ' · ' : ''}${tt('Department of Geography and Land Management, Royal University of Phnom Penh', 'ដេប៉ាតឺម៉ង់ភូមិសាស្ត្រ និងគ្រប់គ្រងដីធ្លី សាកលវិទ្យាល័យភូមិន្ទភ្នំពេញ')} · ${new Date().toLocaleDateString(K ? 'km-KH' : 'en-GB')}</div></div>
+    ${h}<p class="note">${tt('Made with Cambodia 3D · Geoinformatics and Research Lab, RUPP', 'បង្កើតដោយ Cambodia 3D · ក្រុមស្រាវជ្រាវ និងអភិវឌ្ឍន៍ព័ត៌មានភូមិសាស្ត្រ RUPP')}</p></body></html>`;
+    say(''); if (win) { win.document.open(); win.document.write(html); win.document.close(); }
+    return { html, sections: n };
   }
 
   /* ================= 7. Field trip ================= */

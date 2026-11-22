@@ -1,11 +1,11 @@
 // Cinematic look: soft glow around the sun and bright lights, ambient occlusion where things meet the ground,
 // and a light colour grade (warmer highlights, cooler shadows, a little more colour, gentle vignette).
 import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js?v=100';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js?v=100';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js?v=100';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js?v=100';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js?v=100';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js?v=102';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js?v=102';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js?v=102';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js?v=102';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js?v=102';
 
 const GRADE = {
   uniforms: { tDiffuse: { value: null }, uSat: { value: 1.12 }, uCon: { value: 1.06 }, uVig: { value: 0.32 },
@@ -40,7 +40,7 @@ export class Look {
   async setAO(on) { // ambient occlusion: darker where walls meet the ground, under eaves and trees (costly, so off by default)
     this.aoOn = on;
     if (on && !this.ao) {
-      const { GTAOPass } = await import('three/addons/postprocessing/GTAOPass.js?v=100');
+      const { GTAOPass } = await import('three/addons/postprocessing/GTAOPass.js?v=102');
       const s = this.w.renderer.getSize(new THREE.Vector2());
       this.ao = new GTAOPass(this.w.scene, this.w.camera, s.x, s.y);
       this.ao.updateGtaoMaterial({ radius: 2.5, distanceExponent: 1.5, thickness: 2, scale: 1, samples: 12 });
