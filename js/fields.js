@@ -4,8 +4,8 @@
 // filling, rectangularity / width / area filters, 2 m bund gap) plus a road / water / building cut from the
 // scene's OpenStreetMap masks, which removes the road confusion of the model.
 import * as THREE from 'three';
-import * as G from './geo.js?v=96';
-import { bundGeometry } from './ricefield.js?v=96';
+import * as G from './geo.js?v=97';
+import { bundGeometry } from './ricefield.js?v=97';
 
 const ORT = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/';
 let ort = null, provider_ = ''; const sessions = {};

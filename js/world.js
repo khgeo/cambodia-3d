@@ -5,32 +5,32 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=96';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=96';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=96';
-import { buildTrees, GrassField, WIND } from './vegetation.js?v=96';
-import { classify as khClassify, details as khDetails, powerLines } from './khmerbuild.js?v=96';
-import { RoadNet, Driver, Walker } from './modes.js?v=96';
-import { vehicleKit } from './vehicles.js?v=96';
-import { loadCarPack } from './carpack.js?v=96';
-import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=96';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=96';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=96';
-import { LayerStack } from './layers.js?v=96';
-import { Survey } from './survey.js?v=96';
-import { Editor } from './editor.js?v=96';
-import { Atmos } from './atmos.js?v=96';
-import { NightLights } from './lights.js?v=96';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=96';
-import { Tactical, loadCatalog } from './tactical.js?v=96';
-import { LcTrainer } from './lctrain.js?v=96';
-import { Radar } from './radar.js?v=96';
-import { Globe } from './globe.js?v=96';
-import { SEASON } from './vegetation.js?v=96';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=96';
-import { makeCloudDome } from './skyclouds.js?v=96';
-import { EarthContext } from './earthctx.js?v=96';
-import { ResultLayers } from './results.js?v=96';
+import * as G from './geo.js?v=97';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=97';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=97';
+import { buildTrees, GrassField, WIND } from './vegetation.js?v=97';
+import { classify as khClassify, details as khDetails, powerLines, watBuilding, watWalls, watRoles } from './khmerbuild.js?v=97';
+import { RoadNet, Driver, Walker } from './modes.js?v=97';
+import { vehicleKit } from './vehicles.js?v=97';
+import { loadCarPack } from './carpack.js?v=97';
+import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=97';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=97';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=97';
+import { LayerStack } from './layers.js?v=97';
+import { Survey } from './survey.js?v=97';
+import { Editor } from './editor.js?v=97';
+import { Atmos } from './atmos.js?v=97';
+import { NightLights } from './lights.js?v=97';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=97';
+import { Tactical, loadCatalog } from './tactical.js?v=97';
+import { LcTrainer } from './lctrain.js?v=97';
+import { Radar } from './radar.js?v=97';
+import { Globe } from './globe.js?v=97';
+import { SEASON } from './vegetation.js?v=97';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=97';
+import { makeCloudDome } from './skyclouds.js?v=97';
+import { EarthContext } from './earthctx.js?v=97';
+import { ResultLayers } from './results.js?v=97';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -693,6 +693,7 @@ export class World {
     }
 
     // power poles and wires along the roads
+    if (this.watMesh) this.watMesh.geometry.dispose(); this.watMesh = watWalls(this); if (this.watMesh) this.root.add(this.watMesh); // wall and gate round the wat ground
     this.polesMesh = powerLines(this); if (this.polesMesh) { this.polesMesh.visible = this.polesOn !== false; this.root.add(this.polesMesh); }
 
     /* 6. trees + near grass */
@@ -782,7 +783,7 @@ export class World {
     const tmp = new THREE.Color();
     const push = (p, c, w) => { pos.push(...p); col.push(c.r, c.g, c.b); wall.push(...w); };
     const tri = (a, b, c, color, w = [0, 0, 0, 0]) => { push(a, color, w); push(b, color, w); push(c, color, w); };
-    let count = 0;
+    let count = 0; const WR = this.D.landuse ? watRoles(this.D) : new Map();
     for (const b of list) {
       const ring = b.ring, area = Math.abs(G.ringArea(ring)); if (area < 4) continue;
       count++;
@@ -792,6 +793,7 @@ export class World {
       let gnd = Infinity; for (const p of ring) gnd = Math.min(gnd, this.hAt(p[0], p[1])); gnd -= 0.3;
       if (b.stilt) { gnd += b.stilt; for (const p of ring) { const y0 = this.hAt(p[0], p[1]) - 0.2; for (const [dx, dz] of [[0, 0]]) { const px = p[0], pz = p[1], r = 0.13;
         const cyl = [[px - r, pz - r], [px + r, pz - r], [px + r, pz + r], [px - r, pz + r]]; for (let k = 0; k < 4; k++) { const A = cyl[k], B2 = cyl[(k + 1) % 4], pc = new THREE.Color(0x6b5440).convertSRGBToLinear(); tri([A[0], y0, A[1]], [B2[0], y0, B2[1]], [B2[0], gnd, B2[1]], pc); tri([A[0], y0, A[1]], [B2[0], gnd, B2[1]], [A[0], gnd, A[1]], pc); } } } }
+      const wr = WR.get(b); if (wr) { const o6 = G.obb(ring); if (o6 && o6.b > 1.5) { watBuilding(ring, o6, gnd, h, area, tri, rnd, wr === 'main'); continue; } } // wat: vihara, sala…
       const stone = t === 6 && area >= 1500; // large temple complexes: sandstone, flat, no windows
       const K = khClassify(b, ring, area, G.obb(ring), h, this.net); // shophouse, wooden house on stilts, villa, house…
       if (K.kind === 'shop') h = Math.max(h, 3.2 * Math.round(h / 3.2) + 0.4);
@@ -1134,6 +1136,7 @@ export class World {
     if (kind === 'detail') this._grassUserOff = !on;
     if (kind === 'trees') (this.treeMeshes || []).forEach(m => m.visible = on);
     if (kind === 'buildings' && this.buildingsMesh) this.buildingsMesh.visible = on;
+    if (kind === 'buildings' && this.watMesh) this.watMesh.visible = on;
     if (kind === 'houses' && this.housesMesh) this.housesMesh.visible = on;
     if (kind === 'poles') { this.polesOn = on; if (this.polesMesh) this.polesMesh.visible = on; }
     if (kind === 'traffic') { this.trafficOn = on; (this.vehMeshes || []).forEach(g => (g.all || [g.paint, g.fixed]).forEach(m => m.visible = on)); }
@@ -1242,7 +1245,7 @@ export class World {
   }
   // flooded paddies at planting (needs Field Boundaries), straw stacks by the houses after the harvest
   async farmUpdate(fields) {
-    const RF = this._rf || (this._rf = await import('./ricefield.js?v=96')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
+    const RF = this._rf || (this._rf = await import('./ricefield.js?v=97')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
     for (const k of ['paddyMesh', 'hayMesh']) if (this[k]) { this.root.remove(this[k]); this[k].geometry.dispose(); this[k].material.dispose(); this[k] = null; }
     const F = this._farmFields || this.fields; if (this.seasonKey === 'planting' && F && F.length) { this.paddyMesh = RF.paddyWater(this, F); if (this.paddyMesh) this.root.add(this.paddyMesh); }
     if (this.seasonKey === 'harvested') { this.hayMesh = RF.hayStacks(this); if (this.hayMesh) this.root.add(this.hayMesh); }
@@ -1455,7 +1458,7 @@ export class World {
   }
   // cinematic look (glow, colour grade, optional ambient occlusion), loaded on first use
   async setLook(on, ao) {
-    if ((on || ao) && !this.look) { const { Look } = await import('./look.js?v=96'); this.look = new Look(this); const s = this.renderer.getSize(new THREE.Vector2()); this.look.setSize(s.x, s.y); }
+    if ((on || ao) && !this.look) { const { Look } = await import('./look.js?v=97'); this.look = new Look(this); const s = this.renderer.getSize(new THREE.Vector2()); this.look.setSize(s.x, s.y); }
     if (!this.look) return; this.look.on = on; if (ao != null) await this.look.setAO(on && ao);
   }
 }
