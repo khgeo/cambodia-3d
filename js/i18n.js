@@ -45,6 +45,7 @@ export const KM = {
   'Dwarf planet': 'ភពតឿ',
   'Moon': 'ព្រះច័ន្ទ',
   'Space probe': 'យានអវកាស',
+  '⚡ Power poles & wires': '⚡ បង្គោល និងខ្សែភ្លើង',
   '🎬 Cinematic look': '🎬 រូបភាពបែបភាពយន្ត', '🌑 Contact shadows (ambient occlusion)': '🌑 ស្រមោលប៉ះ (ambient occlusion)',
   'Soft glow around the sun and lights, warmer light and richer colours, like a film or a game': 'ពន្លឺស្រទន់ជុំវិញព្រះអាទិត្យ និងភ្លើង ពន្លឺកក់ក្ដៅ និងពណ៌ឆ្អៅជាងមុន ដូចភាពយន្ត ឬហ្គេម',
   'Soft dark shading where walls meet the ground, under roofs and trees. Needs a good graphics card.': 'ស្រមោលស្រទន់ត្រង់ជញ្ជាំងប៉ះដី ក្រោមដំបូល និងក្រោមដើមឈើ។ ត្រូវការកាតក្រាហ្វិកល្អ។', 'Constellation figures: Stellarium (Free Art License).': 'រូបក្រុមផ្កាយ៖ Stellarium (Free Art License)។', 'Constellation lines and names': 'ខ្សែ និងឈ្មោះក្រុមផ្កាយ',

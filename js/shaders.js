@@ -105,7 +105,23 @@ export function makeBuildingMaterial() {
 totalEmissiveRadiance += vec3(1.0, 0.62, 0.28) * winLit * uNight * 0.9;`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 float winLit = 0.0;
-if (vWall.z > 0.5) {
+if (vWall.z > 3.5) {
+  // wooden house: horizontal planks, small shuttered windows
+  float pl = fract(vWall.y * 4.5);
+  diffuseColor.rgb *= 0.86 + 0.14 * smoothstep(0.0, 0.12, pl) * (0.9 + 0.2 * fract(sin(floor(vWall.y * 4.5) * 17.3) * 431.7));
+  float c = mod(vWall.x, 3.0), fl = vWall.y;
+  float win = step(0.9, c) * step(c, 1.9) * step(0.9, fl) * step(fl, 1.9) * step(fl, vWall.w - 0.4);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.06, 0.045, 0.03), win * 0.85);
+  winLit = win * step(0.6, fract(sin(floor(vWall.x / 3.0) * 12.9898 + vWall.w * 7.0) * 43758.5453));
+} else if (vWall.z > 2.5 && vWall.y < 3.0) {
+  // shophouse front, ground floor: roll-up shutters, some open onto a lit shop
+  float bay = floor(vWall.x / 4.0), bx = mod(vWall.x, 4.0), open = step(0.45, fract(sin(bay * 91.7 + vWall.w * 3.1) * 43758.5453));
+  float inBay = step(0.25, bx) * step(bx, 3.75) * step(vWall.y, 2.7);
+  vec3 shutter = vec3(0.55, 0.57, 0.58) * (0.85 + 0.15 * step(0.5, fract(vWall.y * 7.0)));
+  vec3 shop = mix(vec3(0.09, 0.08, 0.07), vec3(0.35, 0.3, 0.22), step(1.2, vWall.y) * step(vWall.y, 2.2) * step(0.6, fract(bx * 1.7)));
+  diffuseColor.rgb = mix(diffuseColor.rgb, mix(shutter, shop, open), inBay);
+  winLit = inBay * open;
+} else if (vWall.z > 0.5) {
   float big = step(1.5, vWall.z);
   float fl = mod(vWall.y, 3.2);
   float c = mod(vWall.x, mix(3.4, 2.7, big));

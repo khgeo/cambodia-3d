@@ -1,7 +1,7 @@
 // Vehicle kit, +z forward, y up, ground at 0. Each type: "paint" (tinted per instance) + "fixed" (vertex colours).
 // Bodies are side profiles extruded across the width with a small bevel, so they read as real cars, not boxes.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=95';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=96';
 
 function finish(g, hex) {
   g = g.index ? g.toNonIndexed() : g;

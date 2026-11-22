@@ -5,31 +5,32 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=95';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=95';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=95';
-import { buildTrees, GrassField, WIND } from './vegetation.js?v=95';
-import { RoadNet, Driver, Walker } from './modes.js?v=95';
-import { vehicleKit } from './vehicles.js?v=95';
-import { loadCarPack } from './carpack.js?v=95';
-import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=95';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=95';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=95';
-import { LayerStack } from './layers.js?v=95';
-import { Survey } from './survey.js?v=95';
-import { Editor } from './editor.js?v=95';
-import { Atmos } from './atmos.js?v=95';
-import { NightLights } from './lights.js?v=95';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=95';
-import { Tactical, loadCatalog } from './tactical.js?v=95';
-import { LcTrainer } from './lctrain.js?v=95';
-import { Radar } from './radar.js?v=95';
-import { Globe } from './globe.js?v=95';
-import { SEASON } from './vegetation.js?v=95';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=95';
-import { makeCloudDome } from './skyclouds.js?v=95';
-import { EarthContext } from './earthctx.js?v=95';
-import { ResultLayers } from './results.js?v=95';
+import * as G from './geo.js?v=96';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=96';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=96';
+import { buildTrees, GrassField, WIND } from './vegetation.js?v=96';
+import { classify as khClassify, details as khDetails, powerLines } from './khmerbuild.js?v=96';
+import { RoadNet, Driver, Walker } from './modes.js?v=96';
+import { vehicleKit } from './vehicles.js?v=96';
+import { loadCarPack } from './carpack.js?v=96';
+import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=96';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=96';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=96';
+import { LayerStack } from './layers.js?v=96';
+import { Survey } from './survey.js?v=96';
+import { Editor } from './editor.js?v=96';
+import { Atmos } from './atmos.js?v=96';
+import { NightLights } from './lights.js?v=96';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=96';
+import { Tactical, loadCatalog } from './tactical.js?v=96';
+import { LcTrainer } from './lctrain.js?v=96';
+import { Radar } from './radar.js?v=96';
+import { Globe } from './globe.js?v=96';
+import { SEASON } from './vegetation.js?v=96';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=96';
+import { makeCloudDome } from './skyclouds.js?v=96';
+import { EarthContext } from './earthctx.js?v=96';
+import { ResultLayers } from './results.js?v=96';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -691,6 +692,9 @@ export class World {
       if (hs.length) { const g = this.buildBuildings(hs, rnd, { noStats: true }); if (g) { const m = new THREE.Mesh(g, makeBuildingMaterial()); m.castShadow = m.receiveShadow = true; this.housesMesh = m; this.root.add(m); } }
     }
 
+    // power poles and wires along the roads
+    this.polesMesh = powerLines(this); if (this.polesMesh) { this.polesMesh.visible = this.polesOn !== false; this.root.add(this.polesMesh); }
+
     /* 6. trees + near grass */
     say('Planting trees from the image…'); await tick();
     // where palms belong: open lowland, not inside large forests or on hills/mountains
@@ -789,19 +793,23 @@ export class World {
       if (b.stilt) { gnd += b.stilt; for (const p of ring) { const y0 = this.hAt(p[0], p[1]) - 0.2; for (const [dx, dz] of [[0, 0]]) { const px = p[0], pz = p[1], r = 0.13;
         const cyl = [[px - r, pz - r], [px + r, pz - r], [px + r, pz + r], [px - r, pz + r]]; for (let k = 0; k < 4; k++) { const A = cyl[k], B2 = cyl[(k + 1) % 4], pc = new THREE.Color(0x6b5440).convertSRGBToLinear(); tri([A[0], y0, A[1]], [B2[0], y0, B2[1]], [B2[0], gnd, B2[1]], pc); tri([A[0], y0, A[1]], [B2[0], gnd, B2[1]], [A[0], gnd, A[1]], pc); } } } }
       const stone = t === 6 && area >= 1500; // large temple complexes: sandstone, flat, no windows
-      const wallC = new THREE.Color(b.wall != null ? b.wall : stone ? 0x9a8c72 : WALLS[(rnd() * WALLS.length) | 0]).convertSRGBToLinear();
-      const winType = t === 9 || t === 10 || t === 6 || t === 11 ? 0 : (h > 6.5 || [3, 4, 7, 8].includes(t)) ? 2 : 1, top = gnd + h;
+      const K = khClassify(b, ring, area, G.obb(ring), h, this.net); // shophouse, wooden house on stilts, villa, house…
+      if (K.kind === 'shop') h = Math.max(h, 3.2 * Math.round(h / 3.2) + 0.4);
+      const wood = K.kind === 'stilt' && rnd() < 0.65;
+      const wallC = new THREE.Color(wood ? [0x7a5538, 0x8a6243, 0x9c7450, 0x6e4c34][(rnd() * 4) | 0] : b.wall != null ? b.wall : stone ? 0x9a8c72 : WALLS[(rnd() * WALLS.length) | 0]).convertSRGBToLinear();
+      const winType0 = t === 9 || t === 10 || t === 6 || t === 11 ? 0 : wood ? 4 : (h > 6.5 || [3, 4, 7, 8].includes(t)) ? 2 : 1, top = gnd + h;
       let along = 0;
       for (let i = 0; i < ring.length; i++) {
         const p = ring[i], q = ring[(i + 1) % ring.length], L = Math.hypot(q[0] - p[0], q[1] - p[1]);
         const a0 = [p[0], gnd, p[1]], a1 = [q[0], gnd, q[1]], b0 = [p[0], top, p[1]], b1 = [q[0], top, q[1]];
         tmp.copy(wallC).multiplyScalar(0.92 + 0.12 * Math.abs(Math.sin(Math.atan2(q[1] - p[1], q[0] - p[0]))));
+        const winType = K.kind === 'shop' ? (i === K.front ? 3 : 2) : winType0;
         const w = (s, y) => [along + s, y, winType, h];
         push(a0, tmp, w(0, 0)); push(a1, tmp, w(L, 0)); push(b1, tmp, w(L, h)); push(a0, tmp, w(0, 0)); push(b1, tmp, w(L, h)); push(b0, tmp, w(0, h));
         along += L;
       }
       const ob = G.obb(ring), rect = ob ? area / (4 * ob.a * ob.b) : 0;
-      const pitched = b.roof ? (b.roof !== 'flat' && !!ob) : ob && !big && rect > 0.78 && ![3, 4, 5, 9].includes(t) && h < 10 && ob.b > 1.5;
+      const pitched = K.kind === 'shop' ? false : b.roof ? (b.roof !== 'flat' && !!ob) : ob && !big && rect > 0.78 && ![3, 4, 5, 9].includes(t) && h < 10 && ob.b > 1.5;
       if (t === 11 && ob) {
         const r = Math.sqrt(area / Math.PI) * 0.9, g = new THREE.LatheGeometry([[0, 0], [r, 0], [r * 0.95, r * 0.6], [r * 0.55, r * 1.3], [r * 0.25, r * 1.9], [0.05, r * 3.2]].map(([x, y]) => new THREE.Vector2(x, y)), 12).toNonIndexed();
         const gp = g.attributes.position, gold = new THREE.Color(0xd8b25a).convertSRGBToLinear(), white = new THREE.Color(0xf2efe6).convertSRGBToLinear();
@@ -833,6 +841,7 @@ export class World {
           tri([q[0][0], y2, q[0][1]], [q[1][0], y2, q[1][1]], [q[2][0], y2, q[2][1]], tc); tri([q[0][0], y2, q[0][1]], [q[2][0], y2, q[2][1]], [q[3][0], y2, q[3][1]], tc);
         }
       }
+      if (ob) khDetails(K, b, ring, ob, gnd, top, h, wallC, tri, rnd, area); // balconies, awnings, stairs, compound walls…
     }
     if (!opts.noStats) this.D.stats.buildings = count;
     if (!pos.length) return null;
@@ -1126,6 +1135,7 @@ export class World {
     if (kind === 'trees') (this.treeMeshes || []).forEach(m => m.visible = on);
     if (kind === 'buildings' && this.buildingsMesh) this.buildingsMesh.visible = on;
     if (kind === 'houses' && this.housesMesh) this.housesMesh.visible = on;
+    if (kind === 'poles') { this.polesOn = on; if (this.polesMesh) this.polesMesh.visible = on; }
     if (kind === 'traffic') { this.trafficOn = on; (this.vehMeshes || []).forEach(g => (g.all || [g.paint, g.fixed]).forEach(m => m.visible = on)); }
     if (kind === 'shadows') this.sun.castShadow = on;
     if (kind === 'reflect') this.reflectOn = on;
@@ -1232,7 +1242,7 @@ export class World {
   }
   // flooded paddies at planting (needs Field Boundaries), straw stacks by the houses after the harvest
   async farmUpdate(fields) {
-    const RF = this._rf || (this._rf = await import('./ricefield.js?v=95')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
+    const RF = this._rf || (this._rf = await import('./ricefield.js?v=96')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
     for (const k of ['paddyMesh', 'hayMesh']) if (this[k]) { this.root.remove(this[k]); this[k].geometry.dispose(); this[k].material.dispose(); this[k] = null; }
     const F = this._farmFields || this.fields; if (this.seasonKey === 'planting' && F && F.length) { this.paddyMesh = RF.paddyWater(this, F); if (this.paddyMesh) this.root.add(this.paddyMesh); }
     if (this.seasonKey === 'harvested') { this.hayMesh = RF.hayStacks(this); if (this.hayMesh) this.root.add(this.hayMesh); }
@@ -1445,7 +1455,7 @@ export class World {
   }
   // cinematic look (glow, colour grade, optional ambient occlusion), loaded on first use
   async setLook(on, ao) {
-    if ((on || ao) && !this.look) { const { Look } = await import('./look.js?v=95'); this.look = new Look(this); const s = this.renderer.getSize(new THREE.Vector2()); this.look.setSize(s.x, s.y); }
+    if ((on || ao) && !this.look) { const { Look } = await import('./look.js?v=96'); this.look = new Look(this); const s = this.renderer.getSize(new THREE.Vector2()); this.look.setSize(s.x, s.y); }
     if (!this.look) return; this.look.on = on; if (ao != null) await this.look.setAO(on && ao);
   }
 }
