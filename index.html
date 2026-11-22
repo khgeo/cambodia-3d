@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=102">
+<link rel="stylesheet" href="css/app.css?v=103">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -424,7 +424,7 @@
   <div id="ghPanel" class="rpanel gpanel" hidden>
     <div class="row lphead"><b>🎒 Geography in hand</b><span id="ghHint" class="hint"></span><button id="ghMin" title="Hide / show">▴</button><button id="ghClose" title="Close">✕</button></div>
     <div>
-      <div class="ghTabs" id="ghTabs"><button data-v="profile" class="on">📋 Place</button><button data-v="time">⏳ Time</button><button data-v="whatif">🌊 What if</button><button data-v="rain">💧 Rain</button><button data-v="access">🚶 Access</button><button data-v="sheet">📄 Report</button><button data-v="trip">📱 Field trip</button></div>
+      <div class="ghTabs" id="ghTabs"><button data-v="profile" class="on">📋 Place</button><button data-v="time">⏳ Time</button><button data-v="whatif">🌊 What if</button><button data-v="rain">💧 Rain</button><button data-v="land">⛰️ Landforms</button><button data-v="people">👥 People</button><button data-v="access">🚶 Access</button><button data-v="sheet">📄 Report</button><button data-v="trip">📱 Field trip</button></div>
       <div id="ghStatus" class="svhelp ghStatus"></div>
       <section data-gh="profile">
         <div class="svhelp">Tap any place on the 3D landscape: height, slope, land, soil, rock, climate, villages, services and where its rain goes, read for you as a fieldwork sheet.</div>
@@ -452,6 +452,15 @@
       <section data-gh="rain" hidden>
         <div class="svhelp">Blue lines: where water collects into streams. Tap any place to drop rain there: watch it run downhill, and see its catchment (all the land that drains to that spot).</div>
         <div id="ghRainOut"></div>
+      </section>
+      <section data-gh="land" hidden>
+        <div class="svhelp">Landforms classified automatically from the terrain: slope, height above the nearest stream and position against the surroundings. Tap a place to see its landform.</div>
+        <div id="ghLfOut"></div>
+      </section>
+      <section data-gh="people" hidden>
+        <div class="svhelp">Where people live: population from WorldPop (100 m) fitted to the 2019 census, the age and sex structure of the province, and the settlements found from the buildings with their form (linear, clustered, dispersed).</div>
+        <div class="seg" id="ghPpMode"><button data-v="pop" class="on">👥 Population</button><button data-v="set">🏘️ Settlements</button></div>
+        <div id="ghPpOut"></div>
       </section>
       <section data-gh="access" hidden>
         <div class="gpgrid"><label>To the nearest<select id="ghAcKind"><option value="school">🏫 School</option><option value="health">🏥 Health centre / hospital</option><option value="market">🛒 Market</option><option value="wat">🛕 Wat</option></select></label>
@@ -646,6 +655,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=102"></script>
+<script type="module" src="js/app.js?v=103"></script>
 </body>
 </html>

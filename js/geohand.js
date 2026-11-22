@@ -2,7 +2,7 @@
 // 1 Place profile · 2 Time machine · 3 What if (flood, heavy rain) · 4 Where does the rain go · 5 Access to services
 // 6 Worksheet maker · 7 Field trip (GPS, stops, observations)
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=102';
+import { t, lang } from './i18n.js?v=103';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -11,6 +11,18 @@ const U = u => km() ? ({ m: 'ម', km: 'គ.ម', ha: 'ហ.ត', mm: 'ម.ម' }
 const NUMKM = '០១២៣៤៥៦៧៨៩';
 const n0 = (v, d = 0) => { if (v == null || !isFinite(v)) return '–'; const s = Number(v).toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d }); return km() ? s.replace(/\d/g, c => NUMKM[c]) : s; };
 const LC = { 1: ['Water', 'ទឹក', '#3b8fd9'], 2: ['Trees', 'ដើមឈើ', '#2f7d3a'], 3: ['Rice fields & grass', 'ស្រែ និងវាលស្មៅ', '#d8c24a'], 4: ['Bare soil', 'ដីទទេ', '#b98a5a'], 5: ['Houses & roads', 'ផ្ទះ និងផ្លូវ', '#c4413a'] };
+const LANDFORMS = { 1: ['Water body', 'ផ្ទៃទឹក', '#3b8fd9'], 2: ['Channel / depression', 'ប្រឡាយ / ទីទាប', '#5fb3c9'], 3: ['Floodplain', 'វាលទំនាបលិចទឹក', '#9fd39a'], 4: ['Low terrace / plain', 'រាបទាប / វាលទំនាប', '#e4dc8c'], 5: ['High terrace / plateau', 'រាបខ្ពស់ / ខ្ពង់រាប', '#e0b46a'], 6: ['Slope / foothill', 'ជម្រាល / ជើងភ្នំ', '#c98552'], 7: ['Hill / ridge', 'ភ្នំ / ខ្នងភ្នំ', '#8f5a43'], 8: ['Isolated rise / mound', 'ទួល', '#d06fa0'] };
+const SETTLE = { linear: ['Linear (along a road)', 'តាមបណ្ដោយផ្លូវ', '#e8742c'], riverbank: ['Linear (along water)', 'តាមបណ្ដោយទឹក', '#2b8fd8'], clustered: ['Clustered (nucleated)', 'ប្រមូលផ្ដុំ', '#c43b3b'], dispersed: ['Dispersed (scattered)', 'រាយប៉ាយ', '#8a5fc0'] };
+const convexHull = P => { const p = P.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]), cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = []; for (const q of p) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); } for (const q of p.reverse()) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); } return lo.slice(0, -1).concat(up.slice(0, -1)); };
+const ringA = r => { let s = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) s += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1]); return s / 2; };
+export { LANDFORMS, SETTLE };
+function dbscanLabels(P, eps, minPts) { // P: [{x, z}] → cluster label per point (-1 noise)
+  const n = P.length, lab = new Int32Array(n).fill(-2), g = new Map(), key = (i, j) => i + ',' + j;
+  P.forEach((p, i) => { const k = key(Math.floor(p.x / eps), Math.floor(p.z / eps)); (g.get(k) || g.set(k, []).get(k)).push(i); });
+  const nb = i => { const p = P[i], ci = Math.floor(p.x / eps), cj = Math.floor(p.z / eps), o = []; for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (const j of g.get(key(ci + a, cj + b)) || []) if (Math.hypot(P[j].x - p.x, P[j].z - p.z) <= eps) o.push(j); return o; };
+  let c = 0; for (let i = 0; i < n; i++) { if (lab[i] !== -2) continue; const N = nb(i); if (N.length < minPts) { lab[i] = -1; continue; } lab[i] = c; const q = [...N];
+    while (q.length) { const j = q.pop(); if (lab[j] === -1) lab[j] = c; if (lab[j] !== -2) continue; lab[j] = c; const M = nb(j); if (M.length >= minPts) q.push(...M); } c++; }
+  return lab; }
 const lcName = k => LC[k] ? (km() ? LC[k][1] : LC[k][0]) : '';
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], MONTHS_KM = ['មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា', 'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'];
 const month = i => km() ? MONTHS_KM[i] : MONTHS[i];
@@ -45,7 +57,7 @@ export class GeoHand {
   constructor(world, opts = {}) {
     this.w = world; this.say = opts.say || (() => { }); this.g = new THREE.Group(); this.tab = 'profile'; this.data = {}; this.trip = this.loadTrip();
   }
-  get D() { return this.w.D; } get F() { return this.w.F; }
+  get D() { return this.w.D; } get F() { return this.w.F; } get LFN() { return LANDFORMS; } get SETN() { return SETTLE; }
   /* ---------- helpers ---------- */
   rawAt(x, z) { const D = this.D, fi = THREE.MathUtils.clamp((x - D.X0) / D.dx, 0, D.nx), fj = THREE.MathUtils.clamp((z - D.Z0) / D.dz, 0, D.nz), i = Math.min(D.nx - 1, Math.floor(fi)), j = Math.min(D.nz - 1, Math.floor(fj)), u = fi - i, v = fj - j, R = D.nx + 1, r = D.raw;
     return (r[j * R + i] * (1 - u) + r[j * R + i + 1] * u) * (1 - v) + (r[(j + 1) * R + i] * (1 - u) + r[(j + 1) * R + i + 1] * u) * v; }
@@ -84,7 +96,7 @@ export class GeoHand {
     const H = this.hydro(), path = this.flowPath(x, z); P.flow = path.info;
     // in parallel: admin names, soil & geology, climate, villages and services nearby
     const [adm, U, clim, near] = await Promise.all([
-      import('./placeinfo.js?v=102').then(m => m.adminAt(lat, lon)).catch(() => null),
+      import('./placeinfo.js?v=103').then(m => m.adminAt(lat, lon)).catch(() => null),
       this.underground().catch(() => null), // rock from the bundled map at once; soil (SoilGrids, can be slow) when it comes
       this.climate(lat, lon), this.nearby(lon, lat)]);
     P.adm = adm; P.clim = clim; P.near = near;
@@ -92,7 +104,7 @@ export class GeoHand {
     void H; this.data.profile = P; return P;
   }
   async underground() {
-    if (this.U && this.U.soilOk) return this.U; const m = this.SM || (this.SM = await import('./section.js?v=102'));
+    if (this.U && this.U.soilOk) return this.U; const m = this.SM || (this.SM = await import('./section.js?v=103'));
     if (!this.Ug) this.Ug = await m.loadUnderground(this.w, null, { noSoil: true });
     if (!this.soilJob) this.soilJob = m.loadUnderground(this.w, s => this.say(t(s))).then(U => { this.U = U; return U; }).catch(() => null);
     const U = await Promise.race([this.soilJob, new Promise(r => setTimeout(() => r(null), 20000))]); return U || this.Ug;
@@ -211,7 +223,7 @@ export class GeoHand {
     return this.impacts(flAt, lvl, base);
   }
   async impacts(flAt, lvl, base, paint = true) {
-    const D = this.D, UM = this.UM || (this.UM = await import('./urban.js?v=102')), B = UM.buildingsOf(this.w), vals = B.map(b => flAt(b.x, b.z) ? 1 : 0), nb = vals.reduce((a, b) => a + b, 0);
+    const D = this.D, UM = this.UM || (this.UM = await import('./urban.js?v=103')), B = UM.buildingsOf(this.w), vals = B.map(b => flAt(b.x, b.z) ? 1 : 0), nb = vals.reduce((a, b) => a + b, 0);
     if (nb && paint) UM.paint(this.w, B, vals.map(v => v ? 1 : 0.15), 0, 1); // flooded houses in yellow, the others dark
     let roadKm = 0; for (const r of this.w.net ? this.w.net.roads : []) for (let i = 1; i < r.pts.length; i++) { const a = r.pts[i - 1], b = r.pts[i]; if (flAt((a.x + b.x) / 2, (a.z + b.z) / 2)) roadKm += Math.hypot(b.x - a.x, b.z - a.z) / 1000; }
     let crop = 0, cells = 0; for (let j = 0; j < D.gh; j++) for (let i = 0; i < D.gw; i++) { const x = D.X0 + (i + 0.5) * D.C, z = D.Z0 + (j + 0.5) * D.C; if (D.cls[j * D.gw + i] === 3 && flAt(x, z)) crop++; if (flAt(x, z)) cells++; }
@@ -227,7 +239,7 @@ export class GeoHand {
 
   /* ================= 5. Access to services ================= */
   async access(kind, mode) {
-    const D = this.D, F = this.F, UM = this.UM || (this.UM = await import('./urban.js?v=102')), a = D.aoi, pad = 0.03, bb = [a.w - pad, a.s - pad, a.e + pad, a.n + pad];
+    const D = this.D, F = this.F, UM = this.UM || (this.UM = await import('./urban.js?v=103')), a = D.aoi, pad = 0.03, bb = [a.w - pad, a.s - pad, a.e + pad, a.n + pad];
     const KINDS = { school: ['school', 'kindergarten', 'college', 'university'], health: ['hospital', 'clinic', 'doctors', 'health_post'], market: ['marketplace'], wat: ['place_of_worship'] };
     const key = bb.join(','); if (!this._poi || this._poi.key !== key) { this.say(t('Finding schools, health centres and markets…'));
       const pts = []; const jobs = [];
@@ -251,7 +263,7 @@ export class GeoHand {
 
   /* ================= 2. Time machine ================= */
   async timeMachine(say) {
-    if (this.TM && this.TM.aoi === this.D.aoi) return this.TM; const D = this.D, a = D.aoi, LCm = await import('./landcover.js?v=102'), LY = await import('./layers.js?v=102');
+    if (this.TM && this.TM.aoi === this.D.aoi) return this.TM; const D = this.D, a = D.aoi, LCm = await import('./landcover.js?v=103'), LY = await import('./layers.js?v=103');
     const years = LY.IO_YEARS, io = {};
     let n = 0; await Promise.all(years.map(async y => { const r = await LCm.loadIO(a, D.W, D.H, y); if (r) io[y] = r; say(`${t('Loading land cover maps')} ${++n}/${years.length}`); }));
     const stats = {}; for (const [y, r] of Object.entries(io)) { const c = {}; for (const v of r.d) c[v] = (c[v] || 0) + 1; const ha = D.W * D.H / 1e4 / r.d.length; stats[y] = Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v * ha])); }
@@ -292,13 +304,91 @@ export class GeoHand {
     if (kind === 'top') { const s = Math.min(cv.width, cv.height), c = document.createElement('canvas'); c.width = c.height = Math.min(1000, s); c.getContext('2d').drawImage(cv, (cv.width - s) / 2, (cv.height - s) / 2, s, s, 0, 0, c.width, c.height); url = c.toDataURL('image/jpeg', 0.88); }
     else url = cv.toDataURL('image/jpeg', 0.85);
     cam.position.copy(p0); ct.target.copy(q0); ct.update(); return url; }
+  /* ================= Landforms (geomorphology) ================= */
+  // classes from slope, height above the nearest stream (HAND) and position against the surroundings (TPI)
+  landforms() {
+    if (this.LF && this.LF.D === this.D) return this.LF;
+    const D = this.D, H = this.hydro(), NX = H.NX, NZ = H.NZ, R = D.raw, N = H.N;
+    // height above the nearest drainage: follow the flow down to the first stream cell
+    const thr = 2 * 1e4 / H.cellA, base = new Float32Array(N).fill(NaN);
+    for (let k0 = 0; k0 < N; k0++) { if (!isNaN(base[k0])) continue; const path = []; let k = k0;
+      while (k >= 0 && isNaN(base[k]) && H.acc[k] < thr && H.dir[k] >= 0) { path.push(k); k = H.dir[k]; }
+      const b = k < 0 ? R[path[path.length - 1]] : !isNaN(base[k]) ? base[k] : R[k]; if (k >= 0 && isNaN(base[k])) base[k] = R[k]; for (const q of path) base[q] = b; }
+    // mean height around each cell (integral image) at two scales
+    const I = new Float64Array((NX + 1) * (NZ + 1)); for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) I[(j + 1) * (NX + 1) + i + 1] = R[j * NX + i] + I[j * (NX + 1) + i + 1] + I[(j + 1) * (NX + 1) + i] - I[j * (NX + 1) + i];
+    const mean = (i, j, r) => { const i0 = Math.max(0, i - r), i1 = Math.min(NX, i + r + 1), j0 = Math.max(0, j - r), j1 = Math.min(NZ, j + r + 1); return (I[j1 * (NX + 1) + i1] - I[j0 * (NX + 1) + i1] - I[j1 * (NX + 1) + i0] + I[j0 * (NX + 1) + i0]) / ((i1 - i0) * (j1 - j0)); };
+    const sb = Math.max(1, Math.round(15 / D.dx)), rS = Math.max(2, Math.round(60 / D.dx)), rL = Math.max(4, Math.round(300 / D.dx)), cls = new Uint8Array(N), cnt = new Array(9).fill(0);
+    for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const k = j * NX + i, x = D.X0 + i * D.dx, z = D.Z0 + j * D.dz;
+      const i0 = Math.max(0, i - sb), i1 = Math.min(NX - 1, i + sb), j0 = Math.max(0, j - sb), j1 = Math.min(NZ - 1, j + sb), gx = (R[j * NX + i1] - R[j * NX + i0]) / ((i1 - i0) * D.dx), gz = (R[j1 * NX + i] - R[j0 * NX + i]) / ((j1 - j0) * D.dz), sl = Math.atan(Math.hypot(gx, gz)) * 180 / Math.PI;
+      const hand = R[k] - base[k], tS = R[k] - mean(i, j, rS), tL = R[k] - mean(i, j, rL); let c;
+      if (this.clsAt(x, z) === 1) c = 1;                         // water: river, lake, pond
+      else if (sl > 15 || (tL > 15 && sl > 6)) c = 7;            // hill, ridge
+      else if (sl > 5) c = 6;                                    // slope, foothill
+      else if (tS < -1.2 && hand < 3) c = 2;                     // channel, depression, valley floor
+      else if (hand < 2) c = 3;                                  // floodplain
+      else if (hand < 6) c = 4;                                  // low terrace, plain
+      else c = 5;                                                // high terrace, plateau
+      if (tL > 8 && c >= 4 && c <= 5 && sl <= 5) c = 8;          // isolated rise, mound (e.g. levee, old dune, temple mound)
+      cls[k] = c; cnt[c]++; }
+    return (this.LF = { D, cls, pct: cnt.map(n => n / N * 100) });
+  }
+  showLandforms() { const L = this.landforms(); this.clear(); this.overlay(this.gridCanvas(k => { const c = LANDFORMS[L.cls[k]]; if (!c) return null; const h = c[2]; return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16), 165]; })); return L; }
+  landformMap(px = 760) { const L = this.landforms(), H = this.hydro(), NX = H.NX, NZ = H.NZ, c = document.createElement('canvas'); c.width = NX; c.height = NZ; const g = c.getContext('2d'), im = g.createImageData(NX, NZ), R = this.D.raw;
+    for (let j = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const k = j * NX + i, h = (LANDFORMS[L.cls[k]] || [, , '#999999'])[2], gx = (R[j * NX + Math.min(NX - 1, i + 1)] - R[j * NX + Math.max(0, i - 1)]) * 1.5, gz = (R[Math.min(NZ - 1, j + 1) * NX + i] - R[Math.max(0, j - 1) * NX + i]) * 1.5, sh = Math.min(1.25, Math.max(0.55, 0.95 + (gx * 0.4 + gz * 0.5) / 10));
+      im.data.set([parseInt(h.slice(1, 3), 16) * sh, parseInt(h.slice(3, 5), 16) * sh, parseInt(h.slice(5, 7), 16) * sh, 255].map(v => Math.min(255, v)), k * 4); }
+    g.putImageData(im, 0, 0); const o = document.createElement('canvas'), s = px / Math.max(NX, NZ); o.width = Math.round(NX * s); o.height = Math.round(NZ * s); const og = o.getContext('2d'); og.drawImage(c, 0, 0, o.width, o.height); this.mapFrame(og, o.width, o.height); return o.toDataURL('image/jpeg', 0.9); }
+
+  /* ================= People: population, age and sex, settlements ================= */
+  async population() {
+    const D = this.D, F = this.F, a = D.aoi; if (this.POP && this.POP.D === D) return this.POP;
+    const idx = this._popIdx || (this._popIdx = await (await fetch('data/pop/index.json')).json()), cells = [];
+    for (let i = Math.floor((a.w - 102) / 0.25); i <= Math.floor((a.e - 102) / 0.25); i++) for (let j = Math.floor((a.s - 10) / 0.25); j <= Math.floor((a.n - 10) / 0.25); j++) {
+      const T = idx.tiles[i + '_' + j]; if (!T) continue; const [c0, r0, w, h] = T;
+      const buf = await new Response((await fetch(`data/pop/${i}_${j}.bin.gz`)).body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer(), v = new Uint16Array(buf);
+      for (let r = 0; r < h; r++) { const lat = idx.oy - (r0 + r + 0.5) * idx.res; if (lat < a.s || lat > a.n) continue; for (let c = 0; c < w; c++) { const q = v[r * w + c]; if (!q) continue; const lon = idx.ox + (c0 + c + 0.5) * idx.res; if (lon < a.w || lon > a.e) continue; cells.push([F.x(lon), F.z(lat), q / idx.scale]); } } }
+    const total = cells.reduce((s, c) => s + c[2], 0), areaKm2 = D.W * D.H / 1e6;
+    const P = this.data.profile, adm = P && P.adm || await import('./placeinfo.js?v=103').then(m => m.adminAt(F.lat0, F.lon0)).catch(() => null);
+    const norm = s => ({ siemreap: 'siemreap', tboungkhmum: 'tbongkhmum', oddarmeanchey: 'otdarmeanchey', ratanakiri: 'ratanakkiri' })[(s || '').toLowerCase().replace(/[^a-z]/g, '')] || (s || '').toLowerCase().replace(/[^a-z]/g, '');
+    const prov = adm ? idx.provinces[norm(adm.pro_en)] : null;
+    return (this.POP = { D, cells, total, density: total / areaKm2, areaKm2, prov, source: idx.source, cellM: idx.res * 110000 });
+  }
+  showPopulation(P) { const D = this.D, NX = Math.ceil(D.W / 92), NZ = Math.ceil(D.H / 92), g = new Float32Array(NX * NZ); for (const [x, z, v] of P.cells) { const i = Math.floor((x - D.X0) / 92), j = Math.floor((z - D.Z0) / 92); if (i >= 0 && j >= 0 && i < NX && j < NZ) g[j * NX + i] += v; }
+    const c = document.createElement('canvas'); c.width = NX; c.height = NZ; const cx = c.getContext('2d'), im = cx.createImageData(NX, NZ), mx = Math.max(10, ...g);
+    for (let k = 0; k < g.length; k++) { if (g[k] < 0.5) continue; const t = Math.sqrt(g[k] / mx); im.data.set([255, Math.round(230 - 200 * t), Math.round(120 - 110 * t), Math.round(90 + 140 * t)], k * 4); }
+    cx.putImageData(im, 0, 0); this.clear(); this.overlay(c); return mx; }
+  pyramid(prov, W = 520, Hh = 260) { const c = document.createElement('canvas'); c.width = W; c.height = Hh; const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, Hh); if (!prov || !prov.proj2024) return c;
+    const { F: Fm, M } = prov.proj2024, tot = prov.proj2024.T, n = Fm.length, mx = Math.max(...Fm, ...M) / tot * 100, cx = W / 2, bh = (Hh - 34) / n, sx = (W / 2 - 40) / mx, L = ['0', '5', '10', '15', '20', '25', '30', '35', '40', '45', '50', '55', '60', '65', '70', '75', '80+'];
+    g.font = '11px system-ui'; for (let i = 0; i < n; i++) { const y = Hh - 22 - (i + 1) * bh, m = M[i] / tot * 100, f = Fm[i] / tot * 100; g.fillStyle = '#3f7fc4'; g.fillRect(cx - 14 - m * sx, y + 1, m * sx, bh - 2); g.fillStyle = '#d0587e'; g.fillRect(cx + 14, y + 1, f * sx, bh - 2); g.fillStyle = '#333'; g.textAlign = 'center'; if (i % 2 === 0) g.fillText(L[i], cx, y + bh - 2); }
+    g.textAlign = 'left'; g.fillStyle = '#3f7fc4'; g.fillText(km() ? 'ប្រុស' : 'Male', 8, 14); g.textAlign = 'right'; g.fillStyle = '#d0587e'; g.fillText(km() ? 'ស្រី' : 'Female', W - 8, 14); g.fillStyle = '#555'; g.textAlign = 'center'; g.fillText(km() ? '% នៃប្រជាជនសរុប' : '% of the population', cx, Hh - 6); return c; }
+  ageStats(prov) { if (!prov || !prov.proj2024) return null; const { F: Fm, M, T } = prov.proj2024, s = (a, b) => { let v = 0; for (let i = a; i <= b; i++) v += Fm[i] + M[i]; return v; };
+    const young = s(0, 2), work = s(3, 12), old = s(13, 16), males = M.reduce((x, y) => x + y, 0); return { young: young / T * 100, work: work / T * 100, old: old / T * 100, dep: (young + old) / work * 100, sexRatio: males / (T - males) * 100 }; }
+  // settlements: groups of buildings, their size and shape (linear along a road or river, clustered, dispersed)
+  async settlements() {
+    const UM = this.UM || (this.UM = await import('./urban.js?v=103')), B = UM.buildingsOf(this.w), D = this.D; if (B.length < 10) return [];
+    const lab = dbscanLabels(B, 45, 6), groups = new Map(); lab.forEach((l, i) => { if (l >= 0) (groups.get(l) || groups.set(l, []).get(l)).push(B[i]); });
+    const roadD = (x, z) => { const n = this.w.net && this.w.net.near(x, z, 80)[0]; return n ? n[2] : 999; }, waterD = (x, z) => { for (let r = 0; r <= 80; r += 10) for (let a = 0; a < 6.28; a += 0.8) if (this.clsAt(x + Math.cos(a) * r, z + Math.sin(a) * r) === 1) return r; return 999; };
+    const out = [];
+    for (const g of groups.values()) { if (g.length < 12) continue; const n = g.length, cx = g.reduce((s, b) => s + b.x, 0) / n, cz = g.reduce((s, b) => s + b.z, 0) / n;
+      let xx = 0, xz = 0, zz = 0; for (const b of g) { const dx = b.x - cx, dz = b.z - cz; xx += dx * dx; xz += dx * dz; zz += dz * dz; } const tr = (xx + zz) / n, det = (xx * zz - xz * xz) / n / n, l1 = tr / 2 + Math.sqrt(Math.max(0, tr * tr / 4 - det)), l2 = Math.max(1, tr / 2 - Math.sqrt(Math.max(0, tr * tr / 4 - det))), elong = Math.sqrt(l1 / l2);
+      const hull = convexHull(g.map(b => [b.x, b.z])), area = Math.max(100, Math.abs(ringA(hull))), dens = n / (area / 1e4);
+      const nearRoad = g.filter(b => roadD(b.x, b.z) < 35).length / n, nearWater = g.filter(b => waterD(b.x, b.z) < 60).length / n;
+      const shape = elong > 2.6 && nearWater > 0.5 ? 'riverbank' : elong > 2.6 && nearRoad > 0.5 ? 'linear' : dens < 6 ? 'dispersed' : 'clustered';
+      out.push({ n, cx, cz, hull, area, dens, elong, nearRoad, nearWater, shape }); }
+    out.sort((a, b) => b.n - a.n); this.SET = out; return out;
+  }
+  showSettlements(list) { for (const s of list) { const col = SETTLE[s.shape][2]; const pts = s.hull.concat([s.hull[0]]); this.ribbon(pts, new THREE.Color(col).getHex(), 3, 1.5, 0.9); this.pin(s.cx, s.cz, `${km() ? SETTLE[s.shape][1] : SETTLE[s.shape][0]} · ${n0(s.n)}`, col); } }
+  settlementMap(list, px = 760) { const D = this.D, c = document.createElement('canvas'), s = px / Math.max(D.W, D.H); c.width = Math.round(D.W * s); c.height = Math.round(D.H * s); const g = c.getContext('2d');     g.fillStyle = '#f4f1ea'; g.fillRect(0, 0, c.width, c.height); g.strokeStyle = '#b9b2a2'; g.lineWidth = 1; for (const r of this.w.net ? this.w.net.roads : []) { g.beginPath(); r.pts.forEach((p, i) => { const x = (p.x - D.X0) * s, y = (p.z - D.Z0) * s; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); }
+    g.fillStyle = '#3b8fd9'; for (let j = 0; j < D.gh; j++) for (let i = 0; i < D.gw; i++) if (D.cls[j * D.gw + i] === 1) g.fillRect(i * D.C * s, j * D.C * s, D.C * s + 0.5, D.C * s + 0.5);
+    for (const t of list) { const col = SETTLE[t.shape][2]; g.fillStyle = col + '55'; g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); t.hull.forEach(([x, z], i) => { const X = (x - D.X0) * s, Y = (z - D.Z0) * s; i ? g.lineTo(X, Y) : g.moveTo(X, Y); }); g.closePath(); g.fill(); g.stroke(); }
+    this.mapFrame(g, c.width, c.height); return c.toDataURL('image/png'); }
+
   /* whole-area figures for the report: relief, slope, land cover, water, settlement, roads, services, flood exposure */
   async areaStats() {
     const D = this.D, F = this.F, H = this.hydro(), NX = H.NX, R = D.raw;
     let lo = Infinity, hi = -Infinity, sum = 0; for (let k = 0; k < H.N; k++) { lo = Math.min(lo, R[k]); hi = Math.max(hi, R[k]); sum += R[k]; }
-    const sl = [0, 0, 0, 0]; for (let j = 1; j < H.NZ - 1; j++) for (let i = 1; i < NX - 1; i++) { const k = j * NX + i, gx = (R[k + 1] - R[k - 1]) / (2 * D.dx), gz = (R[k + NX] - R[k - NX]) / (2 * D.dz), a = Math.atan(Math.hypot(gx, gz)) * 180 / Math.PI; sl[a < 2 ? 0 : a < 8 ? 1 : a < 15 ? 2 : 3]++; }
+    const sl = [0, 0, 0, 0], sb = Math.max(1, Math.round(15 / D.dx)); for (let j = sb; j < H.NZ - sb; j++) for (let i = sb; i < NX - sb; i++) { const k = j * NX + i, gx = (R[k + sb] - R[k - sb]) / (2 * sb * D.dx), gz = (R[k + sb * NX] - R[k - sb * NX]) / (2 * sb * D.dz), a = Math.atan(Math.hypot(gx, gz)) * 180 / Math.PI; sl[a < 2 ? 0 : a < 8 ? 1 : a < 15 ? 2 : 3]++; }
     const slT = sl.reduce((a, b) => a + b, 0) || 1, lc = {}; for (const v of D.cls) if (v) lc[v] = (lc[v] || 0) + 1; const lcT = Object.values(lc).reduce((a, b) => a + b, 0) || 1;
-    const areaKm2 = D.W * D.H / 1e6, UM = this.UM || (this.UM = await import('./urban.js?v=102')), B = UM.buildingsOf(this.w);
+    const areaKm2 = D.W * D.H / 1e6, UM = this.UM || (this.UM = await import('./urban.js?v=103')), B = UM.buildingsOf(this.w);
     const roads = { main: 0, local: 0, track: 0 }; for (const r of this.w.net ? this.w.net.roads : []) { let L = 0; for (let i = 1; i < r.pts.length; i++) L += Math.hypot(r.pts[i].x - r.pts[i - 1].x, r.pts[i].z - r.pts[i - 1].z); roads[r.cls <= 10 ? 'main' : r.cls <= 14 ? 'local' : 'track'] += L / 1000; }
     const st = this.streams(); let stKm = 0; for (const [a, b] of st) stKm += Math.hypot(b[0] - a[0], b[1] - a[1]) / 1000;
     // settlement pattern: Clark–Evans nearest-neighbour index of the houses (R < 1 clustered, ≈ 1 random, > 1 dispersed)
@@ -347,6 +437,9 @@ export class GeoHand {
       h += `<h3>${tt('Relief and landforms', 'ទម្រង់ដី')}</h3>` + tbl([[tt('Lowest / highest / mean elevation', 'កម្ពស់ទាបបំផុត / ខ្ពស់បំផុត / មធ្យម'), `${n0(S.lo)} / ${n0(S.hi)} / ${n0(S.mean)} ${U('m')}`], [tt('Local relief', 'ភាពខុសគ្នានៃកម្ពស់'), `${n0(S.hi - S.lo)} ${U('m')}`]])
         + bar([[tt('Flat (< 2°)', 'រាបស្មើ (< ២°)'), S.slope[0], '#7fb069'], [tt('Gentle (2–8°)', 'ជម្រាលតិច (២–៨°)'), S.slope[1], '#e6c86e'], [tt('Moderate (8–15°)', 'ជម្រាលមធ្យម (៨–១៥°)'), S.slope[2], '#d9894a'], [tt('Steep (> 15°)', 'ជម្រាលចោត (> ១៥°)'), S.slope[3], '#a8493a']])
         + `<figure class="one"><img src="${rel.url}"><figcaption>${tt('Relief map: green low, brown high', 'ផែនទីទម្រង់ដី៖ បៃតង = ទាប ត្នោត = ខ្ពស់')} (${n0(rel.lo)}–${n0(rel.hi)} ${U('m')}) · ${tt('blue: streams from the terrain', 'ខៀវ៖ អូរពីទម្រង់ដី')}</figcaption></figure>`;
+      const LF = this.landforms(); h += `<h3>${tt('Landforms', 'ទម្រង់ភូមិសាស្ត្រ')}</h3><p>${tt('Classified from slope, height above the nearest stream and position against the surroundings.', 'ចាត់ថ្នាក់ពីជម្រាល កម្ពស់ពីអូរជិតបំផុត និងទីតាំងធៀបនឹងជុំវិញ។')}</p>`
+        + bar(Object.keys(LANDFORMS).map(Number).filter(k => LF.pct[k] >= 0.5).sort((a, b) => LF.pct[b] - LF.pct[a]).map(k => [esc(K ? LANDFORMS[k][1] : LANDFORMS[k][0]), LF.pct[k], LANDFORMS[k][2]]))
+        + `<figure class="one"><img src="${this.landformMap()}"><figcaption>${tt('Landform map (automatic classification from the terrain model)', 'ផែនទីទម្រង់ភូមិសាស្ត្រ (ចាត់ថ្នាក់ស្វ័យប្រវត្តិពីគំរូដី)')}</figcaption></figure>`;
       h += `<h3>${tt('Water', 'ធនធានទឹក')}</h3><p>${tt(`Streams traced from the terrain run for about ${U2(S.stKm)} km in the area (drainage density ${U2(S.stKm / S.areaKm2)} km/km²).`, `អូរដែលតាមដានពីទម្រង់ដីមានប្រវែងប្រហែល ${U2(S.stKm)} គ.ម ក្នុងតំបន់ (ដង់ស៊ីតេបណ្ដាញទឹក ${U2(S.stKm / S.areaKm2)} គ.ម/គ.ម²)។`)} ${P.flow ? esc(this.profileText(P).slice(-1)[0]) : ''}</p>`;
       h += `<h3>${tt('Soil and rock', 'ដី និងថ្ម')}</h3>` + tbl([[tt('Topsoil at the centre', 'ដីស្រទាប់លើនៅកណ្ដាល'), P.soil ? `${esc(t(P.soil.cls))} (${t('sand')} ${n0(P.soil.sand)}% · ${t('clay')} ${n0(P.soil.clay)}%)` : tt('no data', 'គ្មានទិន្នន័យ')], [tt('Geology', 'ភូគព្ភសាស្ត្រ'), P.geo ? esc(t(P.geo)) : tt('no data', 'គ្មានទិន្នន័យ')]]);
       if (P.clim) h += `<h3>${tt('Climate', 'អាកាសធាតុ')}</h3><p>${esc(this.profileText(P).find(l => /°C/.test(l)) || '')}</p><figure class="one"><img src="${this.climateChart(P.clim, 700, 230).toDataURL()}"><figcaption>${tt('Monthly rain (bars) and mean temperature (line), 2015–2024', 'ទឹកភ្លៀងប្រចាំខែ (ជួរឈរ) និងសីតុណ្ហភាពមធ្យម (ខ្សែ) ២០១៥–២០២៤')}</figcaption></figure>`;
@@ -354,8 +447,17 @@ export class GeoHand {
     }
     if (sec.includes('human')) {
       h += H2('Human geography', 'ភូមិសាស្ត្រមនុស្ស');
-      h += `<h3>${tt('Settlement and population', 'ការតាំងទីលំនៅ និងប្រជាជន')}</h3>` + tbl([[tt('Buildings', 'អគារ'), n0(S.houses)], [tt('Building density', 'ដង់ស៊ីតេអគារ'), `${n0(S.density)} / ${U('km')}²`], [tt('Population (estimate, 4.3 people per building)', 'ប្រជាជន (ប៉ាន់ស្មាន ៤,៣ នាក់ក្នុងមួយអគារ)'), `≈ ${n0(S.people)}`],
-        [tt('Settlement pattern (nearest-neighbour index R)', 'លំនាំការតាំងទីលំនៅ (សន្ទស្សន៍ R)'), nni == null ? '' : `R = ${n0(nni, 2)} → ${pat}`]]);
+      let POP = null; try { POP = await this.population(); } catch (e) { console.warn('population', e); }
+      const pv = POP && POP.prov, ag = this.ageStats(pv);
+      h += `<h3>${tt('Population', 'ប្រជាជន')}</h3>` + tbl([[tt('Population of the study area', 'ប្រជាជនក្នុងតំបន់សិក្សា'), POP ? `≈ ${n0(Math.round(POP.total / 10) * 10)} (WorldPop 2020, ${tt('fitted to the 2019 census', 'កែតម្រូវតាមជំរឿន ២០១៩')})` : ''], [tt('Population density', 'ដង់ស៊ីតេប្រជាជន'), POP ? `${n0(POP.density)} ${tt('people', 'នាក់')}/${U('km')}²` : ''],
+        [tt('Estimate from buildings (4.3 per building)', 'ប៉ាន់ស្មានពីអគារ (៤,៣ នាក់ក្នុងមួយអគារ)'), `≈ ${n0(S.people)}`],
+        [tt('Province (2019 census)', 'ខេត្ត (ជំរឿន ២០១៩)'), pv ? `${esc(K ? pv.km : pv.en)}: ${n0(pv.pop2019)} ${tt('people', 'នាក់')}, ${n0(pv.hh2019)} ${tt('households', 'គ្រួសារ')}, ${n0(pv.hhsize, 1)} ${tt('per household', 'នាក់ក្នុងមួយគ្រួសារ')}, ${n0(pv.pop2019 / pv.area)} / ${U('km')}²` : ''],
+        [tt('Age groups (province, 2024 projection)', 'ក្រុមអាយុ (ខេត្ត ការព្យាករ ២០២៤)'), ag ? `0–14: ${n0(ag.young, 1)}% · 15–64: ${n0(ag.work, 1)}% · 65+: ${n0(ag.old, 1)}%` : ''], [tt('Dependency ratio', 'អនុបាតអ្នកនៅក្នុងបន្ទុក'), ag ? n0(ag.dep, 1) : ''], [tt('Sex ratio (men per 100 women)', 'អនុបាតភេទ (ប្រុសក្នុងស្រី ១០០)'), ag ? n0(ag.sexRatio, 1) : '']])
+        + (pv && pv.proj2024 ? `<figure class="one"><img src="${this.pyramid(pv, 700, 330).toDataURL()}"><figcaption>${tt('Population pyramid of the province, 2024 projection (NIS)', 'ពីរ៉ាមីតប្រជាជនរបស់ខេត្ត ការព្យាករ ២០២៤ (វិទ្យាស្ថានជាតិស្ថិតិ)')}</figcaption></figure>` : '');
+      const SL = await this.settlements(); h += `<h3>${tt('Settlements', 'ការតាំងទីលំនៅ')}</h3>` + tbl([[tt('Buildings', 'អគារ'), n0(S.houses)], [tt('Building density', 'ដង់ស៊ីតេអគារ'), `${n0(S.density)} / ${U('km')}²`],
+        [tt('Settlement pattern (nearest-neighbour index R)', 'លំនាំការតាំងទីលំនៅ (សន្ទស្សន៍ R)'), nni == null ? '' : `R = ${n0(nni, 2)} → ${pat}`]])
+        + (SL.length ? `<table class="grid"><tr><th>#</th><th>${tt('Form', 'រូបរាង')}</th><th>${tt('Buildings', 'អគារ')}</th><th>${tt('Area', 'ផ្ទៃ')}</th><th>${tt('Buildings per ha', 'អគារក្នុង ១ ហ.ត')}</th><th>${tt('Near a road', 'ជិតផ្លូវ')}</th></tr>` + SL.slice(0, 12).map((t2, i) => `<tr><td>${n0(i + 1)}</td><td><i style="display:inline-block;width:10px;height:10px;background:${SETTLE[t2.shape][2]}"></i> ${esc(K ? SETTLE[t2.shape][1] : SETTLE[t2.shape][0])}</td><td>${n0(t2.n)}</td><td>${U2(t2.area / 1e4)} ${U('ha')}</td><td>${n0(t2.dens, 1)}</td><td>${n0(t2.nearRoad * 100)}%</td></tr>`).join('') + '</table>'
+          + `<figure class="one"><img src="${this.settlementMap(SL)}"><figcaption>${tt('Settlements found from the buildings (groups within 45 m), coloured by form', 'ការតាំងទីលំនៅរកឃើញពីអគារ (ក្រុមក្នុង ៤៥ ម) ពណ៌តាមរូបរាង')}</figcaption></figure>` : '');
       h += `<h3>${tt('Transport', 'ការដឹកជញ្ជូន')}</h3>` + tbl([[tt('Main roads', 'ផ្លូវធំ'), `${U2(S.roads.main)} ${U('km')}`], [tt('Local roads', 'ផ្លូវតូច'), `${U2(S.roads.local)} ${U('km')}`], [tt('Tracks and paths', 'ផ្លូវលំ'), `${U2(S.roads.track)} ${U('km')}`], [tt('Road density', 'ដង់ស៊ីតេផ្លូវ'), `${U2((S.roads.main + S.roads.local + S.roads.track) / S.areaKm2)} ${U('km')}/${U('km')}²`]]);
       const N = P.near || {}, nm = o => o ? `${esc(K ? (o.nk || o.ne) : (o.ne || o.nk)) || tt('name not mapped', 'មិនមានឈ្មោះ')} (${U2(o.d / 1000)} ${U('km')})` : tt('none found within 4.5 km', 'រកមិនឃើញក្នុង ៤,៥ គ.ម');
       h += `<h3>${tt('Services', 'សេវាសាធារណៈ')}</h3>` + tbl([[tt('Schools within 4.5 km', 'សាលារៀនក្នុង ៤,៥ គ.ម'), n0((N.schools || []).length)], [tt('Nearest school', 'សាលារៀនជិតបំផុត'), nm((N.schools || [])[0])], [tt('Health centres within 4.5 km', 'មណ្ឌលសុខភាពក្នុង ៤,៥ គ.ម'), n0((N.health || []).length)], [tt('Nearest health centre', 'មណ្ឌលសុខភាពជិតបំផុត'), nm((N.health || [])[0])], [tt('Wats within 4.5 km', 'វត្តក្នុង ៤,៥ គ.ម'), n0((N.wats || []).length)], [tt('Nearest market', 'ផ្សារជិតបំផុត'), nm((N.markets || [])[0])]]);
@@ -369,7 +471,7 @@ export class GeoHand {
     }
     if (sec.includes('change') && this.TM) { h += H2('Change over time', 'ការផ្លាស់ប្ដូរតាមពេលវេលា') + '<ul>' + this.tmStory().map(l => `<li>${esc(l)}</li>`).join('') + `</ul><figure class="one"><img src="${this.tmChart(700, 220).toDataURL()}"><figcaption>${tt('Land cover area by year (red built, orange crops, green trees, blue water)', 'ផ្ទៃគម្របដីតាមឆ្នាំ (ក្រហម សំណង់ ទឹកក្រូច ដំណាំ បៃតង ដើមឈើ ខៀវ ទឹក)')}</figcaption></figure>`; }
     if (opt.notes) h += H2('Field notes and discussion', 'កំណត់ត្រាវាល និងការពិភាក្សា') + '<div class="notes">' + '<i></i>'.repeat(10) + '</div>';
-    h += H2('Data and methods', 'ទិន្នន័យ និងវិធីសាស្ត្រ') + `<p class="note">${tt('Terrain: AWS Terrain Tiles; imagery: Esri World Imagery; roads, buildings and places: OpenStreetMap; land cover: classified from the image in the app (and Esri | Impact Observatory for change); soil: ISRIC SoilGrids; geology: Open Development Cambodia; climate: Open-Meteo ERA5 2015–2024; forest loss: Hansen Global Forest Change. Streams and catchments from depression-filled terrain (D8). Population estimated from building counts. All figures are automatic estimates for study and should be checked in the field.', 'ទម្រង់ដី៖ AWS Terrain Tiles · រូបភាព៖ Esri World Imagery · ផ្លូវ អគារ និងទីកន្លែង៖ OpenStreetMap · គម្របដី៖ ចាត់ថ្នាក់ពីរូបភាពក្នុងកម្មវិធី (និង Esri | Impact Observatory សម្រាប់ការផ្លាស់ប្ដូរ) · ដី៖ ISRIC SoilGrids · ភូគព្ភសាស្ត្រ៖ Open Development Cambodia · អាកាសធាតុ៖ Open-Meteo ERA5 ២០១៥–២០២៤ · ព្រៃបាត់បង់៖ Hansen Global Forest Change។ អូរ និងអាងទឹកពីទម្រង់ដីដែលបំពេញទីទាប (D8)។ ប្រជាជនប៉ាន់ស្មានពីចំនួនអគារ។ តួលេខទាំងអស់ជាការប៉ាន់ស្មានដោយស្វ័យប្រវត្តិសម្រាប់ការសិក្សា ហើយគួរពិនិត្យនៅទីវាល។')}</p>`;
+    h += H2('Data and methods', 'ទិន្នន័យ និងវិធីសាស្ត្រ') + `<p class="note">${tt('Terrain: AWS Terrain Tiles; imagery: Esri World Imagery; roads, buildings and places: OpenStreetMap; land cover: classified from the image in the app (and Esri | Impact Observatory for change); soil: ISRIC SoilGrids; geology: Open Development Cambodia; climate: Open-Meteo ERA5 2015–2024; forest loss: Hansen Global Forest Change. Streams and catchments from depression-filled terrain (D8). Population: WorldPop 2020 (100 m) fitted to the 2019 General Population Census province totals; age and sex: NIS 2024 province projections (HDX). Landforms from slope, height above the nearest stream (HAND) and topographic position (TPI). Settlements: buildings grouped within 45 m (DBSCAN), form from elongation and closeness to roads and water. All figures are automatic estimates for study and should be checked in the field.', 'ទម្រង់ដី៖ AWS Terrain Tiles · រូបភាព៖ Esri World Imagery · ផ្លូវ អគារ និងទីកន្លែង៖ OpenStreetMap · គម្របដី៖ ចាត់ថ្នាក់ពីរូបភាពក្នុងកម្មវិធី (និង Esri | Impact Observatory សម្រាប់ការផ្លាស់ប្ដូរ) · ដី៖ ISRIC SoilGrids · ភូគព្ភសាស្ត្រ៖ Open Development Cambodia · អាកាសធាតុ៖ Open-Meteo ERA5 ២០១៥–២០២៤ · ព្រៃបាត់បង់៖ Hansen Global Forest Change។ អូរ និងអាងទឹកពីទម្រង់ដីដែលបំពេញទីទាប (D8)។ ប្រជាជន៖ WorldPop ២០២០ (១០០ ម) កែតម្រូវតាមចំនួនប្រជាជនខេត្តនៃជំរឿនទូទៅ ២០១៩ · អាយុ និងភេទ៖ ការព្យាករខេត្ត ២០២៤ របស់វិទ្យាស្ថានជាតិស្ថិតិ (HDX)។ ទម្រង់ភូមិសាស្ត្រពីជម្រាល កម្ពស់ពីអូរជិតបំផុត (HAND) និងទីតាំងសណ្ឋានដី (TPI)។ ការតាំងទីលំនៅ៖ អគារដាក់ជាក្រុមក្នុង ៤៥ ម (DBSCAN) រូបរាងពីភាពវែង និងភាពជិតផ្លូវ និងទឹក។ តួលេខទាំងអស់ជាការប៉ាន់ស្មានដោយស្វ័យប្រវត្តិសម្រាប់ការសិក្សា ហើយគួរពិនិត្យនៅទីវាល។')}</p>`;
     const ttl = opt.title || tt('Geographical study of the area', 'ការសិក្សាភូមិសាស្ត្រនៃតំបន់');
     const html = `<!DOCTYPE html><html lang="${K ? 'km' : 'en'}"><head><meta charset="utf-8"><title>${esc(ttl)}</title><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;700&family=Noto+Serif+Khmer:wght@600&display=swap" rel="stylesheet"><style>
       @page{size:A4;margin:16mm 15mm} body{font-family:"Noto Sans Khmer",system-ui,sans-serif;color:#1a1a1a;font-size:11pt;line-height:1.6;max-width:180mm;margin:auto}
