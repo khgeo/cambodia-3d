@@ -1,7 +1,7 @@
 // Time of day (sun path, dusk, night with lit windows and stars), weather (clear, hazy, monsoon rain, storm with
 // lightning) and a cinematic flight around the area.
 import * as THREE from 'three';
-import { NIGHT } from './shaders.js?v=99';
+import { NIGHT } from './shaders.js?v=100';
 
 const clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp;
 export class Atmos {
@@ -75,7 +75,7 @@ export class Atmos {
   async useRealSky(on) {
     this.realSky = !!on; this.stars.visible = !on;
     if (!on) { if (this.sv) this.sv.frame(0); return; }
-    if (!this.sv) { const { SkyView } = await import('./skyview.js?v=99'); this.sv = new SkyView(this.w); await this.sv.load(); }
+    if (!this.sv) { const { SkyView } = await import('./skyview.js?v=100'); this.sv = new SkyView(this.w); await this.sv.load(); }
     this.updateRealSky();
   }
   // the sky time: an exact date from the Night sky panel, or today at the scene hour (Cambodia time, UTC+7)

@@ -2,11 +2,12 @@
 // 1 Place profile · 2 Time machine · 3 What if (flood, heavy rain) · 4 Where does the rain go · 5 Access to services
 // 6 Worksheet maker · 7 Field trip (GPS, stops, observations)
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=99';
+import { t, lang } from './i18n.js?v=100';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const km = () => lang === 'km';
+const U = u => km() ? ({ m: 'ម', km: 'គ.ម', ha: 'ហ.ត', mm: 'ម.ម' })[u] || u : u;
 const NUMKM = '០១២៣៤៥៦៧៨៩';
 const n0 = (v, d = 0) => { if (v == null || !isFinite(v)) return '–'; const s = Number(v).toLocaleString('en-US', { maximumFractionDigits: d, minimumFractionDigits: d }); return km() ? s.replace(/\d/g, c => NUMKM[c]) : s; };
 const LC = { 1: ['Water', 'ទឹក', '#3b8fd9'], 2: ['Trees', 'ដើមឈើ', '#2f7d3a'], 3: ['Rice fields & grass', 'ស្រែ និងវាលស្មៅ', '#d8c24a'], 4: ['Bare soil', 'ដីទទេ', '#b98a5a'], 5: ['Houses & roads', 'ផ្ទះ និងផ្លូវ', '#c4413a'] };
@@ -83,8 +84,8 @@ export class GeoHand {
     const H = this.hydro(), path = this.flowPath(x, z); P.flow = path.info;
     // in parallel: admin names, soil & geology, climate, villages and services nearby
     const [adm, U, clim, near] = await Promise.all([
-      import('./placeinfo.js?v=99').then(m => m.adminAt(lat, lon)).catch(() => null),
-      this.U ? Promise.resolve(this.U) : Promise.race([import('./section.js?v=99').then(async m => { this.SM = m; this.U = await m.loadUnderground(this.w, s => this.say(t(s))); return this.U; }), new Promise(r => setTimeout(() => r(null), 25000))]).catch(() => null), // soil and rock (SoilGrids can be slow)
+      import('./placeinfo.js?v=100').then(m => m.adminAt(lat, lon)).catch(() => null),
+      this.U ? Promise.resolve(this.U) : Promise.race([import('./section.js?v=100').then(async m => { this.SM = m; this.U = await m.loadUnderground(this.w, s => this.say(t(s))); return this.U; }), new Promise(r => setTimeout(() => r(null), 25000))]).catch(() => null), // soil and rock (SoilGrids can be slow)
       this.climate(lat, lon), this.nearby(lon, lat)]);
     P.adm = adm; P.clim = clim; P.near = near;
     if (U && this.SM) { const gk = this.SM.geologyAt(U, lon, lat), gu = this.SM.UNITS[gk]; P.geo = gu ? gu.n : null; const s = this.SM.soilAt(U, lon, lat, 0); P.soil = s.cls !== 'No data' ? s : null; }
@@ -110,22 +111,22 @@ export class GeoHand {
   profileText(P) {
     const nm = o => o ? (km() ? (o.nk || o.ne) : (o.ne || o.nk)) : '', A = P.adm, L = [];
     const flat = P.slope < 2 ? ['flat land', 'ដីរាបស្មើ'] : P.slope < 8 ? ['gently sloping land', 'ដីជម្រាលតិច'] : P.slope < 20 ? ['a hillside', 'ជម្រាលភ្នំ'] : ['a steep slope', 'ជម្រាលចោត'];
-    const where = A ? (km() ? `${A.com_km || A.com_en} ស្រុក${A.dis_km || A.dis_en} ខេត្ត${A.pro_km || A.pro_en}` : `${A.com_en} commune, ${A.dis_en} district, ${A.pro_en} province`) : '';
+    const where = A ? (km() ? `${A.com_km || A.com_en} ស្រុក ${A.dis_km || A.dis_en} ខេត្ត ${A.pro_km || A.pro_en}` : `${A.com_en} commune, ${A.dis_en} district, ${A.pro_en} province`) : '';
     const v = P.near && P.near.villages[0];
     if (km()) {
-      L.push(`ទីតាំងនេះស្ថិតនៅកម្ពស់ ${n0(P.elev)} ម៉ែត្រពីនីវ៉ូទឹកសមុទ្រ លើ${flat[1]} (ជម្រាល ${n0(P.slope, 1)}°)${where ? ' ក្នុងឃុំ' + where : ''}។`);
+      L.push(`ទីតាំងនេះស្ថិតនៅកម្ពស់ ${n0(P.elev)} ម៉ែត្រពីនីវ៉ូទឹកសមុទ្រ លើ${flat[1]} (ជម្រាល ${n0(P.slope, 1)}°)${where ? ' ក្នុងឃុំ ' + where : ''}។`);
       if (v) L.push(`ភូមិជិតបំផុតគឺ ${nm(v)} (${n0(v.d / 1000, 1)} គ.ម)។`);
       if (P.lc.length) L.push(`ក្នុងរង្វង់ ៥០០ ម៉ែត្រ ដីភាគច្រើនជា${lcName(P.lc[0][0])} (${n0(P.lc[0][1])}%)${P.lc[1] ? ' បន្ទាប់មក' + lcName(P.lc[1][0]) + ' (' + n0(P.lc[1][1]) + '%)' : ''}។ មានផ្ទះប្រហែល ${n0(P.houses)} ក្នុងរង្វង់ ១ គ.ម (ប្រជាជនប្រហែល ${n0(P.people)} នាក់)។`);
       if (P.soil || P.geo) L.push(`${P.soil ? 'ដីខាងលើជាប្រភេទ ' + t(P.soil.cls) + '។ ' : ''}${P.geo ? 'ថ្មខាងក្រោម៖ ' + t(P.geo) + '។' : ''}`);
       if (P.clim) L.push(`អាកាសធាតុក្ដៅពេញមួយឆ្នាំ (${n0(Math.min(...P.clim.T))}–${n0(Math.max(...P.clim.T))} °C)។ ទឹកភ្លៀងប្រហែល ${n0(P.clim.year)} ម.ម ក្នុងមួយឆ្នាំ${P.clim.wet.length ? ' ភាគច្រើនពីខែ' + month(P.clim.wet[0]) + ' ដល់ខែ' + month(P.clim.wet[P.clim.wet.length - 1]) : ''}។`);
-      if (P.flow) L.push(`ទឹកភ្លៀងដែលធ្លាក់នៅទីនេះហូរ ${n0(P.flow.len)} ម៉ែត្រ ទៅទិស${P.flow.dir} ${P.flow.end === 'edge' ? 'ចេញពីតំបន់' : 'ទៅកាន់ទីទាប ឬត្រពាំង'} (ចុះ ${n0(P.flow.drop, 1)} ម៉ែត្រ)។`);
+      if (P.flow) L.push(`ទឹកភ្លៀងដែលធ្លាក់នៅទីនេះហូរ ${n0(P.flow.len)} ម៉ែត្រ ទៅទិស${this.dirOf(P.flow)} ${P.flow.end === 'edge' ? 'ចេញពីតំបន់' : 'ទៅកាន់ទីទាប ឬត្រពាំង'} (ចុះ ${n0(P.flow.drop, 1)} ម៉ែត្រ)។`);
     } else {
       L.push(`This place is ${n0(P.elev)} m above sea level on ${flat[0]} (slope ${n0(P.slope, 1)}°)${where ? ', in ' + where : ''}.`);
       if (v) L.push(`The nearest village is ${nm(v)} (${n0(v.d / 1000, 1)} km).`);
       if (P.lc.length) L.push(`Within 500 m the land is mostly ${lcName(P.lc[0][0]).toLowerCase()} (${n0(P.lc[0][1])}%)${P.lc[1] ? ', then ' + lcName(P.lc[1][0]).toLowerCase() + ' (' + n0(P.lc[1][1]) + '%)' : ''}. About ${n0(P.houses)} houses stand within 1 km (roughly ${n0(P.people)} people).`);
       if (P.soil || P.geo) L.push(`${P.soil ? 'The topsoil is ' + P.soil.cls.toLowerCase() + '. ' : ''}${P.geo ? 'The rock below is ' + P.geo.toLowerCase() + '.' : ''}`);
       if (P.clim) L.push(`It is hot all year (${n0(Math.min(...P.clim.T))}–${n0(Math.max(...P.clim.T))} °C monthly mean) with about ${n0(P.clim.year)} mm of rain a year${P.clim.wet.length ? ', mostly from ' + month(P.clim.wet[0]) + ' to ' + month(P.clim.wet[P.clim.wet.length - 1]) : ''}.`);
-      if (P.flow) L.push(`Rain falling here runs ${n0(P.flow.len)} m to the ${P.flow.dir} ${P.flow.end === 'edge' ? 'and leaves the area' : 'into a low spot or pond'} (${n0(P.flow.drop, 1)} m lower).`);
+      if (P.flow) L.push(`Rain falling here runs ${n0(P.flow.len)} m to the ${this.dirOf(P.flow)} ${P.flow.end === 'edge' ? 'and leaves the area' : 'into a low spot or pond'} (${n0(P.flow.drop, 1)} m lower).`);
     }
     return L;
   }
@@ -138,17 +139,17 @@ export class GeoHand {
     return cv;
   }
   profileHTML(P) {
-    const row = (k, v) => v ? `<tr><td>${t(k)}</td><td>${v}</td></tr>` : '', nm = o => o ? esc(km() ? (o.nk || o.ne) : (o.ne || o.nk)) + ` <small>${n0(o.d / 1000, 1)} km</small>` : '';
+    const row = (k, v) => v ? `<tr><td>${t(k)}</td><td>${v}</td></tr>` : '', nm = o => o ? esc(km() ? (o.nk || o.ne) : (o.ne || o.nk)) + ` <small>${n0(o.d / 1000, 1)} ${U('km')}</small>` : '';
     const A = P.adm, N = P.near || {};
     return `<div class="ghText">${this.profileText(P).map(esc).join(' ')}</div>
       <table class="ghTab">${row('Province / district / commune', A ? esc(km() ? `${A.pro_km || A.pro_en} / ${A.dis_km || A.dis_en} / ${A.com_km || A.com_en}` : `${A.pro_en} / ${A.dis_en} / ${A.com_en}`) : '')}
-      ${row('Position', `${P.lat.toFixed(5)}°N ${P.lon.toFixed(5)}°E`)}${row('Elevation', n0(P.elev) + ' m')}${row('Slope', n0(P.slope, 1) + '°')}${row('Height difference within 500 m', n0(P.relief) + ' m')}
+      ${row('Position', `${P.lat.toFixed(5)}°N ${P.lon.toFixed(5)}°E`)}${row('Elevation', n0(P.elev) + ' ' + U('m'))}${row('Slope', n0(P.slope, 1) + '°')}${row('Height difference within 500 m', n0(P.relief) + ' ' + U('m'))}
       ${row('Land cover within 500 m', P.lc.slice(0, 4).map(([k, p]) => `<i class="ghSw" style="background:${LC[k][2]}"></i>${esc(lcName(k))} ${n0(p)}%`).join('<br>'))}
       ${row('Topsoil', P.soil ? `${esc(t(P.soil.cls))} (${t('sand')} ${n0(P.soil.sand)}% · ${t('clay')} ${n0(P.soil.clay)}%)` : '')}${row('Rock below', P.geo ? esc(t(P.geo)) : '')}
       ${row('Houses within 1 km', `${n0(P.houses)} (≈ ${n0(P.people)} ${t('people')})`)}
       ${row('Nearest village', nm(N.villages && N.villages[0]))}${row('Nearest school', nm(N.schools && N.schools[0]))}${row('Nearest health centre', nm(N.health && N.health[0]))}${row('Nearest wat', nm(N.wats && N.wats[0]))}${row('Nearest market', nm(N.markets && N.markets[0]))}
-      ${row('Rain falling here', P.flow ? `${n0(P.flow.len)} m → ${esc(P.flow.dir)}, ${n0(P.flow.drop, 1)} m ${t('lower')}` : '')}</table>
-      ${P.clim ? `<div class="ghSub">${t('Climate (monthly average)')}</div><img class="ghChart" src="${this.climateChart(P.clim).toDataURL()}"><div class="ghSrc">${t('Rain')} ${n0(P.clim.year)} mm/${t('year')} · ${P.clim.src}</div>` : ''}
+      ${row('Rain falling here', P.flow ? `${n0(P.flow.len)} ${U('m')} → ${esc(this.dirOf(P.flow))}, ${n0(P.flow.drop, 1)} ${km() ? 'ម' : 'm'} ${t('lower')}` : '')}</table>
+      ${P.clim ? `<div class="ghSub">${t('Climate (monthly average)')}</div><img class="ghChart" src="${this.climateChart(P.clim).toDataURL()}"><div class="ghSrc">${t('Rain')} ${n0(P.clim.year)} ${U('mm')}/${t('year')} · ${P.clim.src}</div>` : ''}
       <div class="ghSrc">${t('Sources')}: ${t('terrain and land cover of the 3D area')}, SoilGrids, ODC ${t('geology')}, OpenStreetMap, Open-Meteo. ${t('People are estimated from the houses (4.3 per house).')}</div>`;
   }
 
@@ -158,7 +159,9 @@ export class GeoHand {
     for (let s = 0; s < 20000; s++) { pts.push([D.X0 + (k % NX) * D.dx, D.Z0 + ((k / NX) | 0) * D.dz]); const d = H.dir[k]; if (d < 0) break; k = d; }
     let len = 0; for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
     const i = k % NX, j = (k / NX) | 0, edge = i === 0 || j === 0 || i === NX - 1 || j === H.NZ - 1, e = pts[pts.length - 1];
-    return { pts, start, end: k, info: { len, drop: D.raw[start] - D.raw[k], dir: dirName(e[0] - pts[0][0], e[1] - pts[0][1]), end: edge ? 'edge' : 'pond' } };
+    const dv = [e[0] - pts[0][0], e[1] - pts[0][1]]; return { pts, start, end: k, info: { len, drop: D.raw[start] - D.raw[k], dir: dirName(...dv), dv, end: edge ? 'edge' : 'pond' } };
+  }
+  dirOf(r) { return r.dv ? dirName(...r.dv) : r.dir;
   }
   catchment(k0) { const H = this.hydro(), up = new Uint8Array(H.N), kids = new Int32Array(H.N + 1), list = new Int32Array(H.N);
     for (let k = 0; k < H.N; k++) if (H.dir[k] >= 0) kids[H.dir[k] + 1]++; for (let k = 0; k < H.N; k++) kids[k + 1] += kids[k]; const fill = kids.slice();
@@ -195,7 +198,7 @@ export class GeoHand {
     return this.impacts(flAt, lvl, base);
   }
   async impacts(flAt, lvl, base) {
-    const D = this.D, UM = this.UM || (this.UM = await import('./urban.js?v=99')), B = UM.buildingsOf(this.w), vals = B.map(b => flAt(b.x, b.z) ? 1 : 0), nb = vals.reduce((a, b) => a + b, 0);
+    const D = this.D, UM = this.UM || (this.UM = await import('./urban.js?v=100')), B = UM.buildingsOf(this.w), vals = B.map(b => flAt(b.x, b.z) ? 1 : 0), nb = vals.reduce((a, b) => a + b, 0);
     if (nb) UM.paint(this.w, B, vals.map(v => v ? 1 : 0.15), 0, 1); // flooded houses in yellow, the others dark
     let roadKm = 0; for (const r of this.w.net ? this.w.net.roads : []) for (let i = 1; i < r.pts.length; i++) { const a = r.pts[i - 1], b = r.pts[i]; if (flAt((a.x + b.x) / 2, (a.z + b.z) / 2)) roadKm += Math.hypot(b.x - a.x, b.z - a.z) / 1000; }
     let crop = 0, cells = 0; for (let j = 0; j < D.gh; j++) for (let i = 0; i < D.gw; i++) { const x = D.X0 + (i + 0.5) * D.C, z = D.Z0 + (j + 0.5) * D.C; if (D.cls[j * D.gw + i] === 3 && flAt(x, z)) crop++; if (flAt(x, z)) cells++; }
@@ -211,7 +214,7 @@ export class GeoHand {
 
   /* ================= 5. Access to services ================= */
   async access(kind, mode) {
-    const D = this.D, F = this.F, UM = this.UM || (this.UM = await import('./urban.js?v=99')), a = D.aoi, pad = 0.03, bb = [a.w - pad, a.s - pad, a.e + pad, a.n + pad];
+    const D = this.D, F = this.F, UM = this.UM || (this.UM = await import('./urban.js?v=100')), a = D.aoi, pad = 0.03, bb = [a.w - pad, a.s - pad, a.e + pad, a.n + pad];
     const KINDS = { school: ['school', 'kindergarten', 'college', 'university'], health: ['hospital', 'clinic', 'doctors', 'health_post'], market: ['marketplace'], wat: ['place_of_worship'] };
     const key = bb.join(','); if (!this._poi || this._poi.key !== key) { this.say(t('Finding schools, health centres and markets…'));
       const pts = []; const jobs = [];
@@ -235,7 +238,7 @@ export class GeoHand {
 
   /* ================= 2. Time machine ================= */
   async timeMachine(say) {
-    if (this.TM && this.TM.aoi === this.D.aoi) return this.TM; const D = this.D, a = D.aoi, LCm = await import('./landcover.js?v=99'), LY = await import('./layers.js?v=99');
+    if (this.TM && this.TM.aoi === this.D.aoi) return this.TM; const D = this.D, a = D.aoi, LCm = await import('./landcover.js?v=100'), LY = await import('./layers.js?v=100');
     const years = LY.IO_YEARS, io = {};
     let n = 0; await Promise.all(years.map(async y => { const r = await LCm.loadIO(a, D.W, D.H, y); if (r) io[y] = r; say(`${t('Loading land cover maps')} ${++n}/${years.length}`); }));
     const stats = {}; for (const [y, r] of Object.entries(io)) { const c = {}; for (const v of r.d) c[v] = (c[v] || 0) + 1; const ha = D.W * D.H / 1e4 / r.d.length; stats[y] = Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v * ha])); }
