@@ -2,7 +2,7 @@
 // 1 Place profile · 2 Time machine · 3 What if (flood, heavy rain) · 4 Where does the rain go · 5 Access to services
 // 6 Worksheet maker · 7 Field trip (GPS, stops, observations)
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=103';
+import { t, lang } from './i18n.js?v=104';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -30,10 +30,13 @@ const DIRS = [['north', 'ខាងជើង'], ['north-east', 'ឦសាន'], [
 const dirName = (dx, dz) => { const a = (Math.atan2(dx, -dz) * 180 / Math.PI + 360 + 22.5) % 360; const d = DIRS[Math.floor(a / 45) % 8]; return km() ? d[1] : d[0]; };
 
 function label(text, color = '#fff', bg = 'rgba(10,20,30,.82)') {
-  const c = document.createElement('canvas'), g = c.getContext('2d'), f = 'bold 30px system-ui, "Noto Sans Khmer", sans-serif'; g.font = f;
-  const w = Math.ceil(g.measureText(text).width) + 28; c.width = w; c.height = 46; g.font = f; g.fillStyle = bg; g.beginPath(); g.roundRect(0, 0, w, 46, 12); g.fill(); g.fillStyle = color; g.textBaseline = 'middle'; g.fillText(text, 14, 24);
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true, sizeAttenuation: false })); s.center.set(0.5, 0); s.scale.set(0.0012 * w, 0.0012 * 46, 1); s.renderOrder = 40; return s;
+  const plain = !/[A-Za-z0-9\u1780-\u17ff]/.test(text); if (plain) bg = null; // an emoji alone (📍 💧) needs no box
+  const c = document.createElement('canvas'), g = c.getContext('2d'), f = `bold ${plain ? 44 : 30}px system-ui, "Noto Sans Khmer", sans-serif`; g.font = f;
+  const w = Math.ceil(g.measureText(text).width) + (plain ? 8 : 28), h = plain ? 56 : 46; c.width = w; c.height = h; g.font = f;
+  if (bg) { g.fillStyle = bg; g.beginPath(); g.roundRect(0, 0, w, h, 12); g.fill(); } g.fillStyle = color; g.textBaseline = 'middle'; if (plain) { g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = 6; } g.fillText(text, plain ? 4 : 14, h / 2 + 2);
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), depthTest: false, transparent: true, sizeAttenuation: false })); s.center.set(0.5, 0); const k = plain ? 0.0008 : 0.0005; s.scale.set(k * w, k * h, 1); s.renderOrder = 40; return s;
 }
+const short = (s, n = 26) => { const a = typeof Intl !== 'undefined' && Intl.Segmenter ? [...new Intl.Segmenter().segment(s)].map(x => x.segment) : Array.from(s); return a.length > n ? a.slice(0, n).join('') + '…' : s; };
 
 /* ================= terrain hydrology: depression filling, flow directions, flow accumulation ================= */
 function hydrology(D) {
@@ -64,7 +67,7 @@ export class GeoHand {
   clsAt(x, z) { const D = this.D, i = Math.min(D.gw - 1, Math.max(0, ((x - D.X0) / D.C) | 0)), j = Math.min(D.gh - 1, Math.max(0, ((z - D.Z0) / D.C) | 0)); return D.cls[j * D.gw + i]; }
   inside(x, z) { const D = this.D; return x > D.X0 && z > D.Z0 && x < D.X0 + D.W && z < D.Z0 + D.H; }
   clear() { this.g.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } }); this.g.clear(); if (this.g.parent) this.g.parent.remove(this.g);
-    if (this.w._ghOverlay) { this.w.setCompare(null); this.w._ghOverlay = false; } if (this.UM) this.UM.unpaint(this.w); if (this.anim) { cancelAnimationFrame(this.anim); this.anim = 0; } }
+    if (this.w._ghOverlay) { this.w.setCompare(null); this.w._ghOverlay = false; } this.w.floodAt = null; if (this.UM) this.UM.unpaint(this.w); if (this.anim) { cancelAnimationFrame(this.anim); this.anim = 0; } }
   add(o) { if (!this.g.parent) this.w.root.add(this.g); this.g.add(o); return o; }
   // a raster over the ground: grid canvas covering the 3D area (or a lon/lat box) drawn over the satellite image
   overlay(cv, box) { const D = this.D, F = this.F, W = D.img.width, H = D.img.height, full = document.createElement('canvas'); full.width = W; full.height = H; const g = full.getContext('2d');
@@ -77,8 +80,9 @@ export class GeoHand {
       pos.push(p[0] + nx, p[1], p[2] + nz, p[0] - nx, p[1], p[2] - nz); if (k) { const v = k * 2; idx.push(v - 2, v, v - 1, v - 1, v, v + 1); } });
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
     const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color, transparent: op < 1, opacity: op, side: THREE.DoubleSide, depthTest: false })); m.renderOrder = 31; return this.add(m); }
-  pin(x, z, text, color = '#ffd23f') { const y = this.w.hAt(x, z); const s = this.add(label(text, color)); s.position.set(x, y + 4, z);
-    const st = this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 4, 6).translate(0, 2, 0), new THREE.MeshBasicMaterial({ color }))); st.position.set(x, y, z); return s; }
+  pin(x, z, text, color = '#ffd23f', hgt = 12) { const y = this.w.hAt(x, z); const s = this.add(label(text, color)); s.position.set(x, y + hgt, z);
+    const st = this.add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, hgt, 6).translate(0, hgt / 2, 0), new THREE.MeshBasicMaterial({ color, depthTest: false }))); st.position.set(x, y, z); st.renderOrder = 39;
+    const rg = this.add(new THREE.Mesh(new THREE.RingGeometry(1.4, 2.4, 32).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color, depthTest: false, side: THREE.DoubleSide }))); rg.position.set(x, y + 0.4, z); rg.renderOrder = 39; return s; }
   hydro() { const D = this.D; if (!this.H || this.H.D !== D) { this.H = hydrology(D); this.H.D = D; } return this.H; }
 
   /* ================= 1. Place profile ================= */
@@ -96,7 +100,7 @@ export class GeoHand {
     const H = this.hydro(), path = this.flowPath(x, z); P.flow = path.info;
     // in parallel: admin names, soil & geology, climate, villages and services nearby
     const [adm, U, clim, near] = await Promise.all([
-      import('./placeinfo.js?v=103').then(m => m.adminAt(lat, lon)).catch(() => null),
+      import('./placeinfo.js?v=104').then(m => m.adminAt(lat, lon)).catch(() => null),
       this.underground().catch(() => null), // rock from the bundled map at once; soil (SoilGrids, can be slow) when it comes
       this.climate(lat, lon), this.nearby(lon, lat)]);
     P.adm = adm; P.clim = clim; P.near = near;
@@ -104,7 +108,7 @@ export class GeoHand {
     void H; this.data.profile = P; return P;
   }
   async underground() {
-    if (this.U && this.U.soilOk) return this.U; const m = this.SM || (this.SM = await import('./section.js?v=103'));
+    if (this.U && this.U.soilOk) return this.U; const m = this.SM || (this.SM = await import('./section.js?v=104'));
     if (!this.Ug) this.Ug = await m.loadUnderground(this.w, null, { noSoil: true });
     if (!this.soilJob) this.soilJob = m.loadUnderground(this.w, s => this.say(t(s))).then(U => { this.U = U; return U; }).catch(() => null);
     const U = await Promise.race([this.soilJob, new Promise(r => setTimeout(() => r(null), 20000))]); return U || this.Ug;
@@ -124,7 +128,7 @@ export class GeoHand {
     for (let i = Math.floor((lon - pad - 102) / 0.25); i <= Math.floor((lon + pad - 102) / 0.25); i++) for (let j = Math.floor((lat - pad - 10) / 0.25); j <= Math.floor((lat + pad - 10) / 0.25); j++) jobs.push(fetch(`data/places/${i}_${j}.json`).then(r => r.ok ? r.json() : []).catch(() => []));
     for (const a of await Promise.all(jobs)) for (const p of a) { const d = Math.hypot((p[0] - lon) * 109000, (p[1] - lat) * 110600); if (d < 4500) out.push({ kind: p[2], nk: p[3], ne: p[4], d }); }
     const by = k => out.filter(o => k.includes(o.kind)).sort((a, b) => a.d - b.d);
-    return { villages: by(['village', 'hamlet', 'town', 'city', 'neighbourhood']), schools: by(['school', 'kindergarten', 'college', 'university']), health: by(['hospital', 'clinic', 'doctors', 'health_post']), wats: by(['place_of_worship']), markets: by(['marketplace']) };
+    return { villages: by(['village', 'hamlet', 'town', 'city', 'neighbourhood']).filter(o => !/district|province|commune|ស្រុក|ខេត្ត|ឃុំ/i.test((o.ne || '') + (o.nk || ''))), schools: by(['school', 'kindergarten', 'college', 'university']), health: by(['hospital', 'clinic', 'doctors', 'health_post']), wats: by(['place_of_worship']), markets: by(['marketplace']) };
   }
   profileText(P) {
     const nm = o => o ? (km() ? (o.nk || o.ne) : (o.ne || o.nk)) : '', A = P.adm, L = [];
@@ -187,13 +191,19 @@ export class GeoHand {
     const st = [k0]; up[k0] = 1; let n = 0; while (st.length) { const k = st.pop(); n++; for (let q = kids[k]; q < kids[k + 1]; q++) { const c = list[q]; if (!up[c]) { up[c] = 1; st.push(c); } } }
     return { up, n, ha: n * H.cellA / 1e4 }; }
   streams(minHa = 3) { const D = this.D, H = this.hydro(), thr = minHa * 1e4 / H.cellA, NX = H.NX, segs = [];
-    for (let k = 0; k < H.N; k++) { if (H.acc[k] < thr || H.dir[k] < 0) continue; const d = H.dir[k]; segs.push([[D.X0 + (k % NX) * D.dx, D.Z0 + ((k / NX) | 0) * D.dz], [D.X0 + (d % NX) * D.dx, D.Z0 + ((d / NX) | 0) * D.dz], H.acc[k] * H.cellA / 1e4]); }
+    if (!H.dOut) { const o = Array.from({ length: H.N }, (_, k) => k).sort((a, b) => H.fz[a] - H.fz[b]), dO = new Float32Array(H.N); // distance along the flow to where the water leaves
+      for (const k of o) { const d = H.dir[k]; if (d >= 0) dO[k] = dO[d] + Math.hypot(((k % NX) - (d % NX)) * D.dx, (((k / NX) | 0) - ((d / NX) | 0)) * D.dz); } H.dOut = dO; }
+    for (let k = 0; k < H.N; k++) { if (H.acc[k] < thr || H.dir[k] < 0) continue; const d = H.dir[k]; segs.push([[D.X0 + (k % NX) * D.dx, D.Z0 + ((k / NX) | 0) * D.dz], [D.X0 + (d % NX) * D.dx, D.Z0 + ((d / NX) | 0) * D.dz], H.acc[k] * H.cellA / 1e4, H.dOut[k], H.dOut[d]]); }
     return segs; }
-  showStreams() { const segs = this.streams(); if (!segs.length) return 0; const pos = [], idx = []; let v = 0;
-    for (const [a, b, ha] of segs) { const w = Math.min(6, 1 + Math.log10(ha) * 1.6), ya = this.w.hAt(a[0], a[1]) + 0.6, yb = this.w.hAt(b[0], b[1]) + 0.6, l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / l * w / 2, nz = (b[0] - a[0]) / l * w / 2;
+  showStreams() { const segs = this.streams(); if (!segs.length) return 0; const pos = [], idx = [], dd = []; let v = 0;
+    for (const [a, b, ha, da, db] of segs) { dd.push(da, da, db, db); const w = Math.min(6, 1 + Math.log10(ha) * 1.6), ya = this.w.hAt(a[0], a[1]) + 0.6, yb = this.w.hAt(b[0], b[1]) + 0.6, l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / l * w / 2, nz = (b[0] - a[0]) / l * w / 2;
       pos.push(a[0] + nx, ya, a[1] + nz, a[0] - nx, ya, a[1] - nz, b[0] + nx, yb, b[1] + nz, b[0] - nx, yb, b[1] - nz); idx.push(v, v + 2, v + 1, v + 1, v + 2, v + 3); v += 4; }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
-    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x2aa8ff, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthTest: false })); m.renderOrder = 30; this.add(m); return segs.length; }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('aD', new THREE.Float32BufferAttribute(dd, 1)); g.setIndex(idx);
+    const T = { value: 0 }, t0 = performance.now(), m = new THREE.Mesh(g, new THREE.ShaderMaterial({ uniforms: { uT: T }, transparent: true, depthTest: false, side: THREE.DoubleSide,
+      vertexShader: 'attribute float aD; varying float vD; void main(){ vD = aD; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      // the pattern moves towards smaller "distance to the outlet", i.e. downstream
+      fragmentShader: 'uniform float uT; varying float vD; void main(){ float p = fract((vD + uT * 9.0) / 22.0); float g = smoothstep(0.0, 0.2, p) * smoothstep(0.55, 0.25, p); gl_FragColor = vec4(mix(vec3(0.12, 0.55, 1.0), vec3(0.75, 0.95, 1.0), g), 0.6 + 0.4 * g); }' }));
+    m.onBeforeRender = () => { T.value = (performance.now() - t0) / 1000; }; m.renderOrder = 30; this.add(m); return segs.length; }
   raindrop(x, z) {
     this.clear(); this.showStreams(); const D = this.D, H = this.hydro(), fp = this.flowPath(x, z), C = this.catchment(fp.start);
     const NX = H.NX; this.overlay(this.gridCanvas(k => C.up[k] ? [40, 220, 255, 120] : null));
@@ -205,6 +215,12 @@ export class GeoHand {
   }
 
   /* ================= 3. What if: flood and heavy rain ================= */
+  waterSheet(mask, level) { // a translucent water surface over the wet cells, at the water level (so roads and fields under it look drowned)
+    const D = this.D, H = this.hydro(), NX = H.NX, NZ = H.NZ, e = D.stats.exag || 1, base = Math.max(D.hmin, 0), pos = [], hw = D.dx / 2, hz = D.dz / 2;
+    for (let j = 0; j < NZ; j++) { let i = 0; while (i < NX) { const k = j * NX + i; if (!mask[k]) { i++; continue; } let i1 = i; const y = (level(k) - base) * e + 0.25; while (i1 + 1 < NX && mask[j * NX + i1 + 1] && Math.abs((level(j * NX + i1 + 1) - base) * e + 0.25 - y) < 0.3) i1++;
+      const x0 = D.X0 + i * D.dx - hw, x1 = D.X0 + i1 * D.dx + hw, z0 = D.Z0 + j * D.dz - hz, z1 = D.Z0 + j * D.dz + hz; pos.push(x0, y, z0, x1, y, z1, x1, y, z0, x0, y, z0, x0, y, z1, x1, y, z1); i = i1 + 1; } }
+    if (!pos.length) return; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x2f6a9a, roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.72, depthWrite: false })); m.renderOrder = 5; this.add(m); }
   waterBase() { const D = this.D, H = this.hydro(); let lo = Infinity; for (let k = 0; k < H.N; k++) lo = Math.min(lo, D.raw[k]); const water = []; const NX = H.NX;
     for (let k = 0; k < H.N; k += 3) { const x = D.X0 + (k % NX) * D.dx, z = D.Z0 + ((k / NX) | 0) * D.dz; if (this.clsAt(x, z) === 1) water.push(D.raw[k]); }
     water.sort((a, b) => a - b); return water.length > 30 ? water[Math.floor(water.length * 0.5)] : lo; }
@@ -218,12 +234,12 @@ export class GeoHand {
   flood(rise) {
     const D = this.D, H = this.hydro(), base = this.waterBase(), lvl = base + rise, NX = H.NX;
     const fl = this.floodMask(lvl);
-    this.clear(); this.overlay(this.gridCanvas(k => fl[k] ? [30, 110, 230, Math.min(230, 90 + (lvl - D.raw[k]) * 40)] : null));
-    const flAt = (x, z) => { const i = Math.round((x - D.X0) / D.dx), j = Math.round((z - D.Z0) / D.dz); return i >= 0 && j >= 0 && i < NX && j < H.NZ && fl[j * NX + i]; };
+    this.clear(); const flAt = (x, z) => { const i = Math.round((x - D.X0) / D.dx), j = Math.round((z - D.Z0) / D.dz); return i >= 0 && j >= 0 && i < NX && j < H.NZ && fl[j * NX + i]; };
+    this.waterSheet(fl, () => lvl); this.w.floodAt = flAt;
     return this.impacts(flAt, lvl, base);
   }
   async impacts(flAt, lvl, base, paint = true) {
-    const D = this.D, UM = this.UM || (this.UM = await import('./urban.js?v=103')), B = UM.buildingsOf(this.w), vals = B.map(b => flAt(b.x, b.z) ? 1 : 0), nb = vals.reduce((a, b) => a + b, 0);
+    const D = this.D, UM = this.UM || (this.UM = await import('./urban.js?v=104')), B = UM.buildingsOf(this.w), vals = B.map(b => flAt(b.x, b.z) ? 1 : 0), nb = vals.reduce((a, b) => a + b, 0);
     if (nb && paint) UM.paint(this.w, B, vals.map(v => v ? 1 : 0.15), 0, 1); // flooded houses in yellow, the others dark
     let roadKm = 0; for (const r of this.w.net ? this.w.net.roads : []) for (let i = 1; i < r.pts.length; i++) { const a = r.pts[i - 1], b = r.pts[i]; if (flAt((a.x + b.x) / 2, (a.z + b.z) / 2)) roadKm += Math.hypot(b.x - a.x, b.z - a.z) / 1000; }
     let crop = 0, cells = 0; for (let j = 0; j < D.gh; j++) for (let i = 0; i < D.gw; i++) { const x = D.X0 + (i + 0.5) * D.C, z = D.Z0 + (j + 0.5) * D.C; if (D.cls[j * D.gw + i] === 3 && flAt(x, z)) crop++; if (flAt(x, z)) cells++; }
@@ -233,13 +249,14 @@ export class GeoHand {
     const D = this.D, H = this.hydro(), depth = new Float32Array(H.N), NX = H.NX, scale = mm / 100;
     for (let k = 0; k < H.N; k++) { const d = H.fz[k] - D.raw[k]; if (d > 0.05) depth[k] = Math.min(d, d * scale); }
     const pond = (x, z) => { const i = Math.round((x - D.X0) / D.dx), j = Math.round((z - D.Z0) / D.dz); return i >= 0 && j >= 0 && i < NX && j < H.NZ && depth[j * NX + i] > 0.3 && this.clsAt(x, z) !== 1; };
-    this.clear(); this.overlay(this.gridCanvas(k => { const x = D.X0 + (k % NX) * D.dx, z = D.Z0 + ((k / NX) | 0) * D.dz; return depth[k] > 0.1 && this.clsAt(x, z) !== 1 ? [20, 150, 255, Math.min(230, 70 + depth[k] * 120)] : null; }));
+    this.clear(); const wet = new Uint8Array(H.N); for (let k = 0; k < H.N; k++) { const x = D.X0 + (k % NX) * D.dx, z = D.Z0 + ((k / NX) | 0) * D.dz; if (depth[k] > 0.1 && this.clsAt(x, z) !== 1) wet[k] = 1; }
+    this.waterSheet(wet, k => D.raw[k] + depth[k]); this.w.floodAt = pond;
     return this.impacts(pond, null, null);
   }
 
   /* ================= 5. Access to services ================= */
   async access(kind, mode) {
-    const D = this.D, F = this.F, UM = this.UM || (this.UM = await import('./urban.js?v=103')), a = D.aoi, pad = 0.03, bb = [a.w - pad, a.s - pad, a.e + pad, a.n + pad];
+    const D = this.D, F = this.F, UM = this.UM || (this.UM = await import('./urban.js?v=104')), a = D.aoi, pad = 0.03, bb = [a.w - pad, a.s - pad, a.e + pad, a.n + pad];
     const KINDS = { school: ['school', 'kindergarten', 'college', 'university'], health: ['hospital', 'clinic', 'doctors', 'health_post'], market: ['marketplace'], wat: ['place_of_worship'] };
     const key = bb.join(','); if (!this._poi || this._poi.key !== key) { this.say(t('Finding schools, health centres and markets…'));
       const pts = []; const jobs = [];
@@ -255,7 +272,7 @@ export class GeoHand {
     const B = UM.buildingsOf(this.w), T = B.map(b => { if (!d) return null; const [n, s] = G.nearest(b.x, b.z, 800); if (n < 0) return null; const v = d[n] + s * walkMin; return isFinite(v) ? v : null; });
     // straight-line fallback for places beyond the road network
     const lim = { walk: 30, moto: 15, car: 15 }[mode]; UM.paint(this.w, B, T.map(v => v == null ? null : Math.min(v, lim * 2)), 0, lim * 2, true);
-    for (const p of src) if (this.inside(p.x, p.z)) this.pin(p.x, p.z, { school: '🏫', health: '🏥', market: '🛒', wat: '🛕' }[kind] + (p.name ? ' ' + p.name.slice(0, 18) : ''), '#ffffff');
+    for (const p of src) if (this.inside(p.x, p.z)) this.pin(p.x, p.z, { school: '🏫', health: '🏥', market: '🛒', wat: '🛕' }[kind] + (p.name ? ' ' + short(p.name) : ''), '#ffffff', 16);
     const v = T.filter(x => x != null).sort((a, b) => a - b), within = v.filter(x => x <= lim).length;
     const r = { kind, mode, n: src.length, inArea: src.filter(p => this.inside(p.x, p.z)).length, houses: B.length, reached: v.length, within, lim, median: v.length ? v[Math.floor(v.length / 2)] : null, worst: v.length ? v[v.length - 1] : null };
     this.data.access = r; return r;
@@ -263,7 +280,7 @@ export class GeoHand {
 
   /* ================= 2. Time machine ================= */
   async timeMachine(say) {
-    if (this.TM && this.TM.aoi === this.D.aoi) return this.TM; const D = this.D, a = D.aoi, LCm = await import('./landcover.js?v=103'), LY = await import('./layers.js?v=103');
+    if (this.TM && this.TM.aoi === this.D.aoi) return this.TM; const D = this.D, a = D.aoi, LCm = await import('./landcover.js?v=104'), LY = await import('./layers.js?v=104');
     const years = LY.IO_YEARS, io = {};
     let n = 0; await Promise.all(years.map(async y => { const r = await LCm.loadIO(a, D.W, D.H, y); if (r) io[y] = r; say(`${t('Loading land cover maps')} ${++n}/${years.length}`); }));
     const stats = {}; for (const [y, r] of Object.entries(io)) { const c = {}; for (const v of r.d) c[v] = (c[v] || 0) + 1; const ha = D.W * D.H / 1e4 / r.d.length; stats[y] = Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v * ha])); }
@@ -347,7 +364,7 @@ export class GeoHand {
       const buf = await new Response((await fetch(`data/pop/${i}_${j}.bin.gz`)).body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer(), v = new Uint16Array(buf);
       for (let r = 0; r < h; r++) { const lat = idx.oy - (r0 + r + 0.5) * idx.res; if (lat < a.s || lat > a.n) continue; for (let c = 0; c < w; c++) { const q = v[r * w + c]; if (!q) continue; const lon = idx.ox + (c0 + c + 0.5) * idx.res; if (lon < a.w || lon > a.e) continue; cells.push([F.x(lon), F.z(lat), q / idx.scale]); } } }
     const total = cells.reduce((s, c) => s + c[2], 0), areaKm2 = D.W * D.H / 1e6;
-    const P = this.data.profile, adm = P && P.adm || await import('./placeinfo.js?v=103').then(m => m.adminAt(F.lat0, F.lon0)).catch(() => null);
+    const P = this.data.profile, adm = P && P.adm || await import('./placeinfo.js?v=104').then(m => m.adminAt(F.lat0, F.lon0)).catch(() => null);
     const norm = s => ({ siemreap: 'siemreap', tboungkhmum: 'tbongkhmum', oddarmeanchey: 'otdarmeanchey', ratanakiri: 'ratanakkiri' })[(s || '').toLowerCase().replace(/[^a-z]/g, '')] || (s || '').toLowerCase().replace(/[^a-z]/g, '');
     const prov = adm ? idx.provinces[norm(adm.pro_en)] : null;
     return (this.POP = { D, cells, total, density: total / areaKm2, areaKm2, prov, source: idx.source, cellM: idx.res * 110000 });
@@ -364,7 +381,7 @@ export class GeoHand {
     const young = s(0, 2), work = s(3, 12), old = s(13, 16), males = M.reduce((x, y) => x + y, 0); return { young: young / T * 100, work: work / T * 100, old: old / T * 100, dep: (young + old) / work * 100, sexRatio: males / (T - males) * 100 }; }
   // settlements: groups of buildings, their size and shape (linear along a road or river, clustered, dispersed)
   async settlements() {
-    const UM = this.UM || (this.UM = await import('./urban.js?v=103')), B = UM.buildingsOf(this.w), D = this.D; if (B.length < 10) return [];
+    const UM = this.UM || (this.UM = await import('./urban.js?v=104')), B = UM.buildingsOf(this.w), D = this.D; if (B.length < 10) return [];
     const lab = dbscanLabels(B, 45, 6), groups = new Map(); lab.forEach((l, i) => { if (l >= 0) (groups.get(l) || groups.set(l, []).get(l)).push(B[i]); });
     const roadD = (x, z) => { const n = this.w.net && this.w.net.near(x, z, 80)[0]; return n ? n[2] : 999; }, waterD = (x, z) => { for (let r = 0; r <= 80; r += 10) for (let a = 0; a < 6.28; a += 0.8) if (this.clsAt(x + Math.cos(a) * r, z + Math.sin(a) * r) === 1) return r; return 999; };
     const out = [];
@@ -376,7 +393,7 @@ export class GeoHand {
       out.push({ n, cx, cz, hull, area, dens, elong, nearRoad, nearWater, shape }); }
     out.sort((a, b) => b.n - a.n); this.SET = out; return out;
   }
-  showSettlements(list) { for (const s of list) { const col = SETTLE[s.shape][2]; const pts = s.hull.concat([s.hull[0]]); this.ribbon(pts, new THREE.Color(col).getHex(), 3, 1.5, 0.9); this.pin(s.cx, s.cz, `${km() ? SETTLE[s.shape][1] : SETTLE[s.shape][0]} · ${n0(s.n)}`, col); } }
+  showSettlements(list) { for (const s of list) { const col = SETTLE[s.shape][2]; const pts = s.hull.concat([s.hull[0]]); this.ribbon(pts, new THREE.Color(col).getHex(), 3, 1.5, 0.9); } list.slice(0, 15).forEach((s, i) => this.pin(s.cx, s.cz, `${n0(i + 1)} · ${n0(s.n)} 🏠`, SETTLE[s.shape][2], 8)); }
   settlementMap(list, px = 760) { const D = this.D, c = document.createElement('canvas'), s = px / Math.max(D.W, D.H); c.width = Math.round(D.W * s); c.height = Math.round(D.H * s); const g = c.getContext('2d');     g.fillStyle = '#f4f1ea'; g.fillRect(0, 0, c.width, c.height); g.strokeStyle = '#b9b2a2'; g.lineWidth = 1; for (const r of this.w.net ? this.w.net.roads : []) { g.beginPath(); r.pts.forEach((p, i) => { const x = (p.x - D.X0) * s, y = (p.z - D.Z0) * s; i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); }
     g.fillStyle = '#3b8fd9'; for (let j = 0; j < D.gh; j++) for (let i = 0; i < D.gw; i++) if (D.cls[j * D.gw + i] === 1) g.fillRect(i * D.C * s, j * D.C * s, D.C * s + 0.5, D.C * s + 0.5);
     for (const t of list) { const col = SETTLE[t.shape][2]; g.fillStyle = col + '55'; g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); t.hull.forEach(([x, z], i) => { const X = (x - D.X0) * s, Y = (z - D.Z0) * s; i ? g.lineTo(X, Y) : g.moveTo(X, Y); }); g.closePath(); g.fill(); g.stroke(); }
@@ -388,7 +405,7 @@ export class GeoHand {
     let lo = Infinity, hi = -Infinity, sum = 0; for (let k = 0; k < H.N; k++) { lo = Math.min(lo, R[k]); hi = Math.max(hi, R[k]); sum += R[k]; }
     const sl = [0, 0, 0, 0], sb = Math.max(1, Math.round(15 / D.dx)); for (let j = sb; j < H.NZ - sb; j++) for (let i = sb; i < NX - sb; i++) { const k = j * NX + i, gx = (R[k + sb] - R[k - sb]) / (2 * sb * D.dx), gz = (R[k + sb * NX] - R[k - sb * NX]) / (2 * sb * D.dz), a = Math.atan(Math.hypot(gx, gz)) * 180 / Math.PI; sl[a < 2 ? 0 : a < 8 ? 1 : a < 15 ? 2 : 3]++; }
     const slT = sl.reduce((a, b) => a + b, 0) || 1, lc = {}; for (const v of D.cls) if (v) lc[v] = (lc[v] || 0) + 1; const lcT = Object.values(lc).reduce((a, b) => a + b, 0) || 1;
-    const areaKm2 = D.W * D.H / 1e6, UM = this.UM || (this.UM = await import('./urban.js?v=103')), B = UM.buildingsOf(this.w);
+    const areaKm2 = D.W * D.H / 1e6, UM = this.UM || (this.UM = await import('./urban.js?v=104')), B = UM.buildingsOf(this.w);
     const roads = { main: 0, local: 0, track: 0 }; for (const r of this.w.net ? this.w.net.roads : []) { let L = 0; for (let i = 1; i < r.pts.length; i++) L += Math.hypot(r.pts[i].x - r.pts[i - 1].x, r.pts[i].z - r.pts[i - 1].z); roads[r.cls <= 10 ? 'main' : r.cls <= 14 ? 'local' : 'track'] += L / 1000; }
     const st = this.streams(); let stKm = 0; for (const [a, b] of st) stKm += Math.hypot(b[0] - a[0], b[1] - a[1]) / 1000;
     // settlement pattern: Clark–Evans nearest-neighbour index of the houses (R < 1 clustered, ≈ 1 random, > 1 dispersed)

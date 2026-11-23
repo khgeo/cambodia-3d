@@ -5,32 +5,32 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=103';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=103';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=103';
-import { buildTrees, GrassField, WIND } from './vegetation.js?v=103';
-import { classify as khClassify, details as khDetails, powerLines, watBuilding, watWalls, watRoles } from './khmerbuild.js?v=103';
-import { RoadNet, Driver, Walker } from './modes.js?v=103';
-import { vehicleKit } from './vehicles.js?v=103';
-import { loadCarPack } from './carpack.js?v=103';
-import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=103';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=103';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=103';
-import { LayerStack } from './layers.js?v=103';
-import { Survey } from './survey.js?v=103';
-import { Editor } from './editor.js?v=103';
-import { Atmos } from './atmos.js?v=103';
-import { NightLights } from './lights.js?v=103';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=103';
-import { Tactical, loadCatalog } from './tactical.js?v=103';
-import { LcTrainer } from './lctrain.js?v=103';
-import { Radar } from './radar.js?v=103';
-import { Globe } from './globe.js?v=103';
-import { SEASON } from './vegetation.js?v=103';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=103';
-import { makeCloudDome } from './skyclouds.js?v=103';
-import { EarthContext } from './earthctx.js?v=103';
-import { ResultLayers } from './results.js?v=103';
+import * as G from './geo.js?v=104';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=104';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=104';
+import { buildTrees, GrassField, WIND } from './vegetation.js?v=104';
+import { classify as khClassify, details as khDetails, powerLines, watBuilding, watWalls, watRoles } from './khmerbuild.js?v=104';
+import { RoadNet, Driver, Walker } from './modes.js?v=104';
+import { vehicleKit } from './vehicles.js?v=104';
+import { loadCarPack } from './carpack.js?v=104';
+import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=104';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=104';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=104';
+import { LayerStack } from './layers.js?v=104';
+import { Survey } from './survey.js?v=104';
+import { Editor } from './editor.js?v=104';
+import { Atmos } from './atmos.js?v=104';
+import { NightLights } from './lights.js?v=104';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=104';
+import { Tactical, loadCatalog } from './tactical.js?v=104';
+import { LcTrainer } from './lctrain.js?v=104';
+import { Radar } from './radar.js?v=104';
+import { Globe } from './globe.js?v=104';
+import { SEASON } from './vegetation.js?v=104';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=104';
+import { makeCloudDome } from './skyclouds.js?v=104';
+import { EarthContext } from './earthctx.js?v=104';
+import { ResultLayers } from './results.js?v=104';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -994,6 +994,7 @@ export class World {
             else want = Math.min(v.base, Math.max(0, ld.cur * Math.max(0, gap - 1.5) / safe));
           }
         }
+        if (this.floodAt && v.fwd && (this.floodAt(v.pos.x + v.fwd.x * 9, v.pos.z + v.fwd.z * 9) || this.floodAt(v.pos.x, v.pos.z))) { want = 0; v.passing = null; } // flooded road ahead: stop at the water
         v.cur += THREE.MathUtils.clamp(want - v.cur, -7 * dt, 2.8 * dt);
         const latWant = v.passing ? v.shift : 0; v.lat += THREE.MathUtils.clamp(latWant - v.lat, -1.3 * dt, 1.3 * dt);
       }
@@ -1245,7 +1246,7 @@ export class World {
   }
   // flooded paddies at planting (needs Field Boundaries), straw stacks by the houses after the harvest
   async farmUpdate(fields) {
-    const RF = this._rf || (this._rf = await import('./ricefield.js?v=103')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
+    const RF = this._rf || (this._rf = await import('./ricefield.js?v=104')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
     for (const k of ['paddyMesh', 'hayMesh']) if (this[k]) { this.root.remove(this[k]); this[k].geometry.dispose(); this[k].material.dispose(); this[k] = null; }
     const F = this._farmFields || this.fields; if (this.seasonKey === 'planting' && F && F.length) { this.paddyMesh = RF.paddyWater(this, F); if (this.paddyMesh) this.root.add(this.paddyMesh); }
     if (this.seasonKey === 'harvested') { this.hayMesh = RF.hayStacks(this); if (this.hayMesh) this.root.add(this.hayMesh); }
@@ -1458,7 +1459,7 @@ export class World {
   }
   // cinematic look (glow, colour grade, optional ambient occlusion), loaded on first use
   async setLook(on, ao) {
-    if ((on || ao) && !this.look) { const { Look } = await import('./look.js?v=103'); this.look = new Look(this); const s = this.renderer.getSize(new THREE.Vector2()); this.look.setSize(s.x, s.y); }
+    if ((on || ao) && !this.look) { const { Look } = await import('./look.js?v=104'); this.look = new Look(this); const s = this.renderer.getSize(new THREE.Vector2()); this.look.setSize(s.x, s.y); }
     if (!this.look) return; this.look.on = on; if (ao != null) await this.look.setAO(on && ao);
   }
 }

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=103">
+<link rel="stylesheet" href="css/app.css?v=104">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -476,6 +476,7 @@
         <button id="ghShRun" class="primary eirun">📄 Make the report</button>
       </section>
       <section data-gh="trip" hidden>
+        <details class="ghHow" open><summary>❓ How a field trip works</summary><ol><li>Before (lecturer, on a computer): build the 3D area of the trip, tap “Add a stop”, tap the place on the map and write the task. Repeat for each stop, then tap “Copy trip link” and send it to the students (Telegram, email).</li><li>In the field (students, on a phone): open the link (the same area and stops appear), tap “Start GPS” and allow location. Your blue dot moves on the 3D landscape; within 30 m of a stop its task appears.</li><li>Record: write your name, choose what is there, add a note and a photo, then tap “Save observation here”. Coloured dots mark what you saved.</li><li>After: each student taps “Export” and sends the file to the lecturer, who taps “Import class files” to see everyone's observations on one map.</li></ol><div class="svhelp">No GPS indoors? Use “Practise: tap the map to stand there”. Observations stay on the phone until exported.</div></details>
         <div class="ghSub">Teacher: plan the stops</div>
         <div class="row"><button id="ghTrAdd">➕ Add a stop (tap the map)</button><button id="ghTrLink">🔗 Copy trip link</button></div>
         <div id="ghTrForm" hidden><input id="ghTrTitle" placeholder="Stop name, e.g. Rice fields by the canal" style="width:100%;margin-bottom:4px"><textarea id="ghTrTask" rows="2" placeholder="Task for the students, e.g. What is the land used for? Take a photo." style="width:100%"></textarea><div class="row"><button id="ghTrSave" class="primary">Save stop</button><button id="ghTrCancel">Cancel</button></div></div>
@@ -655,6 +656,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=103"></script>
+<script type="module" src="js/app.js?v=104"></script>
 </body>
 </html>
