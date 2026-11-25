@@ -1,11 +1,11 @@
 // Trees (leafy species, sugar & coconut palms, bushes) placed from imagery canopy, and a near-camera
 // field of grass, rice and forest understory that follows the viewer.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=105';
-import { mulberry32 } from './geo.js?v=105';
-import { makeGrassMaterial } from './shaders.js?v=105';
-import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=105';
-import { FARM, riceHill, sennaGeo, bananaGeo, lilyGeo } from './ricefield.js?v=105';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=106';
+import { mulberry32 } from './geo.js?v=106';
+import { makeGrassMaterial } from './shaders.js?v=106';
+import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=106';
+import { FARM, riceHill, sennaGeo, bananaGeo, lilyGeo } from './ricefield.js?v=106';
 
 let TEX = null;
 const texs = () => TEX || (TEX = foliageTextures());
@@ -201,15 +201,21 @@ export class GrassField {
     const inside = (x, z) => x > X0 && z > Z0 && x < X0 + W && z < Z0 + H;
     let ng = 0, nr = 0; const FM = FARM.mask, kind = SEASON.kind === 'image' ? 'vegetative' : SEASON.kind;
     if (kind !== this.riceKind) { this.riceKind = kind; const g = this.rice.geometry; this.rice.geometry = riceHill(kind, 3); g.dispose(); }
-    // rice hills in rows, 25 cm apart, inside the mapped fields (or the rice cells of the land cover)
-    { const sr = 0.25, Rr = Math.min(R, Math.sqrt(this.N * sr * sr / Math.PI)), tint = SEASON.kind !== 'image';
+    // rice hills in rows, 25 cm apart, inside the mapped fields (or the rice cells of the land cover); with Srae Monitor each field gets its own growth stage
+    const ST = FM && FARM.stage, used = {}, meshOf = k => { if (k === kind && !ST) return this.rice; this.riceK = this.riceK || {}; let m = this.riceK[k];
+      if (!m) { m = this.riceK[k] = new THREE.InstancedMesh(riceHill(k, 3), this.riceMat, this.N); m.count = 0; m.frustumCulled = false; m.receiveShadow = true; this.group.add(m); this.nearParts.push(m); } return m; };
+    { const sr = 0.25, Rr = Math.min(R, Math.sqrt(this.N * sr * sr / Math.PI)), tint = SEASON.kind !== 'image' || ST;
       for (let j = Math.floor((target.z - Rr) / sr); j <= Math.ceil((target.z + Rr) / sr) && nr < this.N; j++) for (let i = Math.floor((target.x - Rr) / sr); i <= Math.ceil((target.x + Rr) / sr) && nr < this.N; i++) {
         const rx = i * sr, rz = j * sr, dd = (rx - target.x) ** 2 + (rz - target.z) ** 2; if (dd > Rr * Rr || !inside(rx, rz) || masked(rx, rz)) continue;
         if (FM) { if (!FM.at(rx, rz)) continue; } else { const ci = Math.min(gw - 1, ((rx - X0) / C) | 0), cj = ((rz - Z0) / C) | 0; if (!(cls[cj * gw + ci] === 3 && splatRice[cj * gw + ci] > 0)) continue; }
+        const fid = FM ? FM.at(rx, rz) : 0, k2 = ST ? ST[fid] || 'none' : kind; if (k2 === 'none') continue; // bare or flooded field: no plants
+        const M = meshOf(k2), n2 = used[k2] || 0; if (n2 >= this.N) continue;
         const hs = hash(i, j), fade = 1 - Math.sqrt(dd) / Rr, x = rx + (hs - .5) * 0.05, z = rz + (hash(j, i) - .5) * 0.05, sc = (0.85 + hs * 0.3) * (0.7 + 0.3 * fade);
-        d.position.set(x, hAt(x, z) - (SEASON.kind === 'seedling' ? 0 : 0.02), z); d.rotation.set(0, hs * 6.28, 0); d.scale.set(sc, sc * (0.9 + hash(i + 1, j) * 0.2), sc); d.updateMatrix(); this.rice.setMatrixAt(nr, d.matrix);
-        if (tint) { col.setScalar(0.85 + hash(i, j + 3) * 0.3); const fid = FM ? FM.at(rx, rz) : 0; if (fid) { const q = hash(fid * 0.37, fid * 1.91); col.r *= 0.82 + q * 0.3; col.b *= 0.75 + q * 0.4; } } else { const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(2.6).lerp(WHITE, 0.35); }
-        this.rice.setColorAt(nr, col); nr++; } }
+        d.position.set(x, hAt(x, z) - (k2 === 'seedling' || k2 === 'germ' || k2 === 'leaf' ? 0 : 0.02), z); d.rotation.set(0, hs * 6.28, 0); d.scale.set(sc, sc * (0.9 + hash(i + 1, j) * 0.2), sc); d.updateMatrix(); M.setMatrixAt(n2, d.matrix);
+        if (tint) { col.setScalar(0.85 + hash(i, j + 3) * 0.3); if (fid) { const q = hash(fid * 0.37, fid * 1.91); col.r *= 0.82 + q * 0.3; col.b *= 0.75 + q * 0.4; } } else { const [r, g, b] = pxAt(x, z); col.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace).multiplyScalar(2.6).lerp(WHITE, 0.35); }
+        M.setColorAt(n2, col); used[k2] = n2 + 1; nr++; } }
+    for (const [k, m] of Object.entries(this.riceK || {})) { m.count = used[k] || 0; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+    if (ST) used[kind] = 0; nr = used[kind] || 0;
     const sp = 0.42, i0 = Math.floor((target.x - R) / sp), i1 = Math.ceil((target.x + R) / sp), j0 = Math.floor((target.z - R) / sp), j1 = Math.ceil((target.z + R) / sp);
     for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
       if (ng >= this.N && nr >= this.N) break;

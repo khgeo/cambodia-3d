@@ -3,7 +3,7 @@
 // after the harvest, and earth bunds between the fields.
 import * as THREE from 'three';
 
-export const FARM = { mask: null }; // field raster: 1 = inside a field, 0 = outside (set from the Field Boundaries)
+export const FARM = { mask: null, stage: null }; // stage: field number (as in the mask) → rice stage kind, from Srae Monitor // field raster: 1 = inside a field, 0 = outside (set from the Field Boundaries)
 const mulberry = a => () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 // stages: seedling (June–July, flooded), vegetative (August–October), ripe (November–December), stubble (dry season)
 export const RICE_SPEC = {
@@ -11,6 +11,15 @@ export const RICE_SPEC = {
   vegetative: { h: 0.85, tillers: 7, leaf: 0x3f7f22, straw: 0x4f7a26, grain: null },
   ripe: { h: 1.0, tillers: 7, leaf: 0x9aac3c, straw: 0xa8aa48, grain: 0xcdb23c }, // mid-November: yellow-green, heads turning gold
   stubble: { h: 0.22, tillers: 9, leaf: 0xa48a5a, straw: 0xc3a46a, grain: null },
+  // growth stages (BBCH) for single fields, from the age of the crop
+  germ: { h: 0.07, tillers: 2, leaf: 0x9ccc4a, straw: 0x8fae4a, grain: null },        // 00–09 germination, sprouts in the water
+  leaf: { h: 0.22, tillers: 3, leaf: 0x7fbf3a, straw: 0x7f9c3a, grain: null },        // 11–19 leaf development
+  tiller: { h: 0.45, tillers: 6, leaf: 0x5a9a2a, straw: 0x5f8a2e, grain: null },      // 21–29 tillering
+  elong: { h: 0.75, tillers: 8, leaf: 0x3f7f22, straw: 0x4f7a26, grain: null },       // 30–39 stem elongation
+  boot: { h: 0.92, tillers: 8, leaf: 0x356f1e, straw: 0x46702a, grain: null },        // 41–59 booting, panicle emerging
+  flower: { h: 1.0, tillers: 8, leaf: 0x3a7322, straw: 0x50782a, grain: 0xdfe6b0 },  // 61–69 flowering (pale panicles)
+  milk: { h: 1.0, tillers: 8, leaf: 0x5f8a2c, straw: 0x7a8a34, grain: 0xb9c25a },     // 71–79 milk, panicles still green
+  mature: { h: 0.98, tillers: 8, leaf: 0xb59a48, straw: 0xc9a44a, grain: 0xd9a53a },  // 87–89 fully ripe, golden
 };
 // one rice hill: a clump of tillers, each a stem with long arching leaves and, when ripe, a nodding golden panicle
 export function riceHill(kind = 'vegetative', seed = 3) {

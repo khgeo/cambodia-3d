@@ -51,5 +51,21 @@
 "NDRE · nitrogen": "NDRE · អាសូត",
 "NDMI · crop water": "NDMI · ទឹកក្នុងដំណាំ",
 "NDWI · standing water": "NDWI · ទឹកដក់",
-"MSAVI · young crops": "MSAVI · ដំណាំខ្ចី"
+"MSAVI · young crops": "MSAVI · ដំណាំខ្ចី",
+"Rice variety": "ពូជស្រូវ",
+"Short (≈100 days)": "ខ្លី (≈១០០ ថ្ងៃ)",
+"Medium (≈125 days)": "មធ្យម (≈១២៥ ថ្ងៃ)",
+"Long (≈145 days)": "វែង (≈១៤៥ ថ្ងៃ)",
+"Stage tags": "ស្លាកដំណាក់កាល",
+"🌱 Rice plants in every field at its growth stage (zoom in close to a field)": "🌱 ដើមស្រូវក្នុងស្រែនីមួយៗតាមដំណាក់កាលលូតលាស់ (ពង្រីកមើលជិតស្រែ)",
+"Colour by growth stage": "ពណ៌តាមដំណាក់កាលលូតលាស់",
+"Rice growth stage (BBCH) of the fields": "ដំណាក់កាលលូតលាស់ស្រូវ (BBCH) នៃស្រែ",
+"Rice growth stage": "ដំណាក់កាលលូតលាស់ស្រូវ",
+"day": "ថ្ងៃទី",
+"from NDVI only": "ពី NDVI តែប៉ុណ្ណោះ",
+"No crop now (bare or flooded field)": "គ្មានដំណាំឥឡូវ (ដីទទេ ឬលិចទឹក)",
+"Sowing / transplanting date": "កាលបរិច្ឆេទសាប / ស្ទូង",
+"Entered by hand.": "បញ្ចូលដោយដៃ។",
+"Estimated from the NDVI curve (green-up minus ~4 weeks); enter the real date if you know it.": "ប៉ាន់ស្មានពីខ្សែកោង NDVI (ពេលចាប់ផ្ដើមខៀវ ដក ~៤ សប្ដាហ៍) បញ្ចូលកាលបរិច្ឆេទពិតប្រសិនបើអ្នកដឹង។",
+"Enter the date if you know it.": "បញ្ចូលកាលបរិច្ឆេទប្រសិនបើអ្នកដឹង។"
 }

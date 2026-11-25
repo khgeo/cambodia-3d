@@ -2,7 +2,7 @@
 // with the land owners. Uses the same engine as khgeo.github.io/srae-monitor: Earth Search STAC (AWS, no key),
 // Cloud-Optimized GeoTIFF windows read in the browser, SCL cloud mask, NDVI / EVI / NDMI / NDWI / NDRE.
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=105';
+import { t, lang } from './i18n.js?v=106';
 import { searchScenes } from './srae/stac.js';
 import { toUtm, utmZone } from './srae/geo.js';
 import { INDICES, valueColor, gradientCss } from './srae/indices.js';
@@ -109,3 +109,68 @@ export class Srae3D {
 }
 export { INDICES, gradientCss };
 export const statusName = k => STATUS[k] ? (km() ? STATUS[k][1] : STATUS[k][0]) : k;
+
+/* ---------- rice growth stages (BBCH) from the age of the crop ---------- */
+// days after sowing for a medium (≈125-day) wet-season variety; other lengths are scaled
+export const RSTAGES = [
+  ['germ', 0, 8, '00–09', 'Germination', 'ដំណុះ', '#c9b38a', 'Keep the soil moist; level, puddled field.', 'រក្សាដីឱ្យសើម ស្រែរាបស្មើ។'],
+  ['leaf', 8, 21, '11–19', 'Leaf development', 'ការលូតលាស់ស្លឹក', '#b9d98a', 'Shallow water (2–3 cm); basal fertiliser if not yet applied.', 'ទឹករាក់ (២–៣ សម) ដាក់ជីទ្រនាប់ ប្រសិនបើមិនទាន់ដាក់។'],
+  ['tiller', 21, 46, '21–29', 'Tillering', 'ការបែកគុម្ព', '#7cc26a', 'First top-dressing (urea) at early tillering; control weeds.', 'ដាក់ជីបន្ថែមលើកទី១ (អ៊ុយរ៉េ) ដើមរដូវបែកគុម្ព កម្ចាត់ស្មៅ។'],
+  ['elong', 46, 61, '30–39', 'Stem elongation / panicle initiation', 'ការលូតដើម / ការបង្កើតកួរ', '#3fa45b', 'Second top-dressing at panicle initiation; keep 5 cm water.', 'ដាក់ជីបន្ថែមលើកទី២ ពេលបង្កើតកួរ រក្សាទឹក ៥ សម។'],
+  ['boot', 61, 76, '41–59', 'Booting / heading', 'ពពោះ / ចេញកួរ', '#2f8a4a', 'Most sensitive to drought: never let the field dry out.', 'ងាយរងគ្រោះរាំងស្ងួតបំផុត៖ កុំឱ្យស្រែស្ងួត។'],
+  ['flower', 76, 86, '61–69', 'Flowering', 'ចេញផ្កា', '#e7c94c', 'Keep water; avoid spraying during flowering hours.', 'រក្សាទឹក ជៀសវាងការបាញ់ថ្នាំពេលចេញផ្កា។'],
+  ['milk', 86, 101, '71–79', 'Milk / dough ripening', 'គ្រាប់ទឹកដោះ / គ្រាប់ទន់', '#d9b04a', 'Watch for birds, rats and brown planthopper.', 'ប្រយ័ត្នសត្វស្លាប កណ្ដុរ និងមមាចត្នោត។'],
+  ['mature', 101, 126, '83–89', 'Ripening / mature', 'ទុំ', '#c08a30', 'Drain the field ~10 days before harvest; harvest at 80–85 % golden grains.', 'បង្ហូរទឹកចេញ ~១០ ថ្ងៃមុនច្រូត ច្រូតពេលគ្រាប់លឿង ៨០–៨៥%។'],
+  ['stubble', 126, 9999, '–', 'Harvested (stubble)', 'ច្រូតរួច (គល់ចំបើង)', '#a48a5a', 'Incorporate straw instead of burning; plan the next crop.', 'ច្រឹបចំបើងចូលដីជំនួសការដុត រៀបចំដំណាំបន្ទាប់។'],
+];
+export const VARIETY = { short: 100, medium: 125, long: 145 };
+const DAY = 864e5;
+// the age of the rice in a field: a sowing date entered by hand, or estimated from the NDVI curve
+// (NDVI passes 0.3 about four weeks after sowing, at early tillering)
+export function riceAge(f, J, today = Date.now()) {
+  if (f.sow_date) return { sow: f.sow_date, age: Math.round((today - Date.parse(f.sow_date)) / DAY), src: 'entered' };
+  if (!J || !J.s || J.s.length < 2) return null; const s = J.s;
+  for (let i = s.length - 1; i > 0; i--) { const [d0, v0] = s[i - 1], [d1, v1] = s[i]; if ((today - Date.parse(d1)) / DAY > 170) break; // only the current crop
+    if (v0 < 0.3 && v1 >= 0.3) { const t0 = Date.parse(d0), t1 = Date.parse(d1), tc = t0 + (t1 - t0) * (0.3 - v0) / Math.max(0.01, v1 - v0), sow = tc - 28 * DAY;
+    return { sow: new Date(sow).toISOString().slice(0, 10), age: Math.round((today - sow) / DAY), src: 'ndvi' }; } }
+  return null;
+}
+export function riceStage(f, J, variety = 'medium', today = Date.now()) {
+  const A = riceAge(f, J, today), k = 125 / (VARIETY[f.variety || variety] || 125);
+  if (J && J.status === 'harvested' && !(A && A.src === 'entered' && A.age < 100)) return { key: 'stubble', A, st: RSTAGES[8] };
+  if (A && A.age >= 0) { const d = A.age * k; const st = RSTAGES.find(r => d >= r[1] && d < r[2]) || RSTAGES[8];
+    if (!(A.src === 'ndvi' && st[0] === 'stubble' && J && J.latest >= 0.35)) return { key: st[0], A, st }; } // a green field cannot be harvested: fall back on the NDVI level
+  if (!J || J.status === 'unknown') return null;
+  if (J.status === 'bare') return { key: 'none', A: null, st: null };
+  const v = J.latest ?? 0.5, guess = J.status === 'young' ? (v < 0.45 ? 'tiller' : 'elong') : J.status === 'full' ? 'boot' : J.status === 'ripening' ? (v > 0.45 ? 'milk' : 'mature') : 'tiller'; return { key: guess, A: null, st: RSTAGES.find(r => r[0] === guess), guessed: true };
+}
+// a BBCH-style bar: the stages of the season with the field's day marked
+export function stageBar(stage, variety = 'medium', W = 330, H = 92) {
+  const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d'), tot = VARIETY[variety] || 125, k = tot / 125, X = d => 6 + Math.min(1, d / (tot + 12)) * (W - 12);
+  g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); g.font = '9px system-ui, "Noto Sans Khmer"';
+  RSTAGES.slice(0, 8).forEach(r => { const x0 = X(r[1] * k), x1 = X(r[2] * k); g.fillStyle = r[6]; g.fillRect(x0, 34, x1 - x0 - 1, 22); g.fillStyle = '#222'; g.save(); g.translate(x0 + 2, 52); g.fillText(r[3], 0, 0); g.restore(); });
+  g.fillStyle = RSTAGES[8][6]; g.fillRect(X(tot), 34, W - 6 - X(tot), 22);
+  g.fillStyle = '#4a90d9'; g.fillRect(X(0), 58, X(tot - 10) - X(0), 4); g.fillStyle = '#555'; g.fillText(km() ? 'ទឹកក្នុងស្រែ' : 'water in the field', X(0), 72);
+  if (stage && stage.A) { const x = X(stage.A.age); g.fillStyle = '#d0302a'; g.beginPath(); g.moveTo(x, 32); g.lineTo(x - 6, 20); g.lineTo(x + 6, 20); g.fill(); g.fillRect(x - 1, 32, 2, 26); g.font = 'bold 11px system-ui, "Noto Sans Khmer"'; g.textAlign = x > W / 2 ? 'right' : 'left'; g.fillText((km() ? 'ថ្ងៃទី ' : 'Day ') + stage.A.age, x + (x > W / 2 ? -8 : 8), 16); }
+  g.textAlign = 'left'; g.fillStyle = '#555'; g.font = '9px system-ui'; g.fillText('BBCH', 6, 86); g.textAlign = 'right'; g.fillText((km() ? 'ថ្ងៃ' : 'days') + ' 0 → ' + tot, W - 6, 86); return c;
+}
+export const stageName = st => st ? (km() ? st[5] : st[4]) : '';
+export const stageTip = st => st ? (km() ? st[8] : st[7]) : '';
+
+// rice plants in every field at its growth stage (the near-camera rice hills), water in the flooded paddies, stage tags
+Srae3D.prototype.stages = function (variety = 'medium') { const FL = this.fieldList(), S = this.S; return FL.map((f, k) => riceStage(f, S ? S.fields[k] : null, variety)); };
+Srae3D.prototype.plants = async function (on, variety = 'medium', tags = true) {
+  const w = this.w, RF = w._rf || (w._rf = await import('./ricefield.js?v=106')), FL = this.fieldList();
+  if (this.water) { w.root.remove(this.water); this.water.geometry.dispose(); this.water.material.dispose(); this.water = null; }
+  if (this.tags) { this.tags.traverse(o => { if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } if (o.geometry) o.geometry.dispose(); }); w.root.remove(this.tags); this.tags = null; }
+  if (!on || !FL.length) { RF.FARM.stage = null; if (w._farmFields) RF.buildFieldMask(w, w._farmFields); else RF.FARM.mask = null; if (w.grass) w.grass.center.set(1e9, 0, 1e9); return null; }
+  const ST = this.stages(variety); RF.buildFieldMask(w, FL); RF.FARM.stage = {}; ST.forEach((s, k) => { RF.FARM.stage[k + 1] = s ? s.key : 'none'; });
+  const wet = FL.filter((f, k) => ST[k] && ['germ', 'leaf', 'tiller', 'elong', 'boot', 'flower', 'milk'].includes(ST[k].key)); if (wet.length) { this.water = RF.paddyWater(w, wet); if (this.water) w.root.add(this.water); }
+  if (tags) { this.tags = new THREE.Group(); const F = this.F;
+    FL.forEach((f, k) => { const s = ST[k]; if (!s || !s.st) return; const c = f.ring.reduce((a, p) => [a[0] + p[0] / f.ring.length, a[1] + p[1] / f.ring.length], [0, 0]), x = F.x(c[0]), z = F.z(c[1]);
+      const txt = `🌾 ${stageName(s.st)}${s.A ? ' · ' + (km() ? 'ថ្ងៃ ' : 'd ') + s.A.age : ''}`, cv = document.createElement('canvas'), g = cv.getContext('2d'), font = 'bold 26px system-ui, "Noto Sans Khmer"'; g.font = font;
+      const W = Math.ceil(g.measureText(txt).width) + 22; cv.width = W; cv.height = 40; g.font = font; g.fillStyle = 'rgba(15,22,30,.8)'; g.beginPath(); g.roundRect(0, 0, W, 40, 10); g.fill(); g.fillStyle = s.st[6]; g.fillRect(0, 34, W, 6); g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.fillText(txt, 11, 19);
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), depthTest: false, transparent: true, sizeAttenuation: false })); sp.center.set(0.5, 0); sp.scale.set(0.00042 * W, 0.00042 * 40, 1); sp.position.set(x, w.hAt(x, z) + 5, z); sp.renderOrder = 45; this.tags.add(sp); });
+    w.root.add(this.tags); }
+  if (w.grass) w.grass.center.set(1e9, 0, 1e9); return ST;
+};
