@@ -45,6 +45,7 @@ export const KM = {
   'Dwarf planet': 'ភពតឿ',
   'Moon': 'ព្រះច័ន្ទ',
   'Space probe': 'យានអវកាស',
+  'Srae Monitor: crop health of every field from Sentinel-2, with the owners': 'ស្រែ Monitor៖ សុខភាពដំណាំនៃស្រែនីមួយៗពី Sentinel-2 ជាមួយម្ចាស់ដី',
   'Geography in hand: place profile, time machine, what if, rain, access, area report, field trip': 'ភូមិសាស្ត្រក្នុងដៃ៖ ព័ត៌មានទីកន្លែង ម៉ាស៊ីនពេលវេលា ចុះបើ ទឹកភ្លៀង ការធ្វើដំណើរ របាយការណ៍តំបន់ ទស្សនកិច្ចសិក្សា',
   '⚡ Power poles & wires': '⚡ បង្គោល និងខ្សែភ្លើង',
   '🎬 Cinematic look': '🎬 រូបភាពបែបភាពយន្ត', '🌑 Contact shadows (ambient occlusion)': '🌑 ស្រមោលប៉ះ (ambient occlusion)',

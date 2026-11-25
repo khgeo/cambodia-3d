@@ -2,7 +2,7 @@
 // 1 Place profile · 2 Time machine · 3 What if (flood, heavy rain) · 4 Where does the rain go · 5 Access to services
 // 6 Worksheet maker · 7 Field trip (GPS, stops, observations)
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=104';
+import { t, lang } from './i18n.js?v=105';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
@@ -100,7 +100,7 @@ export class GeoHand {
     const H = this.hydro(), path = this.flowPath(x, z); P.flow = path.info;
     // in parallel: admin names, soil & geology, climate, villages and services nearby
     const [adm, U, clim, near] = await Promise.all([
-      import('./placeinfo.js?v=104').then(m => m.adminAt(lat, lon)).catch(() => null),
+      import('./placeinfo.js?v=105').then(m => m.adminAt(lat, lon)).catch(() => null),
       this.underground().catch(() => null), // rock from the bundled map at once; soil (SoilGrids, can be slow) when it comes
       this.climate(lat, lon), this.nearby(lon, lat)]);
     P.adm = adm; P.clim = clim; P.near = near;
@@ -108,7 +108,7 @@ export class GeoHand {
     void H; this.data.profile = P; return P;
   }
   async underground() {
-    if (this.U && this.U.soilOk) return this.U; const m = this.SM || (this.SM = await import('./section.js?v=104'));
+    if (this.U && this.U.soilOk) return this.U; const m = this.SM || (this.SM = await import('./section.js?v=105'));
     if (!this.Ug) this.Ug = await m.loadUnderground(this.w, null, { noSoil: true });
     if (!this.soilJob) this.soilJob = m.loadUnderground(this.w, s => this.say(t(s))).then(U => { this.U = U; return U; }).catch(() => null);
     const U = await Promise.race([this.soilJob, new Promise(r => setTimeout(() => r(null), 20000))]); return U || this.Ug;
@@ -239,7 +239,7 @@ export class GeoHand {
     return this.impacts(flAt, lvl, base);
   }
   async impacts(flAt, lvl, base, paint = true) {
-    const D = this.D, UM = this.UM || (this.UM = await import('./urban.js?v=104')), B = UM.buildingsOf(this.w), vals = B.map(b => flAt(b.x, b.z) ? 1 : 0), nb = vals.reduce((a, b) => a + b, 0);
+    const D = this.D, UM = this.UM || (this.UM = await import('./urban.js?v=105')), B = UM.buildingsOf(this.w), vals = B.map(b => flAt(b.x, b.z) ? 1 : 0), nb = vals.reduce((a, b) => a + b, 0);
     if (nb && paint) UM.paint(this.w, B, vals.map(v => v ? 1 : 0.15), 0, 1); // flooded houses in yellow, the others dark
     let roadKm = 0; for (const r of this.w.net ? this.w.net.roads : []) for (let i = 1; i < r.pts.length; i++) { const a = r.pts[i - 1], b = r.pts[i]; if (flAt((a.x + b.x) / 2, (a.z + b.z) / 2)) roadKm += Math.hypot(b.x - a.x, b.z - a.z) / 1000; }
     let crop = 0, cells = 0; for (let j = 0; j < D.gh; j++) for (let i = 0; i < D.gw; i++) { const x = D.X0 + (i + 0.5) * D.C, z = D.Z0 + (j + 0.5) * D.C; if (D.cls[j * D.gw + i] === 3 && flAt(x, z)) crop++; if (flAt(x, z)) cells++; }
@@ -256,7 +256,7 @@ export class GeoHand {
 
   /* ================= 5. Access to services ================= */
   async access(kind, mode) {
-    const D = this.D, F = this.F, UM = this.UM || (this.UM = await import('./urban.js?v=104')), a = D.aoi, pad = 0.03, bb = [a.w - pad, a.s - pad, a.e + pad, a.n + pad];
+    const D = this.D, F = this.F, UM = this.UM || (this.UM = await import('./urban.js?v=105')), a = D.aoi, pad = 0.03, bb = [a.w - pad, a.s - pad, a.e + pad, a.n + pad];
     const KINDS = { school: ['school', 'kindergarten', 'college', 'university'], health: ['hospital', 'clinic', 'doctors', 'health_post'], market: ['marketplace'], wat: ['place_of_worship'] };
     const key = bb.join(','); if (!this._poi || this._poi.key !== key) { this.say(t('Finding schools, health centres and markets…'));
       const pts = []; const jobs = [];
@@ -280,7 +280,7 @@ export class GeoHand {
 
   /* ================= 2. Time machine ================= */
   async timeMachine(say) {
-    if (this.TM && this.TM.aoi === this.D.aoi) return this.TM; const D = this.D, a = D.aoi, LCm = await import('./landcover.js?v=104'), LY = await import('./layers.js?v=104');
+    if (this.TM && this.TM.aoi === this.D.aoi) return this.TM; const D = this.D, a = D.aoi, LCm = await import('./landcover.js?v=105'), LY = await import('./layers.js?v=105');
     const years = LY.IO_YEARS, io = {};
     let n = 0; await Promise.all(years.map(async y => { const r = await LCm.loadIO(a, D.W, D.H, y); if (r) io[y] = r; say(`${t('Loading land cover maps')} ${++n}/${years.length}`); }));
     const stats = {}; for (const [y, r] of Object.entries(io)) { const c = {}; for (const v of r.d) c[v] = (c[v] || 0) + 1; const ha = D.W * D.H / 1e4 / r.d.length; stats[y] = Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v * ha])); }
@@ -364,7 +364,7 @@ export class GeoHand {
       const buf = await new Response((await fetch(`data/pop/${i}_${j}.bin.gz`)).body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer(), v = new Uint16Array(buf);
       for (let r = 0; r < h; r++) { const lat = idx.oy - (r0 + r + 0.5) * idx.res; if (lat < a.s || lat > a.n) continue; for (let c = 0; c < w; c++) { const q = v[r * w + c]; if (!q) continue; const lon = idx.ox + (c0 + c + 0.5) * idx.res; if (lon < a.w || lon > a.e) continue; cells.push([F.x(lon), F.z(lat), q / idx.scale]); } } }
     const total = cells.reduce((s, c) => s + c[2], 0), areaKm2 = D.W * D.H / 1e6;
-    const P = this.data.profile, adm = P && P.adm || await import('./placeinfo.js?v=104').then(m => m.adminAt(F.lat0, F.lon0)).catch(() => null);
+    const P = this.data.profile, adm = P && P.adm || await import('./placeinfo.js?v=105').then(m => m.adminAt(F.lat0, F.lon0)).catch(() => null);
     const norm = s => ({ siemreap: 'siemreap', tboungkhmum: 'tbongkhmum', oddarmeanchey: 'otdarmeanchey', ratanakiri: 'ratanakkiri' })[(s || '').toLowerCase().replace(/[^a-z]/g, '')] || (s || '').toLowerCase().replace(/[^a-z]/g, '');
     const prov = adm ? idx.provinces[norm(adm.pro_en)] : null;
     return (this.POP = { D, cells, total, density: total / areaKm2, areaKm2, prov, source: idx.source, cellM: idx.res * 110000 });
@@ -381,7 +381,7 @@ export class GeoHand {
     const young = s(0, 2), work = s(3, 12), old = s(13, 16), males = M.reduce((x, y) => x + y, 0); return { young: young / T * 100, work: work / T * 100, old: old / T * 100, dep: (young + old) / work * 100, sexRatio: males / (T - males) * 100 }; }
   // settlements: groups of buildings, their size and shape (linear along a road or river, clustered, dispersed)
   async settlements() {
-    const UM = this.UM || (this.UM = await import('./urban.js?v=104')), B = UM.buildingsOf(this.w), D = this.D; if (B.length < 10) return [];
+    const UM = this.UM || (this.UM = await import('./urban.js?v=105')), B = UM.buildingsOf(this.w), D = this.D; if (B.length < 10) return [];
     const lab = dbscanLabels(B, 45, 6), groups = new Map(); lab.forEach((l, i) => { if (l >= 0) (groups.get(l) || groups.set(l, []).get(l)).push(B[i]); });
     const roadD = (x, z) => { const n = this.w.net && this.w.net.near(x, z, 80)[0]; return n ? n[2] : 999; }, waterD = (x, z) => { for (let r = 0; r <= 80; r += 10) for (let a = 0; a < 6.28; a += 0.8) if (this.clsAt(x + Math.cos(a) * r, z + Math.sin(a) * r) === 1) return r; return 999; };
     const out = [];
@@ -405,7 +405,7 @@ export class GeoHand {
     let lo = Infinity, hi = -Infinity, sum = 0; for (let k = 0; k < H.N; k++) { lo = Math.min(lo, R[k]); hi = Math.max(hi, R[k]); sum += R[k]; }
     const sl = [0, 0, 0, 0], sb = Math.max(1, Math.round(15 / D.dx)); for (let j = sb; j < H.NZ - sb; j++) for (let i = sb; i < NX - sb; i++) { const k = j * NX + i, gx = (R[k + sb] - R[k - sb]) / (2 * sb * D.dx), gz = (R[k + sb * NX] - R[k - sb * NX]) / (2 * sb * D.dz), a = Math.atan(Math.hypot(gx, gz)) * 180 / Math.PI; sl[a < 2 ? 0 : a < 8 ? 1 : a < 15 ? 2 : 3]++; }
     const slT = sl.reduce((a, b) => a + b, 0) || 1, lc = {}; for (const v of D.cls) if (v) lc[v] = (lc[v] || 0) + 1; const lcT = Object.values(lc).reduce((a, b) => a + b, 0) || 1;
-    const areaKm2 = D.W * D.H / 1e6, UM = this.UM || (this.UM = await import('./urban.js?v=104')), B = UM.buildingsOf(this.w);
+    const areaKm2 = D.W * D.H / 1e6, UM = this.UM || (this.UM = await import('./urban.js?v=105')), B = UM.buildingsOf(this.w);
     const roads = { main: 0, local: 0, track: 0 }; for (const r of this.w.net ? this.w.net.roads : []) { let L = 0; for (let i = 1; i < r.pts.length; i++) L += Math.hypot(r.pts[i].x - r.pts[i - 1].x, r.pts[i].z - r.pts[i - 1].z); roads[r.cls <= 10 ? 'main' : r.cls <= 14 ? 'local' : 'track'] += L / 1000; }
     const st = this.streams(); let stKm = 0; for (const [a, b] of st) stKm += Math.hypot(b[0] - a[0], b[1] - a[1]) / 1000;
     // settlement pattern: Clark–Evans nearest-neighbour index of the houses (R < 1 clustered, ≈ 1 random, > 1 dispersed)

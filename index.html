@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=104">
+<link rel="stylesheet" href="css/app.css?v=105">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -89,6 +89,7 @@
       <button id="eiaBtn" data-cat="apps" data-tip="EIA Screening: sensitive features around a project">🌿</button>
       <button id="urbanBtn" data-cat="apps" data-tip="Urban Analytics: access, greenery, heat, livability">🏙️</button>
       <button id="riceSosBtn" data-cat="apps" data-tip="Rice SOS Mapper: planting dates from Sentinel-1">🌾</button>
+      <button id="srBtn" data-cat="apps" data-tip="Srae Monitor: crop health of every field from Sentinel-2, with the owners">🌾</button>
       <button id="riceEcoBtn" data-cat="apps" data-tip="Rice Ecosystem Mapper: rainfed, irrigated, recession rice">🌱</button>
       <button id="fieldsBtn" data-cat="apps" data-tip="Field Boundaries (AgriMapper): every field from the image with the Agri ONNX model">🧩</button>
       <button id="mineralBtn" data-cat="apps" data-tip="MineralScope: mineral mapping from satellite bands">🪨</button>
@@ -382,6 +383,24 @@
       <div id="rsRes"></div>
     </div>
   </div>
+  <div id="srPanel" class="rpanel gpanel" hidden>
+    <div class="row lphead"><b>🌾 Srae Monitor</b><span id="srHint" class="hint"></span><button id="srMin" title="Hide / show">▴</button><button id="srClose" title="Close">✕</button></div>
+    <div>
+      <div class="svhelp">Crop health of every field in the 3D area from Sentinel-2 (10 m, every ~5 days), the same engine as Srae Monitor. Fields and their owners come from 🧩 Field Boundaries. Tap a field to see its season and its owner.</div>
+      <div id="srFields" class="svhelp"></div>
+      <div class="gpgrid"><label>Index<select id="srIndex"><option value="NDVI">NDVI · greenness</option><option value="EVI">EVI · dense crops</option><option value="NDRE">NDRE · nitrogen</option><option value="NDMI">NDMI · crop water</option><option value="NDWI">NDWI · standing water</option><option value="MSAVI">MSAVI · young crops</option></select></label>
+        <label>Image date<select id="srDate"><option value="">—</option></select></label></div>
+      <div class="row"><button id="srFind" class="primary">🛰️ Find images (last 12 months)</button><button id="srPrev" title="Older image">◀</button><button id="srNext" title="Newer image">▶</button></div>
+      <div id="srLegend" hidden><div class="ghRamp" id="srRamp"></div><div class="ghLegend"><span id="srMin0"></span><span style="flex:1"></span><span id="srMax0"></span></div></div>
+      <div id="srStatus" class="svhelp ghStatus"></div><div id="srArea"></div>
+      <button id="srSeason" class="primary eirun" disabled>📈 Check the season of every field</button>
+      <div id="srColorBy" class="seg" hidden><button data-v="index" class="on">Colour by index</button><button data-v="status">Colour by crop stage</button></div>
+      <div id="srSum"></div>
+      <div id="srCard" class="ghCard" hidden></div>
+      <div class="row"><button id="srCsv">⬇ Table (CSV)</button><button id="srGeo">⬇ Fields for Srae Monitor</button></div>
+      <div class="svhelp"><a href="https://khgeo.github.io/srae-monitor/" target="_blank" rel="noopener">🌾 Open Srae Monitor</a> to follow single fields in detail (weather, zones, soil, scouting): import the fields file there.</div>
+    </div>
+  </div>
   <div id="riceEcoPanel" class="rpanel gpanel" hidden>
     <div class="row lphead"><b>🌱 Rice Ecosystem Mapper</b><span id="reHint" class="hint"></span><button id="reMin" title="Hide / show">▴</button><button id="reClose" title="Close">✕</button></div>
     <div>
@@ -656,6 +675,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=104"></script>
+<script type="module" src="js/app.js?v=105"></script>
 </body>
 </html>
