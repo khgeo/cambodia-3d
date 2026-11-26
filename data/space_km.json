@@ -157,5 +157,16 @@
 "S waves": "រលក S",
 "min": "នាទី",
 "S-wave shadow": "ស្រមោលរលក S",
-"P-wave shadow": "ស្រមោលរលក P"
+"P-wave shadow": "ស្រមោលរលក P",
+"Live motion (Earth turning, everything moving)": "ចលនាផ្ទាល់ (ផែនដីបង្វិល អ្វីៗទាំងអស់ផ្លាស់ទី)",
+"Live motion: planets spin, everything moves (time runs 10 minutes per second)": "ចលនាផ្ទាល់៖ ភពបង្វិល អ្វីៗផ្លាស់ទី (ពេលវេលាដើរ ១០ នាទីក្នុងមួយវិនាទី)",
+"30 fps (saves power)": "៣០ fps (សន្សំថាមពល)",
+"60 fps (smooth)": "៦០ fps (រលូន)",
+"20 fps (slow computer)": "២០ fps (កុំព្យូទ័រយឺត)",
+"Frame rate in space views": "ល្បឿនរូបភាពក្នុងទិដ្ឋភាពលំហ",
+"Pull the layers apart": "ទាញស្រទាប់ចេញពីគ្នា",
+"Look inside": "មើលខាងក្នុង",
+"Close the cutaway": "បិទផ្នែកកាត់",
+"Inside": "ខាងក្នុង",
+"Depths are measured from the surface. Interiors of the giant planets are still being studied (NASA Juno, Cassini).": "ជម្រៅវាស់ពីផ្ទៃ។ ផ្នែកខាងក្នុងនៃភពយក្ស នៅតែកំពុងសិក្សា (NASA Juno, Cassini)។"
 }

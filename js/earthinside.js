@@ -20,71 +20,28 @@ const PRO = [[0, 15, 0, 2.7], [35, 500, 1, 2.9], [35.1, 500, 1, 3.3], [100, 1300
 export function profile(d) { d = Math.max(0, Math.min(RE, d)); let i = 1; while (i < PRO.length - 1 && PRO[i][0] < d) i++; const a = PRO[i - 1], b = PRO[i], f = (d - a[0]) / Math.max(1e-9, b[0] - a[0]);
   return { depth: d, T: a[1] + (b[1] - a[1]) * f, P: a[2] + (b[2] - a[2]) * f, rho: a[3] + (b[3] - a[3]) * f, layer: LAYERS.find(l => d >= l[2] && d <= l[3]) || LAYERS[6] }; }
 
-const R = LAYERS.map(l => 1 - l[3] / RE); // radius (Earth = 1) at the bottom of each layer
-const FS = `uniform float t; varying vec2 vL;
-float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(h(i), h(i + vec2(1, 0)), f.x), mix(h(i + vec2(0, 1)), h(i + vec2(1, 1)), f.x), f.y); }
-float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int k = 0; k < 5; k++) { s += a * n2(p); p *= 2.03; a *= 0.5; } return s; }
-void main(){ float r = length(vL), ph = atan(vL.y, vL.x); vec3 c;
-  if (r > 1.0) discard;
-  if (r < ${R[5].toFixed(4)}) { float n = fbm(vec2(ph * 5.0, r * 30.0) + t * 0.15); c = mix(vec3(1.0, 0.9, 0.55), vec3(1.0, 1.0, 0.88), n) * (1.1 - r * 1.5); }
-  else if (r < ${R[4].toFixed(4)}) { float a = ph * 3.0 + t * 0.25 * (1.2 - r); float w = fbm(vec2(r * 9.0 - t * 0.1, a)); float n = fbm(vec2(a * 2.0 + w * 2.5, r * 16.0 - t * 0.2));
-    c = mix(vec3(0.95, 0.35, 0.03), vec3(1.0, 0.78, 0.22), n); }
-  else if (r < ${R[3].toFixed(4)}) { float f = (r - ${R[4].toFixed(4)}) / ${(R[3] - R[4]).toFixed(4)}; float cell = sin(ph * 12.0) * 0.5 + 0.5;
-    float n = fbm(vec2(ph * 9.0, f * 4.0 - t * 0.04 * (cell - 0.5) * 2.0)); c = mix(vec3(0.62, 0.17, 0.05), vec3(0.98, 0.5, 0.12), clamp((1.0 - f) * 0.65 + n * 0.55 + cell * 0.12 - 0.15, 0.0, 1.0)); }
-  else if (r < ${R[2].toFixed(4)}) { float n = fbm(vec2(ph * 30.0, r * 60.0) + t * 0.03); c = mix(vec3(0.62, 0.2, 0.08), vec3(0.85, 0.32, 0.12), n); }
-  else if (r < ${R[1].toFixed(4)}) { float n = fbm(vec2(ph * 40.0, r * 90.0) + t * 0.03); c = mix(vec3(0.55, 0.22, 0.1), vec3(0.8, 0.38, 0.16), n); }
-  else if (r < ${R[0].toFixed(4)}) { c = vec3(0.42, 0.33, 0.26); }
-  else { float n = fbm(vec2(ph * 300.0, r * 200.0)); c = mix(vec3(0.5, 0.42, 0.33), vec3(0.68, 0.58, 0.45), n); }
-  float e = 1e9; ${R.slice(0, 6).map(v => `e = min(e, abs(r - ${v.toFixed(5)}));`).join(' ')}
-  c *= 1.0 - 0.45 * smoothstep(0.0025, 0.0, e);
-  gl_FragColor = vec4(c, 1.0); // colours written as sRGB, like a textbook figure
-}`;
-
+import { Interior, INTERIORS } from './interior.js?v=109';
+// the Earth's cutaway on the globe, opened at Cambodia, with a marker for the journey down
 export class Inside {
   constructor(globe) {
-    this.g = globe; this.group = new THREE.Group(); this.group.visible = false; globe.scene.add(this.group); this.U = { t: { value: 0 } };
     const la = 12.5 * Math.PI / 180, lo = 105 * Math.PI / 180; // Cambodia sits on the edge of the cut (same frame as the globe's xyz())
     const e1 = new THREE.Vector3(Math.cos(la) * Math.cos(lo), Math.sin(la), -Math.cos(la) * Math.sin(lo)), e2 = new THREE.Vector3(-Math.sin(lo), 0, -Math.cos(lo)), e3 = new THREE.Vector3(-Math.sin(la) * Math.cos(lo), Math.cos(la), Math.sin(la) * Math.sin(lo));
-    this.E = [e1, e2, e3]; // the removed piece is where p·e1 > 0, p·e2 > 0 and p·e3 > 0
-    const mat = new THREE.ShaderMaterial({ uniforms: this.U, side: THREE.DoubleSide, vertexShader: 'varying vec2 vL; void main(){ vL = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }', fragmentShader: FS });
-    this.faces = [[e1, e2, e3], [e1, e3, e2], [e2, e3, e1]].map(([u, v, n]) => { const m = new THREE.Mesh(new THREE.CircleGeometry(1, 192, 0, Math.PI / 2), mat), M = new THREE.Matrix4().makeBasis(u, v, new THREE.Vector3().crossVectors(u, v));
-      m.quaternion.setFromRotationMatrix(M); m.position.copy(n).multiplyScalar(-0.0003); m.renderOrder = 1; this.group.add(m); return { u, v, n }; });
-    // convection: particles going round cells in the mantle (rising hot, sinking cold), swirling flow in the outer core
-    const P = [], C = [], sp = []; const r0 = R[4] + 0.02, r1 = 0.975;
-    this.faces.forEach((f, fi) => { for (let i = 0; i < 3; i++) for (let L = 0.25; L < 1.0; L += 0.12) for (let k = 0; k < 14; k++) sp.push({ f, kind: 0, pc: (i + 0.5) * Math.PI / 6, rc: (r0 + r1) / 2, ap: Math.PI / 12 * 0.88, ar: (r1 - r0) / 2 * 0.92, L, s: k / 14 * 2 * Math.PI + L * 3, dir: (i + fi) % 2 ? 1 : -1 });
-      for (let k = 0; k < 160; k++) sp.push({ f, kind: 1, p: Math.random() * Math.PI / 2, r: R[5] + 0.015 + Math.random() * (R[4] - R[5] - 0.03), w: 0.12 + Math.random() * 0.1 }); });
-    this.sp = sp; const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(sp.length * 3), 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(sp.length * 3), 3));
-    this.pts = new THREE.Points(g, new THREE.PointsMaterial({ size: 3.2, sizeAttenuation: false, vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false })); this.pts.frustumCulled = false; this.pts.renderOrder = 2; this.group.add(this.pts);
-    // journey marker down the Cambodia edge
-    this.marker = new THREE.Mesh(new THREE.SphereGeometry(0.012, 16, 8), new THREE.MeshBasicMaterial({ color: 0x00e5ff, depthTest: false })); this.marker.renderOrder = 5; this.marker.visible = false; this.group.add(this.marker);
-    const lg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), e1.clone().multiplyScalar(1.0)]); this.axis = new THREE.Line(lg, new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.02, gapSize: 0.015, transparent: true, opacity: 0.6, depthTest: false })); this.axis.computeLineDistances(); this.axis.renderOrder = 4; this.group.add(this.axis);
-    this.lab = document.createElement('div'); this.lab.className = 'insLabels'; this.lab.hidden = true; document.body.appendChild(this.lab); this.lang = 'en';
-    this.t0 = performance.now(); this.speed = 1;
+    this.E = [e1, e2, e3]; this.I = new Interior(INTERIORS.Earth, { E: this.E, parent: globe.scene }); this.group = this.I.group;
+    const top = this.I.layers[this.I.layers.length - 1].g;
+    this.marker = new THREE.Mesh(new THREE.SphereGeometry(0.012, 16, 8), new THREE.MeshBasicMaterial({ color: 0x00e5ff, depthTest: false })); this.marker.renderOrder = 5; this.marker.visible = false; top.add(this.marker);
+    const lg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), e1.clone()]); this.axis = new THREE.Line(lg, new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 0.02, gapSize: 0.015, transparent: true, opacity: 0.6, depthTest: false })); this.axis.computeLineDistances(); this.axis.renderOrder = 4; top.add(this.axis);
   }
-  uniforms() { const [a, b, c] = this.E; return { cutOn: this.group.visible ? 1 : 0, e1: a, e2: b, e3: c }; }
-  setOn(on) { this.group.visible = on; this.lab.hidden = !on; }
+  get speed() { return this.I.speed; } set speed(v) { this.I.speed = v; }
+  setOn(on) { this.I.setOn(on); }
+  setSplit(s) { this.I.setSplit(s); this.axis.visible = s < 0.01; }
   setDepth(d) { this.depth = d; this.marker.visible = d != null; if (d != null) this.marker.position.copy(this.E[0]).multiplyScalar(1 - d / RE); }
-  view() { const d = this.E[0].clone().add(this.E[1]).add(this.E[2]).normalize().multiplyScalar(0.6).add(this.E[0].clone().multiplyScalar(0.4)).normalize(); return d; }
+  view() { return this.E[0].clone().add(this.E[1]).add(this.E[2]).normalize().multiplyScalar(0.6).add(this.E[0].clone().multiplyScalar(0.4)).normalize(); }
   frame(cam, el, names) {
-    if (!this.group.visible) return; const now = performance.now(), dt = Math.min(0.1, (now - (this.tl || now)) / 1000) * this.speed; this.tl = now; this.U.t.value += dt;
-    const P = this.pts.geometry.attributes.position, C = this.pts.geometry.attributes.color, v = new THREE.Vector3();
-    this.sp.forEach((s, i) => { let r, p, col;
-      if (s.kind === 0) { s.s += dt * 0.35 * s.dir; const cs = Math.cos(s.s), sn = Math.sin(s.s); p = s.pc + s.ap * s.L * cs; r = s.rc + s.ar * s.L * sn; const up = cs * s.dir; // dr/ds·dir > 0: rising
-        col = up > 0 ? [1, 0.85 + 0.15 * up, 0.35] : [0.35 + 0.2 * (1 + up), 0.12, 0.08]; }
-      else { s.p += dt * s.w * (0.6 + 0.4 * Math.sin(s.r * 20 + s.p)); if (s.p > Math.PI / 2) s.p -= Math.PI / 2; p = s.p; r = s.r + 0.01 * Math.sin(this.U.t.value * 0.7 + s.w * 50); col = [1, 0.95, 0.6]; }
-      v.copy(s.f.u).multiplyScalar(r * Math.cos(p)).addScaledVector(s.f.v, r * Math.sin(p)).addScaledVector(s.f.n, 0.002); P.setXYZ(i, v.x, v.y, v.z); C.setXYZ(i, ...col); });
-    P.needsUpdate = true; C.needsUpdate = true;
-    // labels on the cut faces, kept apart on screen
-    const rc = el.getBoundingClientRect(), out = [], f = this.faces[0], f2 = this.faces[2];
-    LAYERS.forEach(([en, km, a, b], k) => { const mid = 1 - (a + b) / 2 / RE, thin = b - a < 400, face = k >= 5 ? f2 : f, ang = k >= 5 ? 0.6 : thin ? 0.3 + k * 0.12 : 0.85;
-      v.copy(face.u).multiplyScalar(mid * Math.cos(ang)).addScaledVector(face.v, mid * Math.sin(ang)).project(cam); if (v.z > 1) return;
-      out.push([(v.x + 1) / 2 * rc.width + rc.left, (1 - v.y) / 2 * rc.height + rc.top, `${names(en, km)} <i>${a.toLocaleString()}–${b.toLocaleString()} km</i>`]); });
-    out.sort((p, q) => p[1] - q[1]); for (let i = 1; i < out.length; i++) if (Math.abs(out[i][0] - out[i - 1][0]) < 160 && out[i][1] - out[i - 1][1] < 17) out[i][1] = out[i - 1][1] + 17;
-    v.copy(this.E[0]).multiplyScalar(1.01).project(cam); const cx = (v.x + 1) / 2 * rc.width + rc.left, cy = (1 - v.y) / 2 * rc.height + rc.top;
-    let h = out.map(([x, y, s]) => `<span style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px">${s}</span>`).join('') + `<span class="kh" style="left:${cx.toFixed(0)}px;top:${(cy - 18).toFixed(0)}px">📍 ${names('Cambodia', 'កម្ពុជា')}</span>`;
-    if (this.marker.visible) { v.copy(this.marker.position).project(cam); h += `<span class="dp" style="left:${((v.x + 1) / 2 * rc.width + rc.left + 10).toFixed(0)}px;top:${((1 - v.y) / 2 * rc.height + rc.top).toFixed(0)}px">⬇ ${Math.round(this.depth).toLocaleString()} km</span>`; }
-    if (h !== this._h) { this.lab.innerHTML = h; this._h = h; }
+    if (!this.group.visible) return; const now = performance.now(), dt = Math.min(0.1, (now - (this.tl || now)) / 1000); this.tl = now; this.I.anim(dt);
+    const rc = el.getBoundingClientRect(), v = new THREE.Vector3(), P = p => { v.copy(p).project(cam); return [(v.x + 1) / 2 * rc.width + rc.left, (1 - v.y) / 2 * rc.height + rc.top, v.z]; };
+    const [cx, cy, cz] = P(this.E[0].clone().multiplyScalar(1.01)); let h = cz < 1 ? `<span class="kh" style="left:${cx.toFixed(0)}px;top:${(cy - 18).toFixed(0)}px">📍 ${names('Cambodia', 'កម្ពុជា')}</span>` : '';
+    if (this.marker.visible) { const [x, y] = P(this.marker.position); h += `<span class="dp" style="left:${(x + 10).toFixed(0)}px;top:${y.toFixed(0)}px">⬇ ${Math.round(this.depth).toLocaleString()} km</span>`; }
+    this.I.labels(cam, el, names, h);
   }
 }
 

@@ -6,10 +6,10 @@
 // Frame: equatorial J2000 with y = celestial north (the globe's frame turned by the sidereal time).
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { t, lang } from './i18n.js?v=108';
-import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=108';
-import { loadConArt, buildConstellations } from './conart.js?v=108';
-import { loadSmall, kepler, orbitLine, period, nextPerihelion, dateOfJd, jdOf, LEARN, SHOWERS, nextShowers, showerState } from './smallbodies.js?v=108';
+import { t, lang } from './i18n.js?v=109';
+import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=109';
+import { loadConArt, buildConstellations } from './conart.js?v=109';
+import { loadSmall, kepler, orbitLine, period, nextPerihelion, dateOfJd, jdOf, LEARN, SHOWERS, nextShowers, showerState } from './smallbodies.js?v=109';
 
 const D2R = Math.PI / 180, AU = 1.495978707e8, LY = 9.4607e12, ER = 6371, OBL = 23.43928 * D2R;
 const rev = x => ((x % 360) + 360) % 360;
@@ -95,6 +95,36 @@ const fmtKm = km => { if (km < 1e6) return `${Math.round(km).toLocaleString()} k
 const lightTime = km => { const s = km / 299792.458; if (s < 60) return `${s.toFixed(1)} s`; if (s < 3600) return `${Math.floor(s / 60)} min ${Math.round(s % 60)} s`; if (s < 86400 * 2) return `${(s / 3600).toFixed(1)} h`; if (s < 86400 * 365 * 2) return `${(s / 86400).toFixed(0)} ${t('days')}`; return null; };
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
+// procedural galaxy images (canvas), drawn once: spiral discs with arms, star-forming knots and dust lanes; ellipticals; irregulars
+const LOWG = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
+function galaxyTex(o) {
+  const S = o.size, cv = document.createElement('canvas'); cv.width = cv.height = S; const g = cv.getContext('2d'), C = S / 2, R = S * 0.48, k = S / 1024;
+  let sd = o.seed || 7; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647, gs = () => Math.sqrt(-2 * Math.log(r() || 1e-9)) * Math.cos(2 * Math.PI * r());
+  const glow = (x, y, rad, col, a, sx = 1, ang = 0) => { g.save(); g.translate(x, y); g.rotate(ang); g.scale(sx, 1); const gr = g.createRadialGradient(0, 0, 0, 0, 0, rad); gr.addColorStop(0, col); gr.addColorStop(0.35, col.replace(/[\d.]+\)$/, '0.45)')); gr.addColorStop(1, col.replace(/[\d.]+\)$/, '0)')); g.globalAlpha = a; g.fillStyle = gr; g.fillRect(-rad, -rad, 2 * rad, 2 * rad); g.restore(); };
+  const dot = (x, y, rad, col, a) => { g.globalAlpha = a; g.fillStyle = col; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); };
+  const P = (rr, th) => [C + rr * Math.cos(th) * R, C - rr * Math.sin(th) * R * (o.flip ? -1 : 1)];
+  g.globalCompositeOperation = 'lighter';
+  if (o.kind === 'spiral') { const { arms, pitch, r0, bar = 0, barA = 0 } = o, armAt = (rr, j) => Math.log(rr / r0) / pitch + (o.armA ? o.armA[j] : j * 2 * Math.PI / arms);
+    glow(C, C, R * 1.0, 'rgba(120,150,255,1)', 0.22); glow(C, C, R * 0.6, 'rgba(255,215,170,1)', 0.3);
+    for (let i = 0; i < 26000 * k * k * 4 * (LOWG ? 0.5 : 1); i++) { const rr = Math.min(1, Math.abs(gs()) * 0.32); const th = r() * 2 * Math.PI, [x, y] = P(rr, th); dot(x, y, 0.6 * k + r() * k, r() < 0.7 ? '#ffe2b8' : '#ffffff', 0.12 + 0.2 * (1 - rr)); } // old disc stars
+    for (let i = 0; i < 52000 * k * k * 4 * (LOWG ? 0.5 : 1); i++) { const j = (r() * arms) | 0, rr = r0 + Math.pow(r(), 0.85) * (1 - r0), th = armAt(rr, j) + gs() * 0.16 * (1.1 - rr * 0.4), q = rr + gs() * 0.02, [x, y] = P(q, th);
+      const young = r() < 0.75; dot(x, y, (0.5 + r() * 1.1) * k, young ? (r() < 0.5 ? '#bcd0ff' : '#e8eeff') : '#ffd9a8', (0.18 + 0.4 * r()) * (1.15 - q * 0.7)); }
+    for (let i = 0; i < 700 * k * 2; i++) { const j = (r() * arms) | 0, rr = r0 * 1.5 + r() * (0.85 - r0), th = armAt(rr, j) + gs() * 0.08, [x, y] = P(rr, th); glow(x, y, (2 + r() * 4) * k, 'rgba(255,110,170,1)', 0.5); }
+    for (let i = 0; i < 260 * k * 2; i++) { const j = (r() * arms) | 0, rr = r0 + r() * 0.9, th = armAt(rr, j) + gs() * 0.1, [x, y] = P(rr, th); glow(x, y, (3 + r() * 6) * k, 'rgba(160,200,255,1)', 0.45); }
+    if (bar) glow(C, C, R * bar, 'rgba(255,225,170,1)', 0.85, 1, -barA); if (bar) glow(C, C, R * bar * 0.45, 'rgba(255,235,200,1)', 0.8, 1, -barA);
+    glow(C, C, R * 0.22, 'rgba(255,225,175,1)', 0.95); glow(C, C, R * 0.08, 'rgba(255,250,235,1)', 1);
+    // dust lanes along the inner edge of each arm: take light away
+    g.globalCompositeOperation = 'destination-out';
+    for (let i = 0; i < 9000 * k * 2; i++) { const j = (r() * arms) | 0, rr = r0 * 1.2 + Math.pow(r(), 0.9) * (0.8 - r0), th = armAt(rr, j) - 0.2 + gs() * 0.05, [x, y] = P(rr + gs() * 0.008, th); g.globalAlpha = 0.18; g.fillStyle = '#000'; g.beginPath(); g.arc(x, y, (1.5 + r() * 3) * k, 0, 6.283); g.fill(); }
+  } else if (o.kind === 'elliptical') { const q = o.q || 0.75;
+    glow(C, C, R, 'rgba(255,200,150,1)', 0.35, 1 / q); glow(C, C, R * 0.5, 'rgba(255,215,170,1)', 0.6, 1 / q); glow(C, C, R * 0.15, 'rgba(255,240,215,1)', 1, 1 / q);
+    for (let i = 0; i < 16000 * k * k * 4; i++) { const a = r() * 2 * Math.PI, rr = Math.min(1, Math.abs(gs()) * 0.3); dot(C + Math.cos(a) * rr * R / q * q, C + Math.sin(a) * rr * R * q, 0.6 * k, '#ffe3c0', 0.18); }
+    if (o.lane) { g.globalCompositeOperation = 'destination-out'; g.globalAlpha = 0.85; g.fillStyle = '#000'; g.fillRect(C - R * 0.95, C - R * 0.035, R * 1.9, R * 0.07); g.globalCompositeOperation = 'lighter'; glow(C, C, R * 0.9, 'rgba(255,230,200,1)', 0.25, 4); }
+  } else { for (let b = 0; b < 9; b++) { const cx = C + gs() * R * 0.3, cy = C + gs() * R * 0.22, sz = R * (0.1 + r() * 0.2); glow(cx, cy, sz * 1.6, 'rgba(170,190,255,1)', 0.35);
+      for (let i = 0; i < 2200 * k * k * 4; i++) dot(cx + gs() * sz * 0.6, cy + gs() * sz * 0.5, 0.6 * k, r() < 0.8 ? '#cdd8ff' : '#ffffff', 0.3); for (let i = 0; i < 12; i++) glow(cx + gs() * sz * 0.5, cy + gs() * sz * 0.4, (3 + r() * 5) * k, 'rgba(255,110,170,1)', 0.55); } }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t; }
+const texMat = (map, extra = {}) => new THREE.MeshBasicMaterial({ map, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, ...extra });
+
 export class Cosmos {
   constructor(globe) {
     this.g = globe; this.w = globe.w; this.active = false; this.rate = 0; this.tOff = 0; this.az = 0; this.el = 0.3; this.dist = 8 * ER; this.focus = 'Earth';
@@ -145,32 +175,46 @@ export class Cosmos {
     this.ready = this.loadStars(); this.sbReady = loadSmall().then(S => this.addSmall(S));
     // Milky Way (illustration): bar, bulge, four arms, in galactic coordinates, ly
     { const p = [], c = [], s = [], arm = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2], b = Math.tan(12 * D2R);
-      for (let i = 0; i < 90000; i++) { let x, y, z, col;
+      for (let i = 0; i < (LOWG ? 30000 : 60000); i++) { let x, y, z, col;
         const u = rnd(); if (u < 0.18) { const r = Math.abs(gauss()) * 3500; const v = new THREE.Vector3().randomDirection().multiplyScalar(r); x = v.x * 1.7; y = v.y; z = v.z * 0.55; col = [1, 0.82, 0.55]; }
         else if (u < 0.25) { x = (rnd() - 0.5) * 18000; y = gauss() * 1500; z = gauss() * 400; const ca = Math.cos(0.47), sa = Math.sin(0.47); [x, y] = [x * ca - y * sa, x * sa + y * ca]; col = [1, 0.85, 0.6]; }
         else if (u < 0.4) { const r = Math.abs(gauss()) * 16000 + 3000, th = rnd() * 2 * Math.PI; x = r * Math.cos(th); y = r * Math.sin(th); z = gauss() * 350; col = [1, 0.9, 0.78]; }
         else { const k = arm[(rnd() * 4) | 0], r = 4500 + Math.pow(rnd(), 0.8) * 46000, th = Math.log(r / 4500) / b + k + gauss() * 0.32 * (1 - r / 80000); x = r * Math.cos(th); y = r * Math.sin(th); z = gauss() * (250 + r * 0.004); const hot = rnd() < 0.45; col = hot ? [0.62, 0.75, 1] : [1, 0.93, 0.82]; if (rnd() < 0.06) col = [1, 0.45, 0.6]; }
         p.push(x, y, z); c.push(...col); s.push(0.8 + rnd() * 1.4); }
       // the Sun sits 26,000 ly from the centre, in a gap between arms; x points from the Sun to the centre
-      this.galaxy = cloud(p, c, s, pointsMat(1.6, 0.55)); this.galaxy.quaternion.setFromRotationMatrix(GAL); sc.add(this.galaxy);
+      this.galaxy = cloud(p, c, s, pointsMat(1.6, 0.55)); this.galaxy.quaternion.setFromRotationMatrix(GAL); this.galQ = this.galaxy.quaternion.clone(); this.galSpin = 0; sc.add(this.galaxy);
+      // the disc as an image: same arms and bar as the points, plus dust lanes, pink star-forming regions and the glow of billions of faint stars
+      const tx = galaxyTex({ kind: 'spiral', size: LOWG ? 1024 : 2048, arms: 4, pitch: Math.tan(12 * D2R), r0: 4500 / 52000, armA: [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2], bar: 0.2, barA: 0.47, seed: 11 });
+      this.galDisc = new THREE.Mesh(new THREE.PlaneGeometry(104000, 104000), texMat(tx)); this.galDisc.frustumCulled = false; this.galaxy.add(this.galDisc);
       this.addPoint({ id: 'Milky Way', name: 'Milky Way', km: 'កាឡាក់ស៊ីមីលគីវ៉េ', kind: 'galaxy', col: '#ffe2b8', gal: [26000, 0, 0], info: 'Our galaxy: 100,000 light-years across, 100–400 billion stars. The Sun takes 230 million years to go round once.', show: [5e17, 3e22], R: 50000 * LY, view: 2.2e18 }); }
     // other galaxies (shapes are illustrations)
     { const tmpl = (n, arms) => { const p = [], c = [], s = []; for (let i = 0; i < n; i++) { if (!arms || rnd() < 0.25) { const v = new THREE.Vector3().randomDirection().multiplyScalar(Math.abs(gauss()) * 0.25); p.push(v.x, v.y * (arms ? 0.35 : 0.8), v.z); c.push(1, 0.85, 0.6); } else { const k = ((rnd() * 2) | 0) * Math.PI, r = 0.1 + Math.pow(rnd(), 0.8) * 0.9, th = Math.log(r / 0.1) / 0.3 + k + gauss() * 0.25; p.push(r * Math.cos(th), gauss() * 0.02, r * Math.sin(th)); c.push(0.7, 0.8, 1); } s.push(0.8 + rnd()); } return [p, c, s]; };
-      const SP = tmpl(9000, true), EL2 = tmpl(5000, false), IR = tmpl(3000, false);
+      const SP = tmpl(6000, true), EL2 = tmpl(3000, false), IR = tmpl(2000, false), GT = {};
       for (const [n, ra, dec, ly, kind, size, col, info, show] of DEEP) { const d = dirRD(ra, dec), o = { id: n, name: n, kind, col, fixed: d.map(v => v * ly * LY), info, show, R: size * LY, view: Math.max(size * 6, 0.00001) * LY };
-        if (kind === 'galaxy') { const [p, c, s] = /Magellanic/.test(n) ? IR : /Sombrero|Centaurus|GN-z11/.test(n) ? EL2 : SP; const tint = hexRGB(col), cc = c.map((v, i) => v * tint[i % 3]); const m = cloud(p, cc, s, pointsMat(1.4, 0.7)); m.quaternion.setFromEuler(new THREE.Euler(rnd() * 3, rnd() * 3, rnd() * 3)); sc.add(m); o.cloud = m; o.cloudR = size * LY; }
+        if (kind === 'galaxy') { const [p, c, s] = /Magellanic/.test(n) ? IR : /Sombrero|Centaurus|GN-z11/.test(n) ? EL2 : SP; const tint = hexRGB(col), cc = c.map((v, i) => v * tint[i % 3]); const m = cloud(p, cc, s, pointsMat(1.1, 0.45)); m.quaternion.setFromEuler(new THREE.Euler(rnd() * 3, rnd() * 3, rnd() * 3)); sc.add(m); o.cloud = m; o.cloudR = size * LY;
+          const type = /Magellanic/.test(n) ? 'irr' : /Sombrero/.test(n) ? 'sombrero' : /Centaurus|GN-z11/.test(n) ? 'ell' : 'spiral', key = type;
+          GT[key] = GT[key] || (type === 'spiral' ? galaxyTex({ kind: 'spiral', size: 1024, arms: 2, pitch: 0.3, r0: 0.1, seed: 5, flip: true }) : type === 'irr' ? galaxyTex({ kind: 'irr', size: 512, seed: 9 }) : galaxyTex({ kind: 'elliptical', size: 512, q: type === 'sombrero' ? 0.45 : 0.8, lane: type === 'sombrero', seed: 3 }));
+          let im; if (type === 'spiral') { const g2 = new THREE.PlaneGeometry(2.2, 2.2); g2.rotateX(-Math.PI / 2); im = new THREE.Mesh(g2, texMat(GT[key], { color: new THREE.Color(col).lerp(new THREE.Color('#ffffff'), 0.6) })); }
+          else { im = new THREE.Sprite(new THREE.SpriteMaterial({ map: GT[key], transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })); im.scale.setScalar(type === 'irr' ? 1.6 : 2.0); }
+          im.frustumCulled = false; m.add(im); m.userData.im = im; }
         this.addPoint(o); } }
     // cosmic web (illustration): galaxies along filaments between clusters, out to 1.5 billion ly
-    { const N = 420, nodes = []; for (let i = 0; i < N; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(Math.cbrt(rnd()) * 1.5e9); nodes.push(v); }
+    { const N = LOWG ? 350 : 700, RW = 4.2e10, nodes = []; for (let i = 0; i < N; i++) { const v = new THREE.Vector3().randomDirection().multiplyScalar(Math.cbrt(rnd()) * RW); nodes.push(v); }
       const p = [], c = [], s = []; for (const a of nodes) { const near = nodes.map(b => [b, a.distanceTo(b)]).filter(([, d]) => d > 0).sort((x, y) => x[1] - y[1]).slice(0, 3);
-        for (const [b] of near) for (let k = 0; k < 40; k++) { const f = rnd(); p.push(a.x + (b.x - a.x) * f + gauss() * 5e6, a.y + (b.y - a.y) * f + gauss() * 5e6, a.z + (b.z - a.z) * f + gauss() * 5e6); const w = 0.5 + rnd() * 0.5; c.push(0.75 * w, 0.8 * w, 1 * w); s.push(1.2); }
-        for (let k = 0; k < 60; k++) { p.push(a.x + gauss() * 8e6, a.y + gauss() * 8e6, a.z + gauss() * 8e6); c.push(1, 0.85, 0.7); s.push(1.5); } }
-      this.web = cloud(p, c, s, pointsMat(1.3, 0.6)); sc.add(this.web); }
+        for (const [b, dd] of near) { const sw = dd * 0.035; for (let k = 0; k < 90; k++) { const f = rnd(), sq = Math.sin(Math.PI * f) * 0.6 + 0.4; p.push(a.x + (b.x - a.x) * f + gauss() * sw * sq, a.y + (b.y - a.y) * f + gauss() * sw * sq, a.z + (b.z - a.z) * f + gauss() * sw * sq); const w = 0.35 + rnd() * 0.45; c.push(0.55 * w, 0.6 * w, 1 * w); s.push(0.9 + rnd() * 0.5); } }
+        const cl = near[0][1] * 0.06; for (let k = 0; k < 90; k++) { p.push(a.x + gauss() * cl, a.y + gauss() * cl, a.z + gauss() * cl); const w = 0.7 + rnd() * 0.3; c.push(1 * w, 0.82 * w, 0.6 * w); s.push(1.1 + rnd() * 0.8); } }
+      this.web = cloud(p, c, s, pointsMat(1.1, 0.55)); sc.add(this.web); }
     // cosmic microwave background shell, 46.5 billion ly
     { const tx = T('', 512, 256, (g, w, h) => { const im = g.createImageData(w, h); for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const v = Math.sin(x * 0.11 + Math.sin(y * 0.07) * 3) + Math.sin(y * 0.13 + Math.cos(x * 0.05) * 2) + Math.sin((x + y) * 0.21) * 0.5 + (rnd() - 0.5) * 1.2, f = (v + 3) / 6; const col = new THREE.Color().setHSL(0.66 - f * 0.66, 0.85, 0.35 + f * 0.25); im.data.set([col.r * 255, col.g * 255, col.b * 255, 255], (y * w + x) * 4); } g.putImageData(im, 0, 0); });
       this.cmb = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 32), new THREE.ShaderMaterial({ side: THREE.BackSide, transparent: true, depthWrite: false, uniforms: { map: { value: tx }, uFar: { value: 9e4 }, uOp: { value: 1 } },
-        vertexShader: 'uniform float uFar; varying vec2 vUv; void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position, 1.0); float L = length(mv.xyz); if (L > uFar) mv.xyz *= uFar / L; gl_Position = projectionMatrix * mv; }',
-        fragmentShader: 'uniform sampler2D map; uniform float uOp; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(map, vUv).rgb, uOp); }' })); sc.add(this.cmb);
+        vertexShader: 'uniform float uFar; varying vec2 vUv; varying vec3 vD; void main(){ vUv = uv; vD = position; vec4 mv = modelViewMatrix * vec4(position, 1.0); float L = length(mv.xyz); if (L > uFar) mv.xyz *= uFar / L; gl_Position = projectionMatrix * mv; }',
+        fragmentShader: `uniform float uOp; varying vec3 vD;
+          float h3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+          float n3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(mix(mix(h3(i), h3(i + vec3(1,0,0)), f.x), mix(h3(i + vec3(0,1,0)), h3(i + vec3(1,1,0)), f.x), f.y), mix(mix(h3(i + vec3(0,0,1)), h3(i + vec3(1,0,1)), f.x), mix(h3(i + vec3(0,1,1)), h3(i + vec3(1,1,1)), f.x), f.y), f.z); }
+          vec3 planck(float v){ vec3 a = vec3(0.0, 0.0, 0.35), b = vec3(0.0, 0.3, 0.9), c = vec3(0.55, 0.8, 1.0), d = vec3(1.0, 0.95, 0.82), e = vec3(1.0, 0.65, 0.22), f = vec3(0.85, 0.2, 0.05), g = vec3(0.4, 0.0, 0.0);
+            if (v < 0.17) return mix(a, b, v / 0.17); if (v < 0.35) return mix(b, c, (v - 0.17) / 0.18); if (v < 0.5) return mix(c, d, (v - 0.35) / 0.15); if (v < 0.65) return mix(d, e, (v - 0.5) / 0.15); if (v < 0.83) return mix(e, f, (v - 0.65) / 0.18); return mix(f, g, (v - 0.83) / 0.17); }
+          void main(){ vec3 p = normalize(vD); float v = 0.0, a = 0.5, fr = 5.0; for (int k = 0; k < 6; k++) { v += a * (n3(p * fr + float(k) * 7.3) - 0.5); fr *= 2.1; a *= 0.62; }
+            v = clamp(0.5 + v * 1.6, 0.0, 1.0); gl_FragColor = vec4(planck(v), uOp); }` })); sc.add(this.cmb);
       this.addPoint({ id: 'Observable universe', name: 'Observable universe', km: 'សកលលោកដែលអាចសង្កេតបាន', kind: 'universe', col: '#ff9a6b', fixed: [0, 0, 0], info: 'Everything whose light has had time to reach us: 93 billion light-years across. The glowing shell is the cosmic microwave background – light from 380,000 years after the Big Bang.', show: [3e23, 1e30], R: 4.4e23, view: 1.6e24, noMark: true }); }
     // labels
     this.labelBox = document.createElement('div'); this.labelBox.className = 'cosLabels'; document.body.appendChild(this.labelBox);
@@ -238,7 +282,8 @@ export class Cosmos {
         else if (o.voy) { const e = P.Earth, v = new THREE.Vector3(e[0] - p[0], e[1] - p[1], e[2] - p[2]).normalize(); o.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), v); o.mesh.visible = !bg; }
         else if (o.mesh.userData.pole && this.SPIN[o.id]) o.mesh.quaternion.copy(o.mesh.userData.pole).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (ms / 3.6e6 / this.SPIN[o.id]) % 1 * 2 * Math.PI)); }
       if (o.mark) { this.place(o.mark, p, cam, S); if (bg && o.id === 'Earth') { o.mark.visible = false; continue; } o.mark.visible = true; o.mark.material.uniforms.uOp.value = o.mesh ? Math.max(0, 1 - (o.R * S / Math.max(Lp, 1e-9)) / 0.006) : (o.show ? fade(o.show[0] / 30, o.show[0], D, o.show[1], o.show[1] * 30) : 1); }
-      if (o.cloud) { this.place(o.cloud, p, cam, S, o.cloudR); o.cloud.material.uniforms.uOp.value = 0.75 * fade(o.cloudR * 2, o.cloudR * 30, D, 1e30, 1e31); } }
+      if (o.cloud) { this.place(o.cloud, p, cam, S, o.cloudR); o.cloud.material.uniforms.uOp.value = 0.75 * fade(o.cloudR * 2, o.cloudR * 30, D, 1e30, 1e31); const im = o.cloud.userData.im; if (im) { let k = 0.95 * fade(o.cloudR * 0.5, o.cloudR * 2.5, D, 1e30, 1e31); if (im.isMesh) { const n = new THREE.Vector3(0, 1, 0).applyQuaternion(o.cloud.quaternion), vw = o.cloud.position.clone().normalize(); k *= THREE.MathUtils.smoothstep(Math.abs(n.dot(vw)), 0.08, 0.4); } im.material.opacity = k; im.visible = k > 0.01; } } }
+    if (this.interior) { const I = this.interior, o = this.item(I.id), p = P[I.id]; I.I.group.visible = !bg; if (o && p && !bg) { this.place(I.I.group, p, cam, S, o.R); o.mesh.visible = false; } }
     this.place(this.sunLight, P.Sun, cam, S); this.g.U.sun.value.set(...(() => { const s = [P.Sun[0] - P.Earth[0], P.Sun[1] - P.Earth[1], P.Sun[2] - P.Earth[2]], L = Math.hypot(...s); const v = new THREE.Vector3(s[0] / L, s[1] / L, s[2] / L).applyAxisAngle(new THREE.Vector3(0, 1, 0), -G); return [v.x, v.y, v.z]; })());
     // orbits & belts (stored in AU, around the Sun)
     for (const l of this.orbits) { this.place(l, P.Sun, cam, S, AU); l.material.opacity = 0.5 * fade(3e6, 6e7, D, 3e11, 3e13); l.visible = l.material.opacity > 0.01; }
@@ -253,13 +298,14 @@ export class Cosmos {
     this.place(this.helio, P.Sun, cam, S, AU); this.helio.material.opacity = 0.06 * fade(3e9, 3e10, D, 3e12, 3e13); this.helio.visible = this.helio.material.opacity > 0.003;
     { const op = this.conOn === false ? 0 : 0.35 * fade(1, 2, D, 2e11, 3e13); this.conOp = op; if (this.con) this.con.setOpacity(op / 0.35); }
     if (this.stars) { this.place(this.stars, P.Sun, cam, S, LY); this.stars.material.uniforms.uOp.value = fade(1, 2, D, 3e16, 5e17) || (D < 1 ? 1 : 0); }
-    this.place(this.galaxy, this.galC, cam, S, LY); this.galaxy.material.uniforms.uOp.value = 0.12 + 0.6 * fade(1e15, 3e17, D, 1e21, 3e22); this.galaxy.material.uniforms.uSize.value = D < 1e17 ? 2.2 : 1.6;
+    this.place(this.galaxy, this.galC, cam, S, LY); this.galaxy.material.uniforms.uOp.value = 0.12 + 0.6 * fade(1e15, 3e17, D, 1e21, 3e22); this.galaxy.material.uniforms.uSize.value = D < 1e17 ? 2.2 : 1.6; this.galDisc.material.opacity = 0.95 * fade(3e16, 3e17, D, 1e21, 3e22) * THREE.MathUtils.smoothstep(Math.abs(new THREE.Vector3(0, 0, 1).applyQuaternion(this.galaxy.quaternion).dot(this.galaxy.position.clone().normalize())), 0.06, 0.3); this.galDisc.visible = this.galDisc.material.opacity > 0.01;
     this.place(this.web, P.Sun, cam, S, LY); this.web.material.uniforms.uOp.value = 0.7 * fade(3e19, 1e21, D, 1e30, 1e31); this.web.visible = this.web.material.uniforms.uOp.value > 0.01;
     this.place(this.cmb, P.Sun, cam, S, 4.4e23); this.cmb.material.uniforms.uOp.value = 0.5 * fade(2e22, 3e23, D, 1e30, 1e31); this.cmb.visible = this.cmb.material.uniforms.uOp.value > 0.01;
     return D;
   }
   frame(dt) {
-    if (this.rate) this.tOff += dt * 1000 * this.rate; const w = this.w, el = w.renderer.domElement, asp = el.clientWidth / Math.max(1, el.clientHeight); if (this.cam.aspect !== asp) { this.cam.aspect = asp; this.cam.updateProjectionMatrix(); }
+    const live = !!this.g.opt.live, rr = live && this.rate === 1 ? 600 : this.rate; if (rr) this.tOff += dt * 1000 * rr; // live: time runs 10 min per second, planets spin, galaxies turn
+    if (live) { this.galSpin += dt * 0.015; this.galaxy.quaternion.copy(this.galQ).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), this.galSpin)); for (const o of this.items) if (o.cloud && o.kind === 'galaxy') o.cloud.rotateY(dt * 0.03); } const w = this.w, el = w.renderer.domElement, asp = el.clientWidth / Math.max(1, el.clientHeight); if (this.cam.aspect !== asp) { this.cam.aspect = asp; this.cam.updateProjectionMatrix(); }
     const ms = this.now(); this.positions(ms);
     if (this.fly) { const F = this.fly; F.t = Math.min(1, F.t + dt / F.dur); const e = F.t * F.t * (3 - 2 * F.t), to = this.pos[F.to] || F.b; F.cur = [0, 1, 2].map(i => F.a[i] + (to[i] - F.a[i]) * e);
       this.dist = Math.exp(Math.log(F.d0) + (Math.log(F.d1) - Math.log(F.d0)) * e + F.hump * Math.sin(Math.PI * e)); this.az = F.az0 + F.dAz * e; this.el = F.el0 + F.dEl * e; if (F.t >= 1) { this.focus = F.to; this.fly = null; } }
@@ -269,6 +315,7 @@ export class Cosmos {
     this.cam.position.set(0, 0, 0); this.cam.up.set(0, 1, 0); this.cam.lookAt((f[0] - cam[0]) * this.S, (f[1] - cam[1]) * this.S, (f[2] - cam[2]) * this.S);
     const fo = this.item(this.focus), minD = fo ? fo.R * 1.15 : 10; this.cam.near = Math.max(0.0005, 10 * (this.dist - (fo && fo.mesh ? fo.R : 0)) / this.dist * 0.2); this.cam.far = 2e5; this.cam.updateProjectionMatrix();
     w.renderer.render(this.scene, this.cam); this.labels(D, false); this.hud(D);
+    if (this.interior) { this.interior.I.anim(dt); this.interior.I.labels(this.cam, el, (en, km) => lang === 'km' && km ? km : t(en)); }
     // back down to the globe
     if (this.focus === 'Earth' && !this.fly && this.dist < 7.5 * ER) this.exit();
   }
@@ -315,7 +362,7 @@ export class Cosmos {
   }
   exit() { const G = gmstDeg(Date.now()) * D2R, ce = Math.cos(this.el), v = new THREE.Vector3(ce * Math.sin(this.az), Math.sin(this.el), ce * Math.cos(this.az)).multiplyScalar(Math.max(this.dist, 2 * ER) / ER).applyAxisAngle(new THREE.Vector3(0, 1, 0), -G);
     this.active = false; this.fly = null; this.tOff = 0; this.rate = 0; this.uiBox.hidden = true; this.g.cam.position.copy(v.setLength(Math.min(7.4, v.length()))); this.g.cam.lookAt(0, 0, 0); this.g.ctl.enabled = true; this.g.ctl.update(); document.body.classList.remove('cosmos-on'); this.card(null); this.g.onCosmos && this.g.onCosmos(false); }
-  goTo(id) { const o = this.item(id); if (!o) return; this.positions(this.now()); const a = this.focusPos().slice(), b = this.pos[id], sep = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), d0 = this.dist, d1 = Math.max(o.view, o.R * 3);
+  goTo(id) { const o = this.item(id); if (!o) return; if (this.interior && this.interior.id !== id) this.closeInterior(); this.positions(this.now()); const a = this.focusPos().slice(), b = this.pos[id], sep = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), d0 = this.dist, d1 = Math.max(o.view, o.R * 3);
     const hump = Math.max(0, Math.log(sep * 1.4 / Math.max(d0, d1))); let az1 = this.az, el1 = this.el; if ((o.body || o.voy) && id !== 'Sun' && id !== 'Earth') { const s = new THREE.Vector3(-b[0], -b[1], -b[2]).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.6); az1 = Math.atan2(s.x, s.z); el1 = Math.max(-0.5, Math.min(0.5, Math.asin(s.y) + 0.25)); } // look at the sunlit side
     let dAz = ((az1 - this.az) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
     this.fly = { a, b, to: id, cur: a, t: 0, d0, d1, hump, dur: 2.2 + Math.min(4, hump * 0.35), az0: this.az, dAz, el0: this.el, dEl: el1 - this.el }; this.card(o); }
@@ -335,8 +382,8 @@ export class Cosmos {
   ui() {
     const d = this.uiBox = document.createElement('div'); d.className = 'cosUI'; d.hidden = true;
     d.innerHTML = `<div class="cosTop"><input id="cosFind" placeholder="🔎 ${t('Planet, star, galaxy…')}" autocomplete="off"><div id="cosFound"></div></div>
-      <div class="cosJump">${[['Earth', '🌍'], ['Moon', '🌙'], ['Sun', '☀️'], ['Mars', '🔴'], ['Jupiter', '🟠'], ['Saturn', '🪐'], ['Voyager 1', '🛰️'], ['Alpha Centauri A', '⭐'], ['Milky Way', '🌌'], ['Andromeda Galaxy', '🌀'], ['Observable universe', '🔭']].map(([id, i]) => `<button data-go="${id}" title="${esc(t(id))}">${i}</button>`).join('')}<button id="cosCon" class="on" title="${t('Constellation lines and names')}">✳️</button><button id="cosSB" class="on" title="${t('Comets and asteroids: orbits and tails')}">☄️</button><button id="cosLearn" title="${t('Space rocks: comets, asteroids, meteors')}">📚</button></div>
-      <div class="cosCard" id="cosCard" hidden></div>
+      <div class="cosJump">${[['Earth', '🌍'], ['Moon', '🌙'], ['Sun', '☀️'], ['Mars', '🔴'], ['Jupiter', '🟠'], ['Saturn', '🪐'], ['Voyager 1', '🛰️'], ['Alpha Centauri A', '⭐'], ['Milky Way', '🌌'], ['Andromeda Galaxy', '🌀'], ['Observable universe', '🔭']].map(([id, i]) => `<button data-go="${id}" title="${esc(t(id))}">${i}</button>`).join('')}<button id="cosCon" class="on" title="${t('Constellation lines and names')}">✳️</button><button id="cosSB" class="on" title="${t('Comets and asteroids: orbits and tails')}">☄️</button><button id="cosLearn" title="${t('Space rocks: comets, asteroids, meteors')}">📚</button><button id="cosLive" title="${t('Live motion: planets spin, everything moves (time runs 10 minutes per second)')}">🔄</button></div>
+      <div class="cosCard" id="cosCard" hidden></div><div class="cosCard cosInt" id="cosInt" hidden></div>
       <div class="cosBottom"><div class="cosScale"><i id="cosBar"></i><span id="cosScaleT"></span><b id="cosLevel"></b></div>
         <div class="cosTime"><button data-rate="0" title="${t('Pause')}">⏸</button><button data-rate="1" title="${t('Real time')}">▶</button><button data-rate="3600">1 h/s</button><button data-rate="86400">1 ${t('day')}/s</button><button data-rate="2592000">1 ${t('month')}/s</button><button data-rate="31557600">1 ${t('year')}/s</button><button id="cosNow" title="${t('Now')}">⟲</button><span id="cosDate"></span></div>
         <div class="cosNote">${t('Planets: JPL orbital elements · stars: Yale Bright Star Catalogue · the Milky Way, galaxy shapes and the cosmic web are illustrations.')} ${t('Surface maps: Solar System Scope (CC BY 4.0), from NASA data.')} ${t('Constellation figures: Stellarium (Free Art License).')}</div></div>
@@ -348,6 +395,8 @@ export class Cosmos {
     try { this.sbOn = localStorage.getItem('cambodia3d.smallbodies') !== '0'; } catch (e) { } d.querySelector('#cosSB').classList.toggle('on', this.sbOn !== false);
     d.querySelector('#cosSB').onclick = e => { this.sbOn = this.sbOn === false; e.currentTarget.classList.toggle('on', this.sbOn); try { localStorage.setItem('cambodia3d.smallbodies', this.sbOn ? '1' : '0'); } catch (er) { } };
     d.querySelector('#cosLearn').onclick = () => this.learn();
+    const lv = d.querySelector('#cosLive'), syncLive = () => { lv.classList.toggle('on', !!this.g.opt.live); const cb = document.querySelector('#globePanel [data-g=live]'); if (cb) cb.checked = !!this.g.opt.live; };
+    lv.onclick = () => { this.g.opt.live = !this.g.opt.live; try { localStorage.setItem('cambodia3d.live', this.g.opt.live ? '1' : '0'); } catch (e) { } syncLive(); }; this.syncLive = syncLive; syncLive();
     d.querySelectorAll('[data-rate]').forEach(b => b.onclick = () => { this.rate = +b.dataset.rate; d.querySelectorAll('[data-rate]').forEach(x => x.classList.toggle('on', x === b)); });
     d.querySelector('#cosNow').onclick = () => { this.tOff = 0; this.rate = 1; };
     d.querySelector('#cosBack').onclick = () => { if (this.focus === 'Earth' && !this.fly) this.exit(); else { this.goTo('Earth'); this.fly.d1 = 6 * ER; } };
@@ -366,8 +415,9 @@ export class Cosmos {
         return `<div>☀️ ${t('Distance from the Sun')}: <b>${r.toFixed(2)} AU</b></div><div>🔄 ${isFinite(P) && P < 3000 ? `${t('Once around the Sun every')} <b>${P < 10 ? P.toFixed(1) : Math.round(P)}</b> ${t('years')}` : k.e >= 1 ? t('Open orbit: passes the Sun once and leaves') : t('Very long orbit (thousands of years)')}</div>
           <div>📍 ${t('Closest to the Sun')}: ${k.q.toFixed(2)} AU · ${np.getTime() > this.now() ? t('next') : t('last')}: ${np.toISOString().slice(0, 10)}</div>${k.d ? `<div>📐 ${t('Size')}: ${k.d < 2 ? Math.round(k.d * 1000) + ' m' : k.d.toFixed(k.d < 20 ? 1 : 0) + ' km'}</div>` : ''}<div class="cosK">${esc(k.full)} · ${esc(t(k.cls))}${k.pha ? ' · ⚠️ ' + t('potentially hazardous') : ''}</div>
           ${SHOWERS.filter(m => m.parent === o.id).map(m => `<div>🌠 ${t('Parent of the')} <b>${esc(lang === 'km' ? m.km : t(m.en))}</b></div>`).join('')}`; })() : ''}
-      ${o.info ? `<div class="cosInfo">${esc(t(o.info))}</div>` : ''}${o.voy ? `<div class="cosVoy"><button id="cosReplay">▶ ${t('Replay the journey from 1977')}</button><button id="cosSee">🔍 ${t('See the spacecraft')}</button></div>` : ''}`;
+      ${o.info ? `<div class="cosInfo">${esc(t(o.info))}</div>` : ''}${['Sun', 'Mercury', 'Venus', 'Mars', 'Moon', 'Jupiter', 'Saturn', 'Uranus', 'Neptune'].includes(o.id) ? `<div class="cosVoy"><button id="cosIn">🔪 ${this.interior && this.interior.id === o.id ? t('Close the cutaway') : t('Look inside')}</button></div>` : ''}${o.voy ? `<div class="cosVoy"><button id="cosReplay">▶ ${t('Replay the journey from 1977')}</button><button id="cosSee">🔍 ${t('See the spacecraft')}</button></div>` : ''}`;
     c.querySelector('#cosCardX').onclick = () => this.card(null);
+    if (c.querySelector('#cosIn')) c.querySelector('#cosIn').onclick = () => { if (this.interior && this.interior.id === o.id) this.closeInterior(); else this.openInterior(o); setTimeout(() => this.updCard(), 300); };
     if (o.voy) { c.querySelector('#cosReplay').onclick = () => this.replay(o.id); c.querySelector('#cosSee').onclick = () => { this.tOff = 0; this.rate = 1; this.goTo(o.id); }; } }
   learn() { // space rocks: what comets, asteroids, meteoroids, meteors, fireballs and meteorites are; showers; close approaches
     const c = this.uiBox.querySelector('#cosCard'); this.cardO = null; c.hidden = false; const S = this.SB || { cad: [], fireballs: [] }, now = new Date(this.now()), nm = (en, km) => esc(lang === 'km' && km ? km : t(en));
@@ -387,5 +437,16 @@ export class Cosmos {
   hud(D) { this.cardT = (this.cardT || 0) + 1; if (this.cardT % 15 === 1) this.updCard(); const el = this.w.renderer.domElement, px = 120, km = 2 * this.dist * Math.tan(this.cam.fov * D2R / 2) * px / el.clientHeight;
     const n = Math.pow(10, Math.floor(Math.log10(km))), nice = [1, 2, 5].map(k => k * n).filter(v => v <= km).pop() || n; this.uiBox.querySelector('#cosBar').style.width = (nice / km * px).toFixed(0) + 'px'; this.uiBox.querySelector('#cosScaleT').textContent = fmtKm(nice);
     const fo = this.item(this.focus); this.uiBox.querySelector('#cosLevel').textContent = fo && fo.body && D < fo.R * 60 ? (lang === 'km' && fo.km ? fo.km : t(fo.name)) : t(SCALES.find(([v]) => D < v)[1]); const dt = new Date(this.now()); this.uiBox.querySelector('#cosDate').textContent = dt.toISOString().slice(0, 16).replace('T', ' ') + ' UTC'; }
-  hideLabels() { this.labelBox.hidden = true; this.uiBox.hidden = true; }
+  hideLabels() { this.labelBox.hidden = true; this.uiBox.hidden = true; this.closeInterior(); }
+  async openInterior(o) { this.closeInterior(); const M = await import('./interior.js?v=109'), def = M.INTERIORS[o.id]; if (!def || !o.mesh) return;
+    this.positions(this.now()); const p = this.pos[o.id], c = this.camAbs(), d = new THREE.Vector3(c[0] - p[0], c[1] - p[1], c[2] - p[2]).normalize();
+    const I = new M.Interior(def, { E: M.octant(d), surface: U => M.cutMaterial(o.mesh.material, U), surfRot: o.mesh.quaternion.clone(), parent: this.scene }); I.setOn(true); this.interior = { I, id: o.id };
+    const b = this.uiBox.querySelector('#cosInt'), nm = (en, km) => esc(lang === 'km' && km ? km : t(en)); b.hidden = false;
+    b.innerHTML = `<div class="cosCh"><b style="color:${o.col}">🔪 ${t('Inside')}: ${nm(o.name, o.km)}</b><button id="cosIntX">✕</button></div>
+      <label class="cosSplit">↔ ${t('Pull the layers apart')}<input type="range" id="cosSplit" min="0" max="1" step="0.01" value="0"></label>
+      <div class="insLayers">${def.layers.slice().reverse().map(l => `<div><i style="background:${l.b}"></i><b>${nm(l.en, l.km)}</b> <span>${Math.round((1 - l.r1) * def.R).toLocaleString()}–${Math.round((1 - l.r0) * def.R).toLocaleString()} km · ${esc(lang === 'km' ? l.stateKm : l.state)}</span><p>${esc(lang === 'km' ? l.noteKm : l.note)}</p></div>`).join('')}</div>
+      <div class="cosK">${t('Depths are measured from the surface. Interiors of the giant planets are still being studied (NASA Juno, Cassini).')}</div>`;
+    b.querySelector('#cosIntX').onclick = () => this.closeInterior(); b.querySelector('#cosSplit').oninput = e => I.setSplit(+e.target.value);
+    if (this.dist > o.R * 4) { this.fly = null; this.focus = o.id; this.dist = o.R * 3.2; } }
+  closeInterior() { if (!this.interior) return; const o = this.item(this.interior.id); if (o && o.mesh) o.mesh.visible = true; this.interior.I.dispose(); this.interior = null; const b = this.uiBox.querySelector('#cosInt'); if (b) b.hidden = true; }
 }

@@ -4,8 +4,8 @@
 // or (with your proxy) OpenSky.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { t, lang } from './i18n.js?v=108';
-import { ATM, loadSmall } from './smallbodies.js?v=108';
+import { t, lang } from './i18n.js?v=109';
+import { ATM, loadSmall } from './smallbodies.js?v=109';
 
 const R_KM = 6371, D2R = Math.PI / 180;
 const GIBS = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=EPSG:4326&BBOX=-90,-180,90,180&FORMAT=';
@@ -22,7 +22,7 @@ function sunLatLon(d = new Date()) {
 
 export class Globe {
   constructor(world) {
-    this.w = world; this.on = false; this.opt = { clouds: true, night: true, wind: true, flights: true, temp: false, rain: false, storms: true, radar: true, atmos: false, fireballs: false, sats: { resource: true, stations: true, visual: true, 'gps-ops': false, weather: false, starlink: false } };
+    this.w = world; this.on = false; this.opt = { clouds: true, night: true, wind: true, flights: true, temp: false, rain: false, storms: true, radar: true, live: (() => { try { return localStorage.getItem('cambodia3d.live') === '1'; } catch (e) { return false; } })(), atmos: false, fireballs: false, sats: { resource: true, stations: true, visual: true, 'gps-ops': false, weather: false, starlink: false } };
     const sc = this.scene = new THREE.Scene(); // the sky behind the Earth (stars, Sun, Moon, planets) is drawn by the cosmos view
     this.cam = new THREE.PerspectiveCamera(40, 1, 0.001, 200);
     this.ctl = new OrbitControls(this.cam, world.renderer.domElement); this.ctl.addEventListener('start', () => { this.followSat = null; }); this.ctl.enabled = false; this.ctl.enablePan = false; this.ctl.minDistance = 1.0003; this.ctl.maxDistance = 9; this.ctl.enableZoom = false; this.ctl.enableDamping = true; this.ctl.dampingFactor = 0.08;
@@ -39,11 +39,11 @@ export class Globe {
     this.tiles = new Map();
     // earth with day / night
     const blank = (c) => { const cv = document.createElement('canvas'); cv.width = cv.height = 4; const g = cv.getContext('2d'); g.fillStyle = c; g.fillRect(0, 0, 4, 4); return new THREE.CanvasTexture(cv); };
-    this.U = { day: { value: blank('#1d3b5a') }, night: { value: blank('#000000') }, sun: { value: new THREE.Vector3(1, 0, 0) }, nightOn: { value: 1 }, cutOn: { value: 0 }, ce1: { value: new THREE.Vector3(1, 0, 0) }, ce2: { value: new THREE.Vector3(0, 1, 0) }, ce3: { value: new THREE.Vector3(0, 0, 1) } };
+    this.U = { day: { value: blank('#1d3b5a') }, night: { value: blank('#000000') }, sun: { value: new THREE.Vector3(1, 0, 0) }, nightOn: { value: 1 }, cutOn: { value: 0 }, ce1: { value: new THREE.Vector3(1, 0, 0) }, ce2: { value: new THREE.Vector3(0, 1, 0) }, ce3: { value: new THREE.Vector3(0, 0, 1) }, cHalf: { value: 0 }, cd: { value: new THREE.Vector3(1, 0, 0) } };
     this.earth = new THREE.Mesh(new THREE.SphereGeometry(1, 192, 96), new THREE.ShaderMaterial({ uniforms: this.U,
       vertexShader: 'varying vec2 vUv; varying vec3 vN; void main(){ vUv = uv; vN = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader: `uniform sampler2D day; uniform sampler2D night; uniform vec3 sun; uniform float nightOn; uniform float cutOn; uniform vec3 ce1; uniform vec3 ce2; uniform vec3 ce3; varying vec2 vUv; varying vec3 vN;
-        void main(){ if (cutOn > 0.5 && dot(vN, ce1) > 0.0 && dot(vN, ce2) > 0.0 && dot(vN, ce3) > 0.0) discard; float d = dot(normalize(vN), normalize(sun)); float k = mix(1.0, smoothstep(-0.12, 0.12, d), nightOn);
+      fragmentShader: `uniform sampler2D day; uniform sampler2D night; uniform vec3 sun; uniform float nightOn; uniform float cutOn; uniform vec3 ce1; uniform vec3 ce2; uniform vec3 ce3; uniform float cHalf; uniform vec3 cd; varying vec2 vUv; varying vec3 vN;
+        void main(){ if (cutOn > 0.5 && (cHalf > 0.5 ? dot(vN, cd) > 0.0 : (dot(vN, ce1) > 0.0 && dot(vN, ce2) > 0.0 && dot(vN, ce3) > 0.0))) discard; float d = dot(normalize(vN), normalize(sun)); float k = mix(1.0, smoothstep(-0.12, 0.12, d), nightOn);
           vec3 dc = texture2D(day, vUv).rgb * (0.35 + 0.75 * max(d, 0.0) * nightOn + (1.0 - nightOn) * 0.65); vec3 nc = texture2D(night, vUv).rgb * 1.6 + vec3(0.01, 0.015, 0.03);
           gl_FragColor = vec4(mix(nc, dc, k), 1.0);
           #include <colorspace_fragment>
@@ -80,7 +80,7 @@ export class Globe {
     if (this.on) return; const w = this.w; this.on = true; w.controls.enabled = false; this.ctl.enabled = true; this.placePlate();
     const p = xyz(this.lat, this.lon, 1); this.cam.position.copy(p.clone().multiplyScalar(1.002)); this.ctl.target.set(0, 0, 0); this.ctl.update();
     this.anim = { t: 0, from: 1.002, to: 3.4, dir: p.clone().normalize() }; this.onToggle && this.onToggle(true);
-    if (!this.loaded) { this.loaded = true; this.loadBase(); import('./cosmos.js?v=108').then(M => { this.cos = new M.Cosmos(this); }).catch(e => console.warn('cosmos', e)); this.satEvents(); }
+    if (!this.loaded) { this.loaded = true; this.loadBase(); import('./cosmos.js?v=109').then(M => { this.cos = new M.Cosmos(this); }).catch(e => console.warn('cosmos', e)); this.satEvents(); }
     this.refresh(); clearInterval(this.timer); this.timer = setInterval(() => this.refresh(), 60000);
   }
   leave() {
@@ -88,7 +88,7 @@ export class Globe {
     if (!this.on || (this.anim && this.anim.out)) return; const p = xyz(this.lat, this.lon, 1).normalize(), d = this.cam.position.length();
     this.anim = { t: 0, from: d, to: 1.0012, dir: p, start: this.cam.position.clone().normalize(), out: true };
   }
-  finishLeave() { const w = this.w; if (this.sv && this.sv.active) this.sv.close(); if (this.cos) this.cos.hideLabels(); this.followSat = null; this.satCard(null); this.on = false; this.ctl.enabled = false; w.controls.enabled = true; clearInterval(this.timer); w.clock.getDelta(); this.onToggle && this.onToggle(false); }
+  finishLeave() { const w = this.w; if (this.sv && this.sv.active) this.sv.close(); if (this.cos) this.cos.hideLabels(); if (this.inside) this.inside.setOn(false); this.followSat = null; this.satCard(null); this.on = false; this.ctl.enabled = false; w.controls.enabled = true; clearInterval(this.timer); w.clock.getDelta(); this.onToggle && this.onToggle(false); }
   /* ---------- data ---------- */
   async loadBase() {
     const W = 4096, H = 2048;
@@ -375,7 +375,7 @@ export class Globe {
   frame(dt) {
     const w = this.w, el = w.renderer.domElement, asp = el.clientWidth / Math.max(1, el.clientHeight); if (this.cam.aspect !== asp) { this.cam.aspect = asp; this.cam.updateProjectionMatrix(); }
     if (this.sv && this.sv.active) { this.sv.frame(dt); return; }
-    if (this.cos && this.cos.active) { this.U.cutOn.value = 0; this.cos.frame(dt); return; }
+    if (this.cos && this.cos.active) { this.U.cutOn.value = 0; if (this.inside) this.inside.setOn(false); this.cos.frame(dt); return; }
     if (this.followSat && !this.anim) { const p = this.satPos(this.followSat.rec, new Date()); if (p) { const d = this.cam.position.length(); this.cam.position.lerp(p.clone().setLength(d), Math.min(1, dt * 2)); this.satCardUpd(); } }
     if (this.anim) { const A = this.anim; A.t = Math.min(1, A.t + dt / 2.2); const e = A.t * A.t * (3 - 2 * A.t), d = A.from + (A.to - A.from) * e;
       const dir = A.out ? A.start.clone().lerp(A.dir, e).normalize() : A.dir.clone(); this.cam.position.copy(dir.multiplyScalar(d)); if (A.t >= 1) { this.anim = null; if (A.out) { this.finishLeave(); return; } } }
@@ -411,7 +411,7 @@ export class Globe {
     c.innerHTML = `<div class="cosCh"><b style="color:${SAT_GROUPS[s.grp] ? SAT_GROUPS[s.grp][1] : '#fff'}">🛰️ ${s.sp ? s.sp.label : s.name}</b><button id="satX">✕</button></div><div class="cosK">${SAT_GROUPS[s.grp] ? SAT_GROUPS[s.grp][0] : ''}${s.sp && s.sp.label !== s.name ? ' · ' + s.name : ''}</div>
       <div>⬆️ ${Math.round(gd.height).toLocaleString()} km · 💨 ${sp.toFixed(2)} km/s (${Math.round(sp * 3600).toLocaleString()} km/h)</div><div>🔄 ${per.toFixed(1)} min · ∠ ${(s.rec.inclo / D2R).toFixed(1)}° · 📍 ${(gd.latitude / D2R).toFixed(2)}°, ${(gd.longitude / D2R).toFixed(2)}°</div><div class="cosInfo">${t('The view follows it. Drag or tap ✕ to stop.')}</div><div class="row" style="margin-top:6px"><button id="satClose" class="primary" style="margin:0">🔭 ${t('3D close-up')}${/ISS/.test(s.name) ? ' · ' + t('go inside') : ''}</button></div>`;
     c.querySelector('#satX').onclick = () => { this.followSat = null; this.satCard(null); };
-    c.querySelector('#satClose').onclick = async () => { if (!this.sv) { const M = await import('./satview.js?v=108'); this.sv = new M.SatView(this); } this.satCard(null); this.sv.onClose = () => { if (this.followSat) this.satCard(this.followSat); }; this.sv.open(s); }; }
+    c.querySelector('#satClose').onclick = async () => { if (!this.sv) { const M = await import('./satview.js?v=109'); this.sv = new M.SatView(this); } this.satCard(null); this.sv.onClose = () => { if (this.followSat) this.satCard(this.followSat); }; this.sv.open(s); }; }
   // layers of the atmosphere at their true heights (thin coloured lines at the edge of the Earth) and the Kármán line
   stepSpace() {
     if (this.opt.atmos && !this.atmosG) { const g = this.atmosG = new THREE.Group(), geo = new THREE.SphereGeometry(1, 160, 80);
@@ -420,11 +420,12 @@ export class Globe {
         fragmentShader: 'uniform vec3 c; uniform float op; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 7.0); gl_FragColor = vec4(c * f * op, 1.0); }' })); m.scale.setScalar(1 + km / 6371); g.add(m); };
       for (const [, , , top, col] of ATM) if (top <= 1000) shell(top, col, 1.6); shell(100, '#ffffff', 1.1); this.scene.add(g); }
     const ins = !!this.opt.inside && !(this.cos && this.cos.active);
-    if (ins && !this.inside && !this.insBusy) { this.insBusy = true; import('./earthinside.js?v=108').then(M => { this.inside = new M.Inside(this); this.insM = M; const [a, b, c] = this.inside.E; this.U.ce1.value.copy(a); this.U.ce2.value.copy(b); this.U.ce3.value.copy(c); this.insideView(); }); }
-    if (this.inside) { this.inside.setOn(ins); this.U.cutOn.value = ins ? 1 : 0; if (ins) { this.clouds.visible = false; for (const o of [this.flPts, this.routes]) if (o) o.visible = false; for (const T of this.tiles.values()) T.m.visible = false; if (this.windLines) this.windLines.visible = false; this.inside.frame(this.cam, this.w.renderer.domElement, (en, km) => lang === 'km' && km ? km : t(en)); }
+    if (ins && !this.inside && !this.insBusy) { this.insBusy = true; import('./earthinside.js?v=109').then(M => { this.inside = new M.Inside(this); this.insM = M; const [a, b, c] = this.inside.E; this.U.ce1.value.copy(a); this.U.ce2.value.copy(b); this.U.ce3.value.copy(c); this.insideView(); }); }
+    if (this.inside) { this.inside.setOn(ins); this.U.cutOn.value = ins ? 1 : 0; this.U.cHalf.value = this.inside.I.U.uHalf.value; this.U.cd.value.copy(this.inside.I.hd); if (ins) { this.clouds.visible = false; for (const o of [this.flPts, this.routes]) if (o) o.visible = false; for (const T of this.tiles.values()) T.m.visible = false; if (this.windLines) this.windLines.visible = false; this.inside.frame(this.cam, this.w.renderer.domElement, (en, km) => lang === 'km' && km ? km : t(en)); }
       else if (this._insWas) { for (const T of this.tiles.values()) T.m.visible = true; for (const o of [this.flPts, this.routes]) if (o) o.visible = !!this.opt.flights; if (this.windLines) this.windLines.visible = true; } this._insWas = ins; }
     if (this.insFly) { const F = this.insFly; F.t = Math.min(1, F.t + 1 / 90); const e = F.t * F.t * (3 - 2 * F.t); this.cam.position.copy(F.a.clone().lerp(F.b, e).normalize().multiplyScalar(F.d0 + (F.d1 - F.d0) * e)); this.cam.lookAt(0, 0, 0); if (F.t >= 1) this.insFly = null; }
     if (this.atmosG) this.atmosG.visible = !!this.opt.atmos && !ins;
+    this.ctl.autoRotate = !!this.opt.live && !this.followSat && !this.insFly; this.ctl.autoRotateSpeed = 0.5;
     if (this.opt.fireballs && !this.fbG && !this.fbBusy) { this.fbBusy = true; loadSmall().then(S => { const g = this.fbG = new THREE.Group(), cls = [[0.1, 4, '#ffb347'], [1, 7, '#ff7a3d'], [1e9, 11, '#ff3d3d']];
       for (const [lim, size, col] of cls) { const P = []; for (const f of S.fireballs) { const prev = cls[cls.findIndex(c => c[0] === lim) - 1]; if (f[4] <= lim && (!prev || f[4] > prev[0])) P.push(...xyz(f[1], f[2], 1.003).toArray()); }
         const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: col, size, sizeAttenuation: false, transparent: true, opacity: 0.85, depthWrite: false }))); }
