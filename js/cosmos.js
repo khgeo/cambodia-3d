@@ -6,10 +6,10 @@
 // Frame: equatorial J2000 with y = celestial north (the globe's frame turned by the sidereal time).
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { t, lang } from './i18n.js?v=107';
-import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=107';
-import { loadConArt, buildConstellations } from './conart.js?v=107';
-import { loadSmall, kepler, orbitLine, period, nextPerihelion, dateOfJd, jdOf, LEARN, SHOWERS, nextShowers, showerState } from './smallbodies.js?v=107';
+import { t, lang } from './i18n.js?v=108';
+import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=108';
+import { loadConArt, buildConstellations } from './conart.js?v=108';
+import { loadSmall, kepler, orbitLine, period, nextPerihelion, dateOfJd, jdOf, LEARN, SHOWERS, nextShowers, showerState } from './smallbodies.js?v=108';
 
 const D2R = Math.PI / 180, AU = 1.495978707e8, LY = 9.4607e12, ER = 6371, OBL = 23.43928 * D2R;
 const rev = x => ((x % 360) + 360) % 360;

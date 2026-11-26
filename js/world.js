@@ -5,32 +5,32 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import * as G from './geo.js?v=107';
-import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=107';
-import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=107';
-import { buildTrees, GrassField, WIND } from './vegetation.js?v=107';
-import { classify as khClassify, details as khDetails, powerLines, watBuilding, watWalls, watRoles } from './khmerbuild.js?v=107';
-import { RoadNet, Driver, Walker } from './modes.js?v=107';
-import { vehicleKit } from './vehicles.js?v=107';
-import { loadCarPack } from './carpack.js?v=107';
-import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=107';
-import { human, cow, animMaterial, SHIRTS } from './people.js?v=107';
-import { loadUnderground, sampleLine, wallMesh } from './section.js?v=107';
-import { LayerStack } from './layers.js?v=107';
-import { Survey } from './survey.js?v=107';
-import { Editor } from './editor.js?v=107';
-import { Atmos } from './atmos.js?v=107';
-import { NightLights } from './lights.js?v=107';
-import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=107';
-import { Tactical, loadCatalog } from './tactical.js?v=107';
-import { LcTrainer } from './lctrain.js?v=107';
-import { Radar } from './radar.js?v=107';
-import { Globe } from './globe.js?v=107';
-import { SEASON } from './vegetation.js?v=107';
-import { fillClouds, S2_CREDIT } from './clouds.js?v=107';
-import { makeCloudDome } from './skyclouds.js?v=107';
-import { EarthContext } from './earthctx.js?v=107';
-import { ResultLayers } from './results.js?v=107';
+import * as G from './geo.js?v=108';
+import { makeRoadMaterial, makeBuildingMaterial, makeTerrainMaterial, makeWaterMaterial } from './shaders.js?v=108';
+import { noiseTexture, waterNormals, detailTextures, balanceGains, enhanceCanvas, classify, wb } from './textures.js?v=108';
+import { buildTrees, GrassField, WIND } from './vegetation.js?v=108';
+import { classify as khClassify, details as khDetails, powerLines, watBuilding, watWalls, watRoles } from './khmerbuild.js?v=108';
+import { RoadNet, Driver, Walker } from './modes.js?v=108';
+import { vehicleKit } from './vehicles.js?v=108';
+import { loadCarPack } from './carpack.js?v=108';
+import { landmarksIn, clearFootprints, placeLandmarks } from './landmarks.js?v=108';
+import { human, cow, animMaterial, SHIRTS } from './people.js?v=108';
+import { loadUnderground, sampleLine, wallMesh } from './section.js?v=108';
+import { LayerStack } from './layers.js?v=108';
+import { Survey } from './survey.js?v=108';
+import { Editor } from './editor.js?v=108';
+import { Atmos } from './atmos.js?v=108';
+import { NightLights } from './lights.js?v=108';
+import { loadIO, detailedLandCover, lcCanvas, LC } from './landcover.js?v=108';
+import { Tactical, loadCatalog } from './tactical.js?v=108';
+import { LcTrainer } from './lctrain.js?v=108';
+import { Radar } from './radar.js?v=108';
+import { Globe } from './globe.js?v=108';
+import { SEASON } from './vegetation.js?v=108';
+import { fillClouds, S2_CREDIT } from './clouds.js?v=108';
+import { makeCloudDome } from './skyclouds.js?v=108';
+import { EarthContext } from './earthctx.js?v=108';
+import { ResultLayers } from './results.js?v=108';
 
 const IMAGERY = {
   esri: { url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`, max: 19, credit: 'Imagery © Esri, Maxar, Earthstar Geographics' },
@@ -1246,7 +1246,7 @@ export class World {
   }
   // flooded paddies at planting (needs Field Boundaries), straw stacks by the houses after the harvest
   async farmUpdate(fields) {
-    const RF = this._rf || (this._rf = await import('./ricefield.js?v=107')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
+    const RF = this._rf || (this._rf = await import('./ricefield.js?v=108')); if (fields !== undefined) { this._farmFields = fields; RF.buildFieldMask(this, fields); if (this.grass) this.grass.center.set(1e9, 0, 1e9); }
     for (const k of ['paddyMesh', 'hayMesh']) if (this[k]) { this.root.remove(this[k]); this[k].geometry.dispose(); this[k].material.dispose(); this[k] = null; }
     const F = this._farmFields || this.fields; if (this.seasonKey === 'planting' && F && F.length) { this.paddyMesh = RF.paddyWater(this, F); if (this.paddyMesh) this.root.add(this.paddyMesh); }
     if (this.seasonKey === 'harvested') { this.hayMesh = RF.hayStacks(this); if (this.hayMesh) this.root.add(this.hayMesh); }
@@ -1459,7 +1459,7 @@ export class World {
   }
   // cinematic look (glow, colour grade, optional ambient occlusion), loaded on first use
   async setLook(on, ao) {
-    if ((on || ao) && !this.look) { const { Look } = await import('./look.js?v=107'); this.look = new Look(this); const s = this.renderer.getSize(new THREE.Vector2()); this.look.setSize(s.x, s.y); }
+    if ((on || ao) && !this.look) { const { Look } = await import('./look.js?v=108'); this.look = new Look(this); const s = this.renderer.getSize(new THREE.Vector2()); this.look.setSize(s.x, s.y); }
     if (!this.look) return; this.look.on = on; if (ao != null) await this.look.setAO(on && ao);
   }
 }

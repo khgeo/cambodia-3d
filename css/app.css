@@ -737,3 +737,14 @@ body.ride-on #toolDock,body.ride-on .catBtn,body.ride-on #hud,body.ride-on .rpan
 .cosSec{margin:8px 0 3px;font-weight:600;color:#ffd38a}
 .skShowers{margin:6px 0;font-size:12.5px}.skShowers>div{margin:4px 0}.skShowers .on b{color:#ffd38a}
 .skyLabels .sl.rad{color:#ffd38a;font-weight:600}
+/* inside the Earth */
+.insLabels{position:fixed;inset:0;pointer-events:none;z-index:4}
+.insLabels span{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;font:600 12px system-ui,"Noto Sans Khmer",sans-serif;color:#fff;text-shadow:0 0 4px #000,0 0 2px #000}
+.insLabels span i{font-weight:400;font-style:normal;opacity:.8;font-size:11px}
+.insLabels .kh{color:#7ff3ff}.insLabels .dp{transform:translate(0,-50%);color:#00e5ff}
+.insLayers{display:grid;gap:4px;margin:6px 0;max-height:260px;overflow:auto;font-size:12px}
+.insLayers>div{background:rgba(255,255,255,.04);border-radius:6px;padding:4px 6px}
+.insLayers i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.insLayers span{opacity:.75}.insLayers p{margin:2px 0 0;line-height:1.4;opacity:.9}
+.insRead{font-size:12.5px;margin:2px 0 6px;line-height:1.5}
+#insSeis{width:100%;background:#02040c;border-radius:8px}
