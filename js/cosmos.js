@@ -5,9 +5,11 @@
 // directions and distances. The Milky Way, the other galaxies' shapes and the cosmic web are illustrations.
 // Frame: equatorial J2000 with y = celestial north (the globe's frame turned by the sidereal time).
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=106';
-import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=106';
-import { loadConArt, buildConstellations } from './conart.js?v=106';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { t, lang } from './i18n.js?v=107';
+import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=107';
+import { loadConArt, buildConstellations } from './conart.js?v=107';
+import { loadSmall, kepler, orbitLine, period, nextPerihelion, dateOfJd, jdOf, LEARN, SHOWERS, nextShowers, showerState } from './smallbodies.js?v=107';
 
 const D2R = Math.PI / 180, AU = 1.495978707e8, LY = 9.4607e12, ER = 6371, OBL = 23.43928 * D2R;
 const rev = x => ((x % 360) + 360) % 360;
@@ -140,7 +142,7 @@ export class Cosmos {
     { const T2 = t => (t / 864e5 + 2440587.5 - 2451545) / 36525, hAt = (n, t) => helio(EL[n], T2(t)); this.voy = {};
       for (const id of Object.keys(VOYAGERS)) { const tr = makeTrack(id, hAt), V = tr.V, inner = voyagerModel(), m = new THREE.Group(); inner.scale.setScalar(0.1); m.add(inner); sc.add(m); sc.add(tr.line); this.voy[id] = tr;
         this.addPoint({ id, name: id, km: V.km, kind: 'probe', col: V.col, R: 0.01, view: 0.026, mesh: m, info: V.info, show: [3e9, 5e12], size: 6, voy: tr }); } }
-    this.ready = this.loadStars();
+    this.ready = this.loadStars(); this.sbReady = loadSmall().then(S => this.addSmall(S));
     // Milky Way (illustration): bar, bulge, four arms, in galactic coordinates, ly
     { const p = [], c = [], s = [], arm = [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2], b = Math.tan(12 * D2R);
       for (let i = 0; i < 90000; i++) { let x, y, z, col;
@@ -173,6 +175,28 @@ export class Cosmos {
     // labels
     this.labelBox = document.createElement('div'); this.labelBox.className = 'cosLabels'; document.body.appendChild(this.labelBox);
   }
+  addSmall(S) { // comets and asteroids from the JPL Small-Body Database, on their real orbits
+    this.SB = S; this.sbOrbits = []; this.tails = [];
+    const glowTx = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = g.createRadialGradient(64, 64, 0, 64, 64, 64); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.2, 'rgba(200,240,255,.6)'); r.addColorStop(1, 'rgba(160,220,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+    const tailGeo = (() => { const g = new THREE.ConeGeometry(1, 1, 32, 8, true); g.rotateX(Math.PI); g.translate(0, 0.5, 0); return g; })();
+    const tailMat = (c, w) => new THREE.ShaderMaterial({ uniforms: { col: { value: new THREE.Color(c) }, op: { value: 1 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      vertexShader: `varying float vY; varying vec3 vN; varying vec3 vV; void main(){ vY = position.y; vec3 p = position; p.xz *= ${w.toFixed(3)} * (0.15 + 0.85 * sqrt(max(p.y, 0.0))); vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(p, 1.0); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: 'uniform vec3 col; uniform float op; varying float vY; varying vec3 vN; varying vec3 vV; void main(){ float a = pow(1.0 - clamp(vY, 0.0, 1.0), 1.7) * (0.2 + 0.8 * abs(dot(vN, vV))) * op * 0.9; gl_FragColor = vec4(col * a, a); }' });
+    const rock = (lumps, seed) => { const g = mergeVertices(new THREE.IcosahedronGeometry(1, 4).deleteAttribute('normal').deleteAttribute('uv')), P = g.attributes.position, v = new THREE.Vector3(); let s = seed;
+      const r = () => (s = (s * 16807) % 2147483647) / 2147483647, B = [...Array(9)].map(() => [new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).normalize(), (0.4 + r()) * lumps]);
+      for (let i = 0; i < P.count; i++) { v.fromBufferAttribute(P, i); let k = 1; for (const [d, a] of B) k -= a * Math.max(0, v.dot(d) - 0.55) * 2.2; k += (r() - 0.5) * lumps * 0.08; v.multiplyScalar(k); P.setXYZ(i, v.x, v.y, v.z); }
+      g.computeVertexNormals(); return g; };
+    S.bodies.forEach((o, n) => { const comet = o.kind === 'comet', R = (o.d || (comet ? 6 : 1)) / 2, big = (o.d || 0) > 300;
+      const g = rock(big ? 0.05 : comet ? 0.22 : 0.3, 1000 + n * 77); if (o.id === 'Itokawa') g.scale(1.6, 0.8, 0.8); if (o.id === 'Eros') g.scale(1.9, 0.7, 0.7);
+      const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: comet ? 0x4a4440 : o.col, roughness: 1, metalness: 0 })); this.scene.add(mesh);
+      const it = { id: o.id, name: o.id, km: o.km, kind: comet ? 'comet' : 'asteroid', col: o.col, kep: o, R, mesh, view: comet ? Math.max(R * 8, 4e4) : R * 8, info: o.info, show: comet ? [2e7, 3e10] : [2e7, 8e9], size: comet ? 5 : 4 };
+      this.addPoint(it);
+      const pts = orbitLine(o, 60).flatMap(p => ecl(...p)), lg = new THREE.BufferGeometry(); lg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+      const l = new THREE.Line(lg, new THREE.LineDashedMaterial({ color: o.col, transparent: true, opacity: 0.3, depthWrite: false, dashSize: 0.14, gapSize: 0.09 })); l.computeLineDistances(); l.frustumCulled = false; l.userData.id = o.id; this.scene.add(l); this.sbOrbits.push(l);
+      if (comet) { const ion = new THREE.Mesh(tailGeo, tailMat('#7fc8ff', 0.035)), dust = new THREE.Mesh(tailGeo, tailMat('#ffe9b8', 0.09)), coma = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTx, color: 0xd8f4ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+        for (const m of [ion, dust, coma]) { m.frustumCulled = false; m.visible = false; this.scene.add(m); } this.tails.push({ it, ion, dust, coma }); } });
+  }
+  kepAt(o, ms) { return ecl(...kepler(o, jdOf(ms))).map(v => v * AU); }
   addBody(o) { o.body = true; o.view = o.view || o.R * 4.5; const mk = cloud([0, 0, 0], hexRGB(o.col), [o.id === 'Sun' ? 9 : 5], pointsMat(1, 1, false)); mk.renderOrder = 5; this.scene.add(mk); o.mark = mk; this.items.push(o); }
   addPoint(o) { if (!o.noMark) { const mk = cloud([0, 0, 0], hexRGB(o.col), [o.size || (o.kind === 'gcluster' ? 7 : 6)], pointsMat(1, 1, false)); this.scene.add(mk); o.mark = mk; } o.R = o.R || 1e5; o.view = o.view || o.R * 8; this.items.push(o); }
   async loadStars() { // Yale Bright Star Catalogue as a bubble of stars around the Sun (named stars at their real distance)
@@ -191,7 +215,7 @@ export class Cosmos {
     const T = (ms / 864e5 + 2440587.5 - 2451545) / 36525, P = this.pos; P.Sun = [0, 0, 0];
     for (const n of Object.keys(EL)) P[n] = helio(EL[n], T); const m = moonGeo(ms); P.Moon = [P.Earth[0] + m[0], P.Earth[1] + m[1], P.Earth[2] + m[2]];
     if (!this.galC) { const g = galDir(26000, 0, 0); this.galC = [g.x * LY, g.y * LY, g.z * LY]; }
-    for (const o of this.items) if (!o.body) P[o.id] = o.voy ? o.voy.at(ms) : o.gal ? this.galC : o.fixed;
+    for (const o of this.items) if (!o.body) P[o.id] = o.kep ? this.kepAt(o.kep, ms) : o.voy ? o.voy.at(ms) : o.gal ? this.galC : o.fixed;
     return P;
   }
   sunEcef(ms = Date.now()) { const P = this.positions(ms), s = new THREE.Vector3(P.Sun[0] - P.Earth[0], P.Sun[1] - P.Earth[1], P.Sun[2] - P.Earth[2]).normalize(); return s.applyAxisAngle(new THREE.Vector3(0, 1, 0), -gmstDeg(ms) * D2R); }
@@ -219,6 +243,11 @@ export class Cosmos {
     // orbits & belts (stored in AU, around the Sun)
     for (const l of this.orbits) { this.place(l, P.Sun, cam, S, AU); l.material.opacity = 0.5 * fade(3e6, 6e7, D, 3e11, 3e13); l.visible = l.material.opacity > 0.01; }
     for (const id in this.voy) { const l = this.voy[id].line; this.place(l, P.Sun, cam, S, AU); this.voy[id].upTo(ms); l.material.opacity = 0.75 * fade(2e6, 3e7, D, 3e12, 3e13); l.visible = l.material.opacity > 0.01; }
+    if (this.sbOrbits) { const on = this.sbOn !== false; for (const l of this.sbOrbits) { this.place(l, P.Sun, cam, S, AU); const f = l.userData.id === this.focus || (this.cardO && this.cardO.id === l.userData.id); l.material.opacity = f ? 0.8 * fade(3e5, 6e6, D, 1e11, 1e13) : 0.2 * fade(2e8, 1.5e9, D, 1e11, 1e13); l.visible = (on || f) && l.material.opacity > 0.01; }
+      for (const T of this.tails) { const p = P[T.it.id], s = P.Sun, d = new THREE.Vector3(p[0] - s[0], p[1] - s[1], p[2] - s[2]), r = d.length() / AU; d.normalize(); const L = r < 5 ? 5e7 * Math.min(1.2, 1 / (r * r)) : 0, show = L > 0 && (on || T.it.id === this.focus);
+        for (const m of [T.ion, T.dust, T.coma]) m.visible = show; if (!show) continue; const q = this.kepAt(T.it.kep, ms + 864e5), v = new THREE.Vector3(q[0] - p[0], q[1] - p[1], q[2] - p[2]).normalize(), up = new THREE.Vector3(0, 1, 0);
+        this.place(T.ion, p, cam, S, L); T.ion.quaternion.setFromUnitVectors(up, d); this.place(T.dust, p, cam, S, L * 0.6); T.dust.quaternion.setFromUnitVectors(up, d.clone().addScaledVector(v, -0.45).normalize());
+        this.place(T.coma, p, cam, S, Math.max(L * 0.012, 3e4)); const op = Math.min(1, L / 1e7); T.ion.material.uniforms.op.value = op; T.dust.material.uniforms.op.value = op; T.coma.material.opacity = Math.min(1, op * 1.5); } }
     this.place(this.moonOrbit, P.Earth, cam, S, 384400); this.moonOrbit.material.opacity = 0.4 * fade(2e4, 2e5, D, 1e7, 2e8); this.moonOrbit.visible = this.moonOrbit.material.opacity > 0.01;
     for (const [b, lo, hi] of [[this.asteroids, 3e7, 2e11], [this.kuiper, 5e8, 5e12], [this.oort, 5e10, 2e15]]) { this.place(b, P.Sun, cam, S, AU); b.material.uniforms.uOp.value = 0.8 * fade(lo, lo * 20, D, hi / 30, hi); b.visible = b.material.uniforms.uOp.value > 0.01; }
     this.place(this.helio, P.Sun, cam, S, AU); this.helio.material.opacity = 0.06 * fade(3e9, 3e10, D, 3e12, 3e13); this.helio.visible = this.helio.material.opacity > 0.003;
@@ -306,7 +335,7 @@ export class Cosmos {
   ui() {
     const d = this.uiBox = document.createElement('div'); d.className = 'cosUI'; d.hidden = true;
     d.innerHTML = `<div class="cosTop"><input id="cosFind" placeholder="🔎 ${t('Planet, star, galaxy…')}" autocomplete="off"><div id="cosFound"></div></div>
-      <div class="cosJump">${[['Earth', '🌍'], ['Moon', '🌙'], ['Sun', '☀️'], ['Mars', '🔴'], ['Jupiter', '🟠'], ['Saturn', '🪐'], ['Voyager 1', '🛰️'], ['Alpha Centauri A', '⭐'], ['Milky Way', '🌌'], ['Andromeda Galaxy', '🌀'], ['Observable universe', '🔭']].map(([id, i]) => `<button data-go="${id}" title="${esc(t(id))}">${i}</button>`).join('')}<button id="cosCon" class="on" title="${t('Constellation lines and names')}">✳️</button></div>
+      <div class="cosJump">${[['Earth', '🌍'], ['Moon', '🌙'], ['Sun', '☀️'], ['Mars', '🔴'], ['Jupiter', '🟠'], ['Saturn', '🪐'], ['Voyager 1', '🛰️'], ['Alpha Centauri A', '⭐'], ['Milky Way', '🌌'], ['Andromeda Galaxy', '🌀'], ['Observable universe', '🔭']].map(([id, i]) => `<button data-go="${id}" title="${esc(t(id))}">${i}</button>`).join('')}<button id="cosCon" class="on" title="${t('Constellation lines and names')}">✳️</button><button id="cosSB" class="on" title="${t('Comets and asteroids: orbits and tails')}">☄️</button><button id="cosLearn" title="${t('Space rocks: comets, asteroids, meteors')}">📚</button></div>
       <div class="cosCard" id="cosCard" hidden></div>
       <div class="cosBottom"><div class="cosScale"><i id="cosBar"></i><span id="cosScaleT"></span><b id="cosLevel"></b></div>
         <div class="cosTime"><button data-rate="0" title="${t('Pause')}">⏸</button><button data-rate="1" title="${t('Real time')}">▶</button><button data-rate="3600">1 h/s</button><button data-rate="86400">1 ${t('day')}/s</button><button data-rate="2592000">1 ${t('month')}/s</button><button data-rate="31557600">1 ${t('year')}/s</button><button id="cosNow" title="${t('Now')}">⟲</button><span id="cosDate"></span></div>
@@ -316,6 +345,9 @@ export class Cosmos {
     d.querySelectorAll('[data-go]').forEach(b => b.onclick = () => this.goTo(b.dataset.go));
     try { this.conOn = localStorage.getItem('cambodia3d.constellations') !== '0'; } catch (e) { } d.querySelector('#cosCon').classList.toggle('on', this.conOn !== false);
     d.querySelector('#cosCon').onclick = e => { this.conOn = this.conOn === false; e.currentTarget.classList.toggle('on', this.conOn); try { localStorage.setItem('cambodia3d.constellations', this.conOn ? '1' : '0'); } catch (er) { } };
+    try { this.sbOn = localStorage.getItem('cambodia3d.smallbodies') !== '0'; } catch (e) { } d.querySelector('#cosSB').classList.toggle('on', this.sbOn !== false);
+    d.querySelector('#cosSB').onclick = e => { this.sbOn = this.sbOn === false; e.currentTarget.classList.toggle('on', this.sbOn); try { localStorage.setItem('cambodia3d.smallbodies', this.sbOn ? '1' : '0'); } catch (er) { } };
+    d.querySelector('#cosLearn').onclick = () => this.learn();
     d.querySelectorAll('[data-rate]').forEach(b => b.onclick = () => { this.rate = +b.dataset.rate; d.querySelectorAll('[data-rate]').forEach(x => x.classList.toggle('on', x === b)); });
     d.querySelector('#cosNow').onclick = () => { this.tOff = 0; this.rate = 1; };
     d.querySelector('#cosBack').onclick = () => { if (this.focus === 'Earth' && !this.fly) this.exit(); else { this.goTo('Earth'); this.fly.d1 = 6 * ER; } };
@@ -324,15 +356,31 @@ export class Cosmos {
       box.innerHTML = L.map(o => `<div data-f="${esc(o.id)}" style="color:${o.col}">${esc(lang === 'km' && o.km ? o.km : t(o.name))} <em>${t(this.kindName(o.kind))}</em></div>`).join('') || `<div>${t('Nothing found')}</div>`;
       box.querySelectorAll('[data-f]').forEach(x => x.onclick = () => { this.goTo(x.dataset.f); f.value = ''; box.innerHTML = ''; }); };
   }
-  kindName(k) { return { star: 'Star', planet: 'Planet', dwarf: 'Dwarf planet', moon: 'Moon', probe: 'Space probe', galaxy: 'Galaxy', gcluster: 'Galaxy cluster', cluster: 'Star cluster', nebula: 'Nebula', blackhole: 'Black hole', quasar: 'Quasar', universe: 'Universe' }[k] || k; }
+  kindName(k) { return { star: 'Star', planet: 'Planet', dwarf: 'Dwarf planet', comet: 'Comet', asteroid: 'Asteroid', moon: 'Moon', probe: 'Space probe', galaxy: 'Galaxy', gcluster: 'Galaxy cluster', cluster: 'Star cluster', nebula: 'Nebula', blackhole: 'Black hole', quasar: 'Quasar', universe: 'Universe' }[k] || k; }
   card(o) { const c = this.uiBox.querySelector('#cosCard'); this.cardO = o; if (!o) { c.hidden = true; return; } c.hidden = false; this.cardT = 0; this.updCard(); }
   updCard() { const o = this.cardO, c = this.uiBox.querySelector('#cosCard'); if (!o || c.hidden) return; const p = this.pos[o.id], e = this.pos.Earth, dk = p && e ? Math.hypot(p[0] - e[0], p[1] - e[1], p[2] - e[2]) : 0, lt = lightTime(dk);
     c.innerHTML = `<div class="cosCh"><b style="color:${o.col}">${esc(lang === 'km' && o.km ? o.km : t(o.name))}</b>${o.km && lang !== 'km' ? ` <span>${esc(o.km)}</span>` : ''}<button id="cosCardX">✕</button></div><div class="cosK">${t(this.kindName(o.kind))}</div>
       ${o.id !== 'Earth' && o.id !== 'Observable universe' ? `<div>📏 ${t('Distance from Earth')}: <b>${fmtKm(dk)}</b>${lt ? ` · ${t('light takes')} ${lt}` : ''}</div>` : ''}${o.body || o.kind === 'star' ? `<div>⭕ ${t('Radius')}: ${fmtKm(o.R)}${o.id !== 'Earth' ? ` (${(o.R / ER).toFixed(o.R / ER < 10 ? 2 : 0)} × ${t('Earth')})` : ''}</div>` : ''}
       ${o.voy ? (() => { const s = this.pos.Sun, r = Math.hypot(p[0] - s[0], p[1] - s[1], p[2] - s[2]); return `<div>☀️ ${t('Distance from the Sun')}: <b>${fmtKm(r)}</b> (${(r / 1e9).toFixed(2)} ${t('billion km')})</div><div>🚀 ${t('Speed')}: ${o.voy.speed(this.now()).toFixed(1)} km/s · ${t('launched')} ${new Date(o.voy.V.launch).toISOString().slice(0, 10)}</div>`; })() : ''}
+      ${o.kep ? (() => { const k = o.kep, s = this.pos.Sun, r = Math.hypot(p[0] - s[0], p[1] - s[1], p[2] - s[2]) / AU, P = period(k), jd = jdOf(this.now()), np = dateOfJd(nextPerihelion(k, jd));
+        return `<div>☀️ ${t('Distance from the Sun')}: <b>${r.toFixed(2)} AU</b></div><div>🔄 ${isFinite(P) && P < 3000 ? `${t('Once around the Sun every')} <b>${P < 10 ? P.toFixed(1) : Math.round(P)}</b> ${t('years')}` : k.e >= 1 ? t('Open orbit: passes the Sun once and leaves') : t('Very long orbit (thousands of years)')}</div>
+          <div>📍 ${t('Closest to the Sun')}: ${k.q.toFixed(2)} AU · ${np.getTime() > this.now() ? t('next') : t('last')}: ${np.toISOString().slice(0, 10)}</div>${k.d ? `<div>📐 ${t('Size')}: ${k.d < 2 ? Math.round(k.d * 1000) + ' m' : k.d.toFixed(k.d < 20 ? 1 : 0) + ' km'}</div>` : ''}<div class="cosK">${esc(k.full)} · ${esc(t(k.cls))}${k.pha ? ' · ⚠️ ' + t('potentially hazardous') : ''}</div>
+          ${SHOWERS.filter(m => m.parent === o.id).map(m => `<div>🌠 ${t('Parent of the')} <b>${esc(lang === 'km' ? m.km : t(m.en))}</b></div>`).join('')}`; })() : ''}
       ${o.info ? `<div class="cosInfo">${esc(t(o.info))}</div>` : ''}${o.voy ? `<div class="cosVoy"><button id="cosReplay">▶ ${t('Replay the journey from 1977')}</button><button id="cosSee">🔍 ${t('See the spacecraft')}</button></div>` : ''}`;
     c.querySelector('#cosCardX').onclick = () => this.card(null);
     if (o.voy) { c.querySelector('#cosReplay').onclick = () => this.replay(o.id); c.querySelector('#cosSee').onclick = () => { this.tOff = 0; this.rate = 1; this.goTo(o.id); }; } }
+  learn() { // space rocks: what comets, asteroids, meteoroids, meteors, fireballs and meteorites are; showers; close approaches
+    const c = this.uiBox.querySelector('#cosCard'); this.cardO = null; c.hidden = false; const S = this.SB || { cad: [], fireballs: [] }, now = new Date(this.now()), nm = (en, km) => esc(lang === 'km' && km ? km : t(en));
+    const act = showerState(now).filter(o => o.active), nxt = nextShowers(now, 3), ld = v => `${v.toFixed(v < 10 ? 1 : 0)} ${t('Moon distances')}`, size = H => { const d = 1329 / Math.sqrt(0.14) * Math.pow(10, -H / 5) * 1000; return d < 1000 ? `~${Math.round(d)} m` : `~${(d / 1000).toFixed(1)} km`; };
+    const cad = S.cad.filter(a => { const [y, m, dd] = a[1].slice(0, 11).split('-'); return Date.UTC(+y, 'JanFebMarAprMayJunJulAugSepOctNovDec'.indexOf(m) / 3, +dd) >= now.getTime() - 864e5; }).sort((a, b) => a[2] - b[2]).slice(0, 5);
+    c.innerHTML = `<div class="cosCh"><b>📚 ${t('Space rocks')}</b><button id="cosCardX">✕</button></div>
+      <div class="cosLearn">${LEARN.map(([i, en, km, d, ex]) => `<div><b>${i} ${nm(en, km)}</b>${lang !== 'km' ? ` <span>${esc(km)}</span>` : ''}<p>${esc(t(d))}</p>${ex ? `<button data-ex="${ex}">${t('Show me')}: ${esc(t(ex))}</button>` : ''}</div>`).join('')}</div>
+      <div class="cosSec">🌠 ${t('Meteor showers')}</div>${act.map(o => `<div>● <b>${nm(o.s.en, o.s.km)}</b> ${t('active now')} (${t('peak')} ${o.peak.toISOString().slice(5, 10)}, ~${Math.round(o.rate)}/${t('h')})</div>`).join('')}
+      ${nxt.map(o => `<div>○ ${nm(o.s.en, o.s.km)}: ${t('peak')} ${o.next.toISOString().slice(0, 10)} · ${o.s.zhr}/${t('h')} · ${t('from')} ${esc(t(o.s.parent))}</div>`).join('')}<div class="cosK">${t('Watch them in 🌌 Night sky → Stand here and look up.')}</div>
+      ${cad.length ? `<div class="cosSec">🛰️ ${t('Asteroids passing close to Earth')}</div>${cad.map(a => `<div>${esc(a[0])} · ${esc(a[1].slice(0, 11))} · <b>${ld(a[2])}</b> · ${size(a[4])} · ${a[3]} km/s</div>`).join('')}` : ''}
+      <div class="cosK">${t('Orbits: NASA/JPL Small-Body Database (two-body orbits, dates approximate). Close approaches and')} ${S.fireballs.length} ${t('fireballs: NASA CNEOS, snapshot')} ${esc(S.fetched || '')}.</div>`;
+    c.querySelector('#cosCardX').onclick = () => this.card(null);
+    c.querySelectorAll('[data-ex]').forEach(b => b.onclick = () => this.goTo(b.dataset.ex)); }
   replay(id) { // watch both Voyagers leave Earth and swing past the giant planets, one year per second
     const V = this.voy[id].V; this.fly = null; this.tOff = V.launch - 30 * 864e5 - Date.now(); this.rate = 31557600 / 3; this.focus = 'Sun'; this.dist = 75 * AU; this.el = 0.55; this.az = 0.4; this.replaying = id;
     this.uiBox.querySelectorAll('[data-rate]').forEach(x => x.classList.remove('on')); }

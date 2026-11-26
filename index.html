@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=106">
+<link rel="stylesheet" href="css/app.css?v=107">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -304,7 +304,10 @@
         <label><input type="checkbox" data-g="storms" checked> 🌀 Tropical storms: track &amp; forecast</label>
         <label><input type="checkbox" data-g="flights" checked> ✈️ Aircraft &amp; routes</label>
         <label><input type="checkbox" data-g="radar" checked> 📡 My radar (range, sweep, targets)</label>
+        <label><input type="checkbox" data-g="atmos"> 🌫️ Layers of the atmosphere (true heights)</label>
+        <label><input type="checkbox" data-g="fireballs"> 🔥 Fireballs seen from space (NASA)</label>
       </div>
+      <div id="atmosBox" class="atmosBox" hidden></div>
       <div class="lbl" style="margin-top:6px">🛰️ Satellites (live orbits)</div>
       <div class="gchk">
         <label><input type="checkbox" data-s="resource" checked> Earth observation (Landsat, Sentinel …)</label>
@@ -326,6 +329,8 @@
       <div class="row"><input type="range" id="skHour" min="0" max="24" step="0.25" style="flex:1"><b id="skHourLbl" style="width:42px;text-align:right"></b><button id="skPlay" style="flex:0 0 auto" title="Let the night pass">▶</button></div>
       <div class="row skchips"><label><input type="checkbox" id="skLines" checked> Constellation lines</label><label><input type="checkbox" id="skNames" checked> Names</label><label><input type="checkbox" id="skInsetOn" checked> Sky chart inset</label></div>
       <div id="skBodies" class="skbodies"></div>
+      <div class="row skchips"><label><input type="checkbox" id="skMeteors" checked> 🌠 Meteors (120× faster)</label></div>
+      <div id="skShowers" class="skShowers"></div>
       <div class="row"><select id="skLang" style="flex:1" title="Chart language"><option value="both">ខ្មែរ + English</option><option value="km">ខ្មែរ</option><option value="en">English</option></select><button id="skPng">⬇ Star chart PNG</button></div>
       <div class="svhelp">Stars: Yale Bright Star Catalogue via d3-celestial (BSD-3). Planets and Moon computed in the browser (StarChart).</div>
     </div>
@@ -678,6 +683,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=106"></script>
+<script type="module" src="js/app.js?v=107"></script>
 </body>
 </html>

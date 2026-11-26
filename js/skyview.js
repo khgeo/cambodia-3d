@@ -2,8 +2,9 @@
 // planets, the Moon with its phase, constellation lines and floating names, for the area and the chosen time.
 // Scene axes: east = +x, up = +y, north = -z.
 import * as THREE from 'three';
-import { skyNow, bvColor, BODY_KM, loadSky } from './sky.js?v=106';
-import { loadConArt, buildConstellations } from './conart.js?v=106';
+import { skyNow, bvColor, BODY_KM, loadSky } from './sky.js?v=107';
+import { loadConArt, buildConstellations } from './conart.js?v=107';
+import { showerState } from './smallbodies.js?v=107';
 
 const D2R = Math.PI / 180;
 const dirOf = (alt, az) => { const a = alt * D2R, z = az * D2R; return [Math.sin(z) * Math.cos(a), Math.sin(a), -Math.cos(z) * Math.cos(a)]; };
@@ -25,6 +26,9 @@ export class SkyView {
     const cv = document.createElement('canvas'); cv.width = cv.height = 128; this.moonCv = cv;
     this.moonTex = new THREE.CanvasTexture(cv); this.moonTex.colorSpace = THREE.SRGBColorSpace;
     this.moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.moonTex, transparent: true, depthWrite: false, fog: false })); this.moon.visible = false; this.group.add(this.moon);
+    // meteors: streaks shooting out of the active showers' radiants, plus random (sporadic) ones; sped up so a few minutes show an hour
+    this.meteorsOn = true; this.mSpeed = 120; this.meteors = []; this.mGroup = new THREE.Group(); this.group.add(this.mGroup); this.mT = 0; this.mCount = 0;
+    this.mMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
     this.labels = []; this.showLines = true; this.showNames = true; this.opacity = 0;
     const host = world.renderer.domElement.parentElement; this.lab = document.createElement('div'); this.lab.className = 'skyLabels'; host.appendChild(this.lab);
   }
@@ -56,6 +60,8 @@ export class SkyView {
     // planetarium figures (translucent drawings + dotted figures) for this place and time
     if (this.ART) { if (this.art) { this.w.scene.remove(this.art.group); this.art.dispose(); }
       this.art = buildConstellations(this.ART, S, (ra, dec) => { const [alt, az] = sky.hor(ra, dec); return alt < -10 ? null : new THREE.Vector3(...dirOf(alt, az)); }, { artOpacity: 0.5, dotSize: 2.4 }); this.art.group.renderOrder = 2; this.w.scene.add(this.art.group); } // drawn after the night dome, so it is not dimmed by it
+    this.showers = showerState(date).filter(o => o.active).map(o => { const [alt, az] = sky.hor(o.s.ra, o.s.dec); return { ...o, alt, az, d: new THREE.Vector3(...dirOf(alt, az)) }; });
+    for (const o of this.showers) if (o.alt > -5) L.push({ d: dirOf(o.alt, o.az), t: '☄️ ' + (lang === 'km' ? o.s.km : o.s.en), c: 'rad' });
     for (const [id, en, ra, dec, rank] of S.cons) {
       const k = S.km[id]; if (rank > 1 && !k) continue; const [alt, az] = sky.hor(ra, dec); if (alt < 6) continue;
       L.push({ d: dirOf(alt, az), t: lang === 'km' && k ? k : k ? `${en} · ${k}` : en.replace(/ /g, ' '), c: k ? 'zod' : 'con' });
@@ -78,6 +84,7 @@ export class SkyView {
     if (!on) return; this.mat.uniforms.op.value = op; this.lineMat.opacity = 0.32 * op; this.lines.visible = this.showLines && !this.art; if (this.art) { this.art.setOpacity(this.showLines ? op : 0); this.art.group.scale.setScalar(R * 0.995); this.art.group.position.copy(cam.position); }
     this.group.position.copy(cam.position); this.pts.scale.setScalar(R); this.lines.scale.setScalar(R);
     if (this.moon.visible) { this.moon.position.copy(this.moon.userData.d).multiplyScalar(R * 0.98); const s = R * Math.tan(1.6 * D2R) * 2; this.moon.scale.set(s, s, 1); this.moon.material.opacity = Math.min(1, op * 1.2); }
+    this.stepMeteors(op);
     if (!this.showNames) return;
     const el = w.renderer.domElement, W = el.clientWidth, H = el.clientHeight, v = new THREE.Vector3(), fw = new THREE.Vector3(); cam.getWorldDirection(fw);
     const now = performance.now(); if (!this._pr || now - this._prT > 500) { this._prT = now; const hr = el.getBoundingClientRect(); this._pr = [...document.querySelectorAll('#toolbar, .toolbar, .rpanel, #skyPanel, #skyInset, #hud, .cosUI')].filter(e => !e.hidden && e.offsetParent !== null).map(e => e.getBoundingClientRect()).filter(r => r.width).map(r => [r.left - hr.left - 20, r.top - hr.top - 10, r.right - hr.left + 20, r.bottom - hr.top + 10]); }
@@ -88,6 +95,27 @@ export class SkyView {
       const sx = (v.x + 1) / 2 * W + (L.off || 7), sy = (1 - v.y) / 2 * H - 7; if (this._pr.some(r => sx > r[0] && sx < r[2] && sy > r[1] && sy < r[3])) { L.e.style.display = 'none'; continue; } // not under a panel or the toolbar
       L.e.style.display = ''; L.e.style.opacity = op; L.e.style.transform = `translate(${sx.toFixed(1)}px,${sy.toFixed(1)}px)`;
     }
+  }
+  stepMeteors(op) {
+    const now = performance.now(), dt = Math.min(0.1, this.mT ? (now - this.mT) / 1000 : 0); this.mT = now; this.mGroup.scale.setScalar((this.w.extent || 3000) * 5.9);
+    if (this.meteorsOn && op > 0.3) { const k = this.mSpeed / 3600 * dt, src = [[8, null, 40]];
+      for (const o of this.showers || []) if (o.alt > 0) src.push([o.rate * Math.sin(o.alt * D2R), o, o.s.v]);
+      for (const [rate, o, v] of src) if (Math.random() < rate * k) this.spawn(o, v); }
+    for (let i = this.meteors.length - 1; i >= 0; i--) { const m = this.meteors[i]; m.t += dt; const f = m.t / m.dur;
+      if (f >= 1) { this.mGroup.remove(m.mesh); m.mesh.geometry.dispose(); this.meteors.splice(i, 1); continue; }
+      const sH = m.s0 + m.len * f, sT = Math.max(m.s0, sH - m.trail), at = s => m.r.clone().multiplyScalar(Math.cos(s)).addScaledVector(m.t2, Math.sin(s)), h = at(sH), tl = at(sT), side = new THREE.Vector3().crossVectors(h, m.t2).normalize().multiplyScalar(m.w);
+      const P = m.mesh.geometry.attributes.position, C = m.mesh.geometry.attributes.color, b = Math.sin(Math.PI * Math.min(1, f * 1.15)) * op;
+      P.setXYZ(0, tl.x, tl.y, tl.z); P.setXYZ(1, h.x + side.x, h.y + side.y, h.z + side.z); P.setXYZ(2, h.x - side.x, h.y - side.y, h.z - side.z); P.needsUpdate = true;
+      for (const j of [1, 2]) C.setW(j, b); C.needsUpdate = true; }
+  }
+  spawn(o, v) { // a meteor moving along a great circle away from its radiant
+    const r = o ? o.d.clone() : new THREE.Vector3().randomDirection(), t2 = new THREE.Vector3().randomDirection(); t2.addScaledVector(r, -t2.dot(r)).normalize();
+    const s0 = (o ? 6 + Math.random() * 45 : Math.random() * 60) * D2R, len = (5 + Math.random() * 18) * D2R, h0 = r.clone().multiplyScalar(Math.cos(s0)).addScaledVector(t2, Math.sin(s0));
+    if (h0.y < 0.06 || this.meteors.length > 40) return; const w = (0.0012 + Math.random() * 0.002) * (Math.random() < 0.05 ? 3 : 1), om = (10 + v * 0.35) * D2R;
+    const col = o && o.s.code === 'GEM' ? [1, 0.93, 0.7] : v > 55 ? [0.8, 0.9, 1] : [1, 1, 0.92], g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(9), 3)); g.setAttribute('color', new THREE.Float32BufferAttribute([...col, 0, ...col, 1, ...col, 1], 4));
+    const mesh = new THREE.Mesh(g, this.mMat); mesh.frustumCulled = false; mesh.renderOrder = 3; this.mGroup.add(mesh); this.mCount++;
+    this.meteors.push({ r, t2, s0, len, trail: Math.min(len * 0.6, (4 + v * 0.06) * D2R), dur: len / om, t: 0, w, mesh, o });
   }
   dispose() { if (this.art) { this.w.scene.remove(this.art.group); this.art.dispose(); } this.lab.remove(); this.w.scene.remove(this.group); }
 }

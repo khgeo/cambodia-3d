@@ -4,7 +4,8 @@
 // or (with your proxy) OpenSky.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { t } from './i18n.js?v=106';
+import { t } from './i18n.js?v=107';
+import { ATM, loadSmall } from './smallbodies.js?v=107';
 
 const R_KM = 6371, D2R = Math.PI / 180;
 const GIBS = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=EPSG:4326&BBOX=-90,-180,90,180&FORMAT=';
@@ -21,7 +22,7 @@ function sunLatLon(d = new Date()) {
 
 export class Globe {
   constructor(world) {
-    this.w = world; this.on = false; this.opt = { clouds: true, night: true, wind: true, flights: true, temp: false, rain: false, storms: true, radar: true, sats: { resource: true, stations: true, visual: true, 'gps-ops': false, weather: false, starlink: false } };
+    this.w = world; this.on = false; this.opt = { clouds: true, night: true, wind: true, flights: true, temp: false, rain: false, storms: true, radar: true, atmos: false, fireballs: false, sats: { resource: true, stations: true, visual: true, 'gps-ops': false, weather: false, starlink: false } };
     const sc = this.scene = new THREE.Scene(); // the sky behind the Earth (stars, Sun, Moon, planets) is drawn by the cosmos view
     this.cam = new THREE.PerspectiveCamera(40, 1, 0.001, 200);
     this.ctl = new OrbitControls(this.cam, world.renderer.domElement); this.ctl.addEventListener('start', () => { this.followSat = null; }); this.ctl.enabled = false; this.ctl.enablePan = false; this.ctl.minDistance = 1.0003; this.ctl.maxDistance = 9; this.ctl.enableZoom = false; this.ctl.enableDamping = true; this.ctl.dampingFactor = 0.08;
@@ -79,7 +80,7 @@ export class Globe {
     if (this.on) return; const w = this.w; this.on = true; w.controls.enabled = false; this.ctl.enabled = true; this.placePlate();
     const p = xyz(this.lat, this.lon, 1); this.cam.position.copy(p.clone().multiplyScalar(1.002)); this.ctl.target.set(0, 0, 0); this.ctl.update();
     this.anim = { t: 0, from: 1.002, to: 3.4, dir: p.clone().normalize() }; this.onToggle && this.onToggle(true);
-    if (!this.loaded) { this.loaded = true; this.loadBase(); import('./cosmos.js?v=106').then(M => { this.cos = new M.Cosmos(this); }).catch(e => console.warn('cosmos', e)); this.satEvents(); }
+    if (!this.loaded) { this.loaded = true; this.loadBase(); import('./cosmos.js?v=107').then(M => { this.cos = new M.Cosmos(this); }).catch(e => console.warn('cosmos', e)); this.satEvents(); }
     this.refresh(); clearInterval(this.timer); this.timer = setInterval(() => this.refresh(), 60000);
   }
   leave() {
@@ -383,6 +384,7 @@ export class Globe {
       if (this.plate && this.cam.position.length() < 1.0012 && this.cam.position.clone().normalize().angleTo(this.plate.position.clone().normalize()) < this.plateReal * 0.8) this.leave(); }
     const [sl, so] = sunLatLon(); const s = xyz(sl, so); this.U.sun.value.copy(s); this.U.nightOn.value = this.opt.night ? 1 : 0; this.sunL.position.copy(s.clone().multiplyScalar(10));
     this.clouds.visible = this.opt.clouds; this.clouds.rotation.y += dt * 0.0; this.stepWind(Math.min(dt, 0.05)); if (this.SJ) this.stepSats(); this.stepFlights(Math.min(dt, 0.1)); this.stepRadar();
+    this.stepSpace();
     if (this.temp) this.temp.visible = this.opt.temp; if (this.rain) this.rain.visible = this.opt.rain; if (this.storms) this.storms.visible = this.opt.storms;
     if ((this.opt.wind || this.opt.temp) && this.cam.position.length() < 2.2 && (!this._detT || performance.now() - this._detT > 4000)) { this._detT = performance.now(); this.loadDetail(); }
     const dd = this.cam.position.length(), alt = dd - 1; if (this.plate) this.plate.scale.setScalar(Math.max(1, alt * 0.012 / this.plateReal));
@@ -409,7 +411,23 @@ export class Globe {
     c.innerHTML = `<div class="cosCh"><b style="color:${SAT_GROUPS[s.grp] ? SAT_GROUPS[s.grp][1] : '#fff'}">🛰️ ${s.sp ? s.sp.label : s.name}</b><button id="satX">✕</button></div><div class="cosK">${SAT_GROUPS[s.grp] ? SAT_GROUPS[s.grp][0] : ''}${s.sp && s.sp.label !== s.name ? ' · ' + s.name : ''}</div>
       <div>⬆️ ${Math.round(gd.height).toLocaleString()} km · 💨 ${sp.toFixed(2)} km/s (${Math.round(sp * 3600).toLocaleString()} km/h)</div><div>🔄 ${per.toFixed(1)} min · ∠ ${(s.rec.inclo / D2R).toFixed(1)}° · 📍 ${(gd.latitude / D2R).toFixed(2)}°, ${(gd.longitude / D2R).toFixed(2)}°</div><div class="cosInfo">${t('The view follows it. Drag or tap ✕ to stop.')}</div><div class="row" style="margin-top:6px"><button id="satClose" class="primary" style="margin:0">🔭 ${t('3D close-up')}${/ISS/.test(s.name) ? ' · ' + t('go inside') : ''}</button></div>`;
     c.querySelector('#satX').onclick = () => { this.followSat = null; this.satCard(null); };
-    c.querySelector('#satClose').onclick = async () => { if (!this.sv) { const M = await import('./satview.js?v=106'); this.sv = new M.SatView(this); } this.satCard(null); this.sv.onClose = () => { if (this.followSat) this.satCard(this.followSat); }; this.sv.open(s); }; }
+    c.querySelector('#satClose').onclick = async () => { if (!this.sv) { const M = await import('./satview.js?v=107'); this.sv = new M.SatView(this); } this.satCard(null); this.sv.onClose = () => { if (this.followSat) this.satCard(this.followSat); }; this.sv.open(s); }; }
+  // layers of the atmosphere at their true heights (thin coloured lines at the edge of the Earth) and the Kármán line
+  stepSpace() {
+    if (this.opt.atmos && !this.atmosG) { const g = this.atmosG = new THREE.Group(), geo = new THREE.SphereGeometry(1, 160, 80);
+      const shell = (km, col, op) => { const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { c: { value: new THREE.Color(col) }, op: { value: op } },
+        vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position,1.0); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
+        fragmentShader: 'uniform vec3 c; uniform float op; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 7.0); gl_FragColor = vec4(c * f * op, 1.0); }' })); m.scale.setScalar(1 + km / 6371); g.add(m); };
+      for (const [, , , top, col] of ATM) if (top <= 1000) shell(top, col, 1.6); shell(100, '#ffffff', 1.1); this.scene.add(g); }
+    if (this.atmosG) this.atmosG.visible = !!this.opt.atmos;
+    if (this.opt.fireballs && !this.fbG && !this.fbBusy) { this.fbBusy = true; loadSmall().then(S => { const g = this.fbG = new THREE.Group(), cls = [[0.1, 4, '#ffb347'], [1, 7, '#ff7a3d'], [1e9, 11, '#ff3d3d']];
+      for (const [lim, size, col] of cls) { const P = []; for (const f of S.fireballs) { const prev = cls[cls.findIndex(c => c[0] === lim) - 1]; if (f[4] <= lim && (!prev || f[4] > prev[0])) P.push(...xyz(f[1], f[2], 1.003).toArray()); }
+        const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: col, size, sizeAttenuation: false, transparent: true, opacity: 0.85, depthWrite: false }))); }
+      const big = [...S.fireballs].sort((a, b) => b[4] - a[4])[0], kh = S.fireballs.map(f => [f, Math.hypot(f[1] - 12.5, (f[2] - 105) * Math.cos(12.5 * D2R))]).sort((a, b) => a[1] - b[1])[0][0];
+      this.status.fireballs = `${S.fireballs.length} ${t('fireballs since 1988 (US government sensors, NASA CNEOS)')} · ${t('largest')}: ${big[0].slice(0, 10)}, ${big[4]} kt · ${t('nearest to Cambodia')}: ${kh[0].slice(0, 10)} (${kh[1]}°, ${kh[2]}°)`;
+      this.scene.add(g); this.fbBusy = false; }); }
+    if (this.fbG) this.fbG.visible = !!this.opt.fireballs;
+  }
   info() { const d = new Date(); return { utc: d.toISOString().slice(11, 16), ...this.status, radar: this.w.radar && this.w.radar.placed ? `Radar: ${this.w.radar.range} km, ${this.w.radar.list().length} aircraft detected` : '', sats: Object.entries(this.sats).filter(([g]) => this.opt.sats[g]).map(([g, v]) => `${SAT_GROUPS[g][0]} ${v.list.length}`).join(' · '), flights: this.status.flights || (this.nFlights ? `Aircraft: ${this.nFlights} from the radar` : '') }; }
 }
 export { SAT_GROUPS };

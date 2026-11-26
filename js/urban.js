@@ -3,7 +3,7 @@
 // network, amenity agglomerations, greenery, heat, flood exposure and persona livability – for the 3D area.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { evaluate } from './gee.js?v=106';
+import { evaluate } from './gee.js?v=107';
 
 export const CATEGORIES = ['food', 'retail', 'education', 'health', 'finance', 'leisure', 'tourism', 'services', 'worship'];
 export const CAT_ICON = { food: '🍜', retail: '🛒', education: '🏫', health: '🏥', finance: '🏦', leisure: '🎭', tourism: '🏨', services: '🏛️', worship: '🛕', transit: '🚌' };
