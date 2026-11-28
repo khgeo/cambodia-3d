@@ -4,8 +4,8 @@
 // or (with your proxy) OpenSky.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { t, lang } from './i18n.js?v=111';
-import { ATM, loadSmall } from './smallbodies.js?v=111';
+import { t, lang } from './i18n.js?v=112';
+import { ATM, loadSmall } from './smallbodies.js?v=112';
 
 const R_KM = 6371, D2R = Math.PI / 180;
 const GIBS = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=EPSG:4326&BBOX=-90,-180,90,180&FORMAT=';
@@ -22,7 +22,7 @@ function sunLatLon(d = new Date()) {
 
 export class Globe {
   constructor(world) {
-    this.w = world; this.on = false; this.opt = { clouds: true, night: true, wind: true, flights: true, temp: false, rain: false, storms: true, radar: true, live: (() => { try { return localStorage.getItem('cambodia3d.live') === '1'; } catch (e) { return false; } })(), atmos: false, fireballs: false, sats: { resource: true, stations: true, visual: true, 'gps-ops': false, weather: false, starlink: false } };
+    this.w = world; this.on = false; this.opt = { clouds: true, night: true, wind: true, flights: true, temp: false, rain: false, storms: true, radar: true, tz: false, live: (() => { try { return localStorage.getItem('cambodia3d.live') === '1'; } catch (e) { return false; } })(), atmos: false, fireballs: false, sats: { resource: true, stations: true, visual: true, 'gps-ops': false, weather: false, starlink: false } };
     const sc = this.scene = new THREE.Scene(); // the sky behind the Earth (stars, Sun, Moon, planets) is drawn by the cosmos view
     this.cam = new THREE.PerspectiveCamera(40, 1, 0.001, 200);
     this.ctl = new OrbitControls(this.cam, world.renderer.domElement); this.ctl.addEventListener('start', () => { this.followSat = null; }); this.ctl.enabled = false; this.ctl.enablePan = false; this.ctl.minDistance = 1.0003; this.ctl.maxDistance = 9; this.ctl.enableZoom = false; this.ctl.enableDamping = true; this.ctl.dampingFactor = 0.08;
@@ -80,7 +80,7 @@ export class Globe {
     if (this.on) return; const w = this.w; this.on = true; w.controls.enabled = false; this.ctl.enabled = true; this.placePlate();
     const p = xyz(this.lat, this.lon, 1); this.cam.position.copy(p.clone().multiplyScalar(1.002)); this.ctl.target.set(0, 0, 0); this.ctl.update();
     this.anim = { t: 0, from: 1.002, to: 3.4, dir: p.clone().normalize() }; this.onToggle && this.onToggle(true);
-    if (!this.loaded) { this.loaded = true; this.loadBase(); import('./cosmos.js?v=111').then(M => { this.cos = new M.Cosmos(this); }).catch(e => console.warn('cosmos', e)); this.satEvents(); }
+    if (!this.loaded) { this.loaded = true; this.loadBase(); import('./cosmos.js?v=112').then(M => { this.cos = new M.Cosmos(this); }).catch(e => console.warn('cosmos', e)); this.satEvents(); }
     this.refresh(); clearInterval(this.timer); this.timer = setInterval(() => this.refresh(), 60000);
   }
   leave() {
@@ -411,16 +411,28 @@ export class Globe {
     c.innerHTML = `<div class="cosCh"><b style="color:${SAT_GROUPS[s.grp] ? SAT_GROUPS[s.grp][1] : '#fff'}">🛰️ ${s.sp ? s.sp.label : s.name}</b><button id="satX">✕</button></div><div class="cosK">${SAT_GROUPS[s.grp] ? SAT_GROUPS[s.grp][0] : ''}${s.sp && s.sp.label !== s.name ? ' · ' + s.name : ''}</div>
       <div>⬆️ ${Math.round(gd.height).toLocaleString()} km · 💨 ${sp.toFixed(2)} km/s (${Math.round(sp * 3600).toLocaleString()} km/h)</div><div>🔄 ${per.toFixed(1)} min · ∠ ${(s.rec.inclo / D2R).toFixed(1)}° · 📍 ${(gd.latitude / D2R).toFixed(2)}°, ${(gd.longitude / D2R).toFixed(2)}°</div><div class="cosInfo">${t('The view follows it. Drag or tap ✕ to stop.')}</div><div class="row" style="margin-top:6px"><button id="satClose" class="primary" style="margin:0">🔭 ${t('3D close-up')}${/ISS/.test(s.name) ? ' · ' + t('go inside') : ''}</button></div>`;
     c.querySelector('#satX').onclick = () => { this.followSat = null; this.satCard(null); };
-    c.querySelector('#satClose').onclick = async () => { if (!this.sv) { const M = await import('./satview.js?v=111'); this.sv = new M.SatView(this); } this.satCard(null); this.sv.onClose = () => { if (this.followSat) this.satCard(this.followSat); }; this.sv.open(s); }; }
+    c.querySelector('#satClose').onclick = async () => { if (!this.sv) { const M = await import('./satview.js?v=112'); this.sv = new M.SatView(this); } this.satCard(null); this.sv.onClose = () => { if (this.followSat) this.satCard(this.followSat); }; this.sv.open(s); }; }
   // layers of the atmosphere at their true heights (thin coloured lines at the edge of the Earth) and the Kármán line
+  // time zones: coloured zones (Cambodia's UTC+7 outlined) and a live clock over each whole-hour zone
+  stepTZ() {
+    if (this.opt.tz && !this.tzG && !this.tzBusy) { this.tzBusy = true; import('./timezones.js?v=112').then(async M => { this.tzM = M; const cv = await M.tzCanvas(4096), tx = new THREE.CanvasTexture(cv); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 8;
+      const g = this.tzG = new THREE.Group(); g.add(new THREE.Mesh(new THREE.SphereGeometry(1.0025, 128, 64), new THREE.MeshBasicMaterial({ map: tx, transparent: true, depthWrite: false })));
+      this.tzLab = []; for (let o = -11; o <= 12; o++) { const c = document.createElement('canvas'); c.width = 256; c.height = 128; const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false, depthTest: true })); sp.position.copy(xyz(o === 7 ? 4 : 30, o * 15, 1.04)); sp.scale.set(0.16, 0.08, 1); sp.userData = { o, c, t }; g.add(sp); this.tzLab.push(sp); }
+      this.scene.add(g); this.tzBusy = false; this.tzT = 0; }); }
+    if (this.tzG) { this.tzG.visible = !!this.opt.tz; if (this.opt.tz && performance.now() - (this.tzT || 0) > 15000) { this.tzT = performance.now(); const now = Date.now();
+      for (const sp of this.tzLab) { const { o, c, t } = sp.userData, x = c.getContext('2d'); x.clearRect(0, 0, 256, 128); x.textAlign = 'center'; x.fillStyle = o === 7 ? 'rgba(60,45,0,.85)' : 'rgba(10,16,28,.78)'; x.beginPath(); x.roundRect(8, 8, 240, 112, 22); x.fill();
+        x.fillStyle = o === 7 ? '#ffe14d' : '#cfe3ff'; x.font = 'bold 34px system-ui'; x.fillText(this.tzM.fmtOff(o), 128, 52); x.fillStyle = '#fff'; x.font = 'bold 44px system-ui'; x.fillText(this.tzM.fmtTime(now, o), 128, 104); t.needsUpdate = true; } } }
+  }
   stepSpace() {
+    this.stepTZ();
     if (this.opt.atmos && !this.atmosG) { const g = this.atmosG = new THREE.Group(), geo = new THREE.SphereGeometry(1, 160, 80);
       const shell = (km, col, op) => { const m = new THREE.Mesh(geo, new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { c: { value: new THREE.Color(col) }, op: { value: op } },
         vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vN = normalize(normalMatrix * normal); vec4 mv = modelViewMatrix * vec4(position,1.0); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }',
         fragmentShader: 'uniform vec3 c; uniform float op; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 7.0); gl_FragColor = vec4(c * f * op, 1.0); }' })); m.scale.setScalar(1 + km / 6371); g.add(m); };
       for (const [, , , top, col] of ATM) if (top <= 1000) shell(top, col, 1.6); shell(100, '#ffffff', 1.1); this.scene.add(g); }
     const ins = !!this.opt.inside && !(this.cos && this.cos.active);
-    if (ins && !this.inside && !this.insBusy) { this.insBusy = true; import('./earthinside.js?v=111').then(M => { this.inside = new M.Inside(this); this.insM = M; const [a, b, c] = this.inside.E; this.U.ce1.value.copy(a); this.U.ce2.value.copy(b); this.U.ce3.value.copy(c); this.insideView(); }); }
+    if (ins && !this.inside && !this.insBusy) { this.insBusy = true; import('./earthinside.js?v=112').then(M => { this.inside = new M.Inside(this); this.insM = M; const [a, b, c] = this.inside.E; this.U.ce1.value.copy(a); this.U.ce2.value.copy(b); this.U.ce3.value.copy(c); this.insideView(); }); }
     if (this.inside) { this.inside.setOn(ins); this.U.cutOn.value = ins ? 1 : 0; this.U.cHalf.value = this.inside.I.U.uHalf.value; this.U.cd.value.copy(this.inside.I.hd); if (ins) { this.clouds.visible = false; for (const o of [this.flPts, this.routes]) if (o) o.visible = false; for (const T of this.tiles.values()) T.m.visible = false; if (this.windLines) this.windLines.visible = false; this.inside.frame(this.cam, this.w.renderer.domElement, (en, km) => lang === 'km' && km ? km : t(en)); }
       else if (this._insWas) { for (const T of this.tiles.values()) T.m.visible = true; for (const o of [this.flPts, this.routes]) if (o) o.visible = !!this.opt.flights; if (this.windLines) this.windLines.visible = true; } this._insWas = ins; }
     if (this.insFly) { const F = this.insFly; F.t = Math.min(1, F.t + 1 / 90); const e = F.t * F.t * (3 - 2 * F.t); this.cam.position.copy(F.a.clone().lerp(F.b, e).normalize().multiplyScalar(F.d0 + (F.d1 - F.d0) * e)); this.cam.lookAt(0, 0, 0); if (F.t >= 1) this.insFly = null; }

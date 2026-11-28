@@ -1,11 +1,11 @@
 // Trees (leafy species, sugar & coconut palms, bushes) placed from imagery canopy, and a near-camera
 // field of grass, rice and forest understory that follows the viewer.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=111';
-import { mulberry32 } from './geo.js?v=111';
-import { makeGrassMaterial } from './shaders.js?v=111';
-import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=111';
-import { FARM, riceHill, sennaGeo, bananaGeo, lilyGeo } from './ricefield.js?v=111';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js?v=112';
+import { mulberry32 } from './geo.js?v=112';
+import { makeGrassMaterial } from './shaders.js?v=112';
+import { foliageTextures, sugarPalmGeo, leafyTree, understoryKit } from './foliage.js?v=112';
+import { FARM, riceHill, sennaGeo, bananaGeo, lilyGeo } from './ricefield.js?v=112';
 
 let TEX = null;
 const texs = () => TEX || (TEX = foliageTextures());

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=111">
+<link rel="stylesheet" href="css/app.css?v=112">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -78,6 +78,7 @@
       <button id="placeBtn" data-cat="explore" data-tip="Place info: names, photos, details of any place">📍</button>
       <button id="skyBtn" data-cat="explore" data-tip="Night sky: stars, planets &amp; star chart (StarChart)">🌌</button>
       <button id="globeBtn" data-cat="explore" data-tip="Whole Earth: where this area is, live clouds, wind, satellites, flights">🌍</button>
+      <button id="arBtn" data-cat="explore" data-tip="AR Lab: seasons, Moon phases, time zones, inside the Earth, Solar System — turn, zoom, or place them in your room">🥽</button>
       <button id="sectionBtn" data-cat="explore" data-tip="Cross-section: soil &amp; geology">✂️</button>
       <button id="surveyBtn" data-cat="edit" data-tip="Survey: measure, mark &amp; go to">📐</button>
       <button id="editBtn" data-cat="edit" data-tip="Digitize: roads, buildings, trees">✏️</button>
@@ -306,10 +307,12 @@
         <label><input type="checkbox" data-g="radar" checked> 📡 My radar (range, sweep, targets)</label>
         <label><input type="checkbox" data-g="live"> 🔄 Live motion (Earth turning, everything moving)</label>
         <label class="fpsRow">⚡ <select id="spaceFps" title="Frame rate in space views"><option value="30" selected>30 fps (saves power)</option><option value="60">60 fps (smooth)</option><option value="20">20 fps (slow computer)</option></select></label>
+        <label><input type="checkbox" data-g="tz"> 🕒 Time zones (live clocks)</label>
         <label><input type="checkbox" data-g="inside"> 🌋 Inside the Earth (cutaway, animated)</label>
         <label><input type="checkbox" data-g="atmos"> 🌫️ Layers of the atmosphere (true heights)</label>
         <label><input type="checkbox" data-g="fireballs"> 🔥 Fireballs seen from space (NASA)</label>
       </div>
+      <div id="tzBox" class="atmosBox" hidden></div>
       <div id="insideBox" class="atmosBox" hidden></div>
       <div id="atmosBox" class="atmosBox" hidden></div>
       <div class="lbl" style="margin-top:6px">🛰️ Satellites (live orbits)</div>
@@ -688,6 +691,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=111"></script>
+<script type="module" src="js/app.js?v=112"></script>
 </body>
 </html>

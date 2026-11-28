@@ -6,7 +6,7 @@
 // Speed: from power and the slope (a road-bike physics model), else from the bike's own speed, else from cadence.
 // Without a bike: ↑/↓ keys or the slider pedal for you. ←/→ choose the turn at the next junction.
 import * as THREE from 'three';
-import { t } from './i18n.js?v=111';
+import { t } from './i18n.js?v=112';
 
 const FTMS = 0x1826, IBD = 0x2ad2, FCP = 0x2ad9, CPS = 0x1818, CPM = 0x2a63, CSC = 0x1816, CSCM = 0x2a5b, HRS = 0x180d, HRM = 0x2a37;
 const norm = a => ((a + 540) % 360) - 180, WHEEL = 2.105;
