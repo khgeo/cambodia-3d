@@ -20,7 +20,7 @@ const PRO = [[0, 15, 0, 2.7], [35, 500, 1, 2.9], [35.1, 500, 1, 3.3], [100, 1300
 export function profile(d) { d = Math.max(0, Math.min(RE, d)); let i = 1; while (i < PRO.length - 1 && PRO[i][0] < d) i++; const a = PRO[i - 1], b = PRO[i], f = (d - a[0]) / Math.max(1e-9, b[0] - a[0]);
   return { depth: d, T: a[1] + (b[1] - a[1]) * f, P: a[2] + (b[2] - a[2]) * f, rho: a[3] + (b[3] - a[3]) * f, layer: LAYERS.find(l => d >= l[2] && d <= l[3]) || LAYERS[6] }; }
 
-import { Interior, INTERIORS } from './interior.js?v=109';
+import { Interior, INTERIORS } from './interior.js?v=110';
 // the Earth's cutaway on the globe, opened at Cambodia, with a marker for the journey down
 export class Inside {
   constructor(globe) {

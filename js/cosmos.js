@@ -6,10 +6,10 @@
 // Frame: equatorial J2000 with y = celestial north (the globe's frame turned by the sidereal time).
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { t, lang } from './i18n.js?v=109';
-import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=109';
-import { loadConArt, buildConstellations } from './conart.js?v=109';
-import { loadSmall, kepler, orbitLine, period, nextPerihelion, dateOfJd, jdOf, LEARN, SHOWERS, nextShowers, showerState } from './smallbodies.js?v=109';
+import { t, lang } from './i18n.js?v=110';
+import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=110';
+import { loadConArt, buildConstellations } from './conart.js?v=110';
+import { loadSmall, kepler, orbitLine, period, nextPerihelion, dateOfJd, jdOf, LEARN, SHOWERS, nextShowers, showerState } from './smallbodies.js?v=110';
 
 const D2R = Math.PI / 180, AU = 1.495978707e8, LY = 9.4607e12, ER = 6371, OBL = 23.43928 * D2R;
 const rev = x => ((x % 360) + 360) % 360;
@@ -184,14 +184,28 @@ export class Cosmos {
       // the Sun sits 26,000 ly from the centre, in a gap between arms; x points from the Sun to the centre
       this.galaxy = cloud(p, c, s, pointsMat(1.6, 0.55)); this.galaxy.quaternion.setFromRotationMatrix(GAL); this.galQ = this.galaxy.quaternion.clone(); this.galSpin = 0; sc.add(this.galaxy);
       // the disc as an image: same arms and bar as the points, plus dust lanes, pink star-forming regions and the glow of billions of faint stars
-      const tx = galaxyTex({ kind: 'spiral', size: LOWG ? 1024 : 2048, arms: 4, pitch: Math.tan(12 * D2R), r0: 4500 / 52000, armA: [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2], bar: 0.2, barA: 0.47, seed: 11 });
-      this.galDisc = new THREE.Mesh(new THREE.PlaneGeometry(104000, 104000), texMat(tx)); this.galDisc.frustumCulled = false; this.galaxy.add(this.galDisc);
+      // the disc: artist's impression from Spitzer data (NASA/JPL-Caltech/ESO/R. Hurt); Sun 26,000 ly below the centre, longitude 90° to the left (seen from the north)
+      const tx = new THREE.TextureLoader().load('textures/space/milkyway_top_2k.jpg'); tx.colorSpace = THREE.SRGBColorSpace; tx.anisotropy = 8;
+      const gd = new THREE.PlaneGeometry(136000, 136000); gd.rotateZ(-Math.PI / 2);
+      this.galDisc = new THREE.Mesh(gd, texMat(tx)); this.galDisc.frustumCulled = false; this.galaxy.add(this.galDisc);
+      { const pt = new THREE.TextureLoader().load(`textures/space/milkyway_pano_${LOWG ? '2k' : '4k'}.jpg`); pt.colorSpace = THREE.SRGBColorSpace; pt.generateMipmaps = false; pt.minFilter = THREE.LinearFilter;
+        this.pano = new THREE.Mesh(new THREE.SphereGeometry(7e4, 96, 48), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, depthTest: false, uniforms: { map: { value: pt }, uOp: { value: 1 } },
+          vertexShader: 'varying vec3 vD; void main(){ vD = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+          fragmentShader: `uniform sampler2D map; uniform float uOp; varying vec3 vD; void main(){ vec3 d = normalize(vD); float l = atan(d.y, d.x), b = asin(clamp(d.z, -1.0, 1.0));
+            gl_FragColor = vec4(texture2D(map, vec2(fract(0.5 - l / 6.2831853), 0.5 + b / 3.14159265)).rgb * uOp, 1.0);
+            #include <colorspace_fragment>
+          }` })); this.pano.quaternion.setFromRotationMatrix(GAL); this.pano.renderOrder = -100; this.pano.frustumCulled = false; sc.add(this.pano); }
       this.addPoint({ id: 'Milky Way', name: 'Milky Way', km: 'កាឡាក់ស៊ីមីលគីវ៉េ', kind: 'galaxy', col: '#ffe2b8', gal: [26000, 0, 0], info: 'Our galaxy: 100,000 light-years across, 100–400 billion stars. The Sun takes 230 million years to go round once.', show: [5e17, 3e22], R: 50000 * LY, view: 2.2e18 }); }
     // other galaxies (shapes are illustrations)
     { const tmpl = (n, arms) => { const p = [], c = [], s = []; for (let i = 0; i < n; i++) { if (!arms || rnd() < 0.25) { const v = new THREE.Vector3().randomDirection().multiplyScalar(Math.abs(gauss()) * 0.25); p.push(v.x, v.y * (arms ? 0.35 : 0.8), v.z); c.push(1, 0.85, 0.6); } else { const k = ((rnd() * 2) | 0) * Math.PI, r = 0.1 + Math.pow(rnd(), 0.8) * 0.9, th = Math.log(r / 0.1) / 0.3 + k + gauss() * 0.25; p.push(r * Math.cos(th), gauss() * 0.02, r * Math.sin(th)); c.push(0.7, 0.8, 1); } s.push(0.8 + rnd()); } return [p, c, s]; };
       const SP = tmpl(6000, true), EL2 = tmpl(3000, false), IR = tmpl(2000, false), GT = {};
+      const PHOTO = { 'Andromeda Galaxy': ['m31_2k.jpg', 2.44], 'Bode\'s Galaxy (M81)': ['m81_1k.jpg', 3.6], 'Whirlpool Galaxy (M51)': ['m51_1k.jpg', 2.2] }; // ESA/Hubble & DSS2; N.A. Sharp/NOIRLab/NSF/AURA; NASA, ESA, S. Beckwith & Hubble Heritage Team
       for (const [n, ra, dec, ly, kind, size, col, info, show] of DEEP) { const d = dirRD(ra, dec), o = { id: n, name: n, kind, col, fixed: d.map(v => v * ly * LY), info, show, R: size * LY, view: Math.max(size * 6, 0.00001) * LY };
-        if (kind === 'galaxy') { const [p, c, s] = /Magellanic/.test(n) ? IR : /Sombrero|Centaurus|GN-z11/.test(n) ? EL2 : SP; const tint = hexRGB(col), cc = c.map((v, i) => v * tint[i % 3]); const m = cloud(p, cc, s, pointsMat(1.1, 0.45)); m.quaternion.setFromEuler(new THREE.Euler(rnd() * 3, rnd() * 3, rnd() * 3)); sc.add(m); o.cloud = m; o.cloudR = size * LY;
+        if (kind === 'galaxy') { const [p, c, s] = /Magellanic/.test(n) ? IR : /Sombrero|Centaurus|GN-z11/.test(n) ? EL2 : SP; const tint = hexRGB(col), cc = c.map((v, i) => v * tint[i % 3]); const m = cloud(p, cc, s, pointsMat(1.1, 0.45)), ph = PHOTO[n]; m.quaternion.setFromEuler(new THREE.Euler(rnd() * 3, rnd() * 3, rnd() * 3)); sc.add(m); o.cloud = m; o.cloudR = size * LY;
+          if (ph) { // a real photograph, hung facing the Milky Way with north up (as we see it from Earth)
+            m.quaternion.identity(); m.material.visible = false; m.userData.photo = true; const dv = new THREE.Vector3(...dirRD(ra, dec)), north = new THREE.Vector3(0, 1, 0).addScaledVector(dv, -dv.y).normalize(), west = new THREE.Vector3(Math.sin(ra * D2R), 0, Math.cos(ra * D2R)).addScaledVector(dv, 0).normalize();
+            const g2 = new THREE.PlaneGeometry(ph[1], ph[1]); g2.applyMatrix4(new THREE.Matrix4().makeBasis(west, north, dv.clone().negate())); const pt = TL.load('textures/space/' + ph[0]); pt.colorSpace = THREE.SRGBColorSpace; pt.anisotropy = 8;
+            const im = new THREE.Mesh(g2, texMat(pt)); im.userData.n = dv; im.frustumCulled = false; m.add(im); m.userData.im = im; this.addPoint(o); continue; }
           const type = /Magellanic/.test(n) ? 'irr' : /Sombrero/.test(n) ? 'sombrero' : /Centaurus|GN-z11/.test(n) ? 'ell' : 'spiral', key = type;
           GT[key] = GT[key] || (type === 'spiral' ? galaxyTex({ kind: 'spiral', size: 1024, arms: 2, pitch: 0.3, r0: 0.1, seed: 5, flip: true }) : type === 'irr' ? galaxyTex({ kind: 'irr', size: 512, seed: 9 }) : galaxyTex({ kind: 'elliptical', size: 512, q: type === 'sombrero' ? 0.45 : 0.8, lane: type === 'sombrero', seed: 3 }));
           let im; if (type === 'spiral') { const g2 = new THREE.PlaneGeometry(2.2, 2.2); g2.rotateX(-Math.PI / 2); im = new THREE.Mesh(g2, texMat(GT[key], { color: new THREE.Color(col).lerp(new THREE.Color('#ffffff'), 0.6) })); }
@@ -282,7 +296,7 @@ export class Cosmos {
         else if (o.voy) { const e = P.Earth, v = new THREE.Vector3(e[0] - p[0], e[1] - p[1], e[2] - p[2]).normalize(); o.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), v); o.mesh.visible = !bg; }
         else if (o.mesh.userData.pole && this.SPIN[o.id]) o.mesh.quaternion.copy(o.mesh.userData.pole).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), (ms / 3.6e6 / this.SPIN[o.id]) % 1 * 2 * Math.PI)); }
       if (o.mark) { this.place(o.mark, p, cam, S); if (bg && o.id === 'Earth') { o.mark.visible = false; continue; } o.mark.visible = true; o.mark.material.uniforms.uOp.value = o.mesh ? Math.max(0, 1 - (o.R * S / Math.max(Lp, 1e-9)) / 0.006) : (o.show ? fade(o.show[0] / 30, o.show[0], D, o.show[1], o.show[1] * 30) : 1); }
-      if (o.cloud) { this.place(o.cloud, p, cam, S, o.cloudR); o.cloud.material.uniforms.uOp.value = 0.75 * fade(o.cloudR * 2, o.cloudR * 30, D, 1e30, 1e31); const im = o.cloud.userData.im; if (im) { let k = 0.95 * fade(o.cloudR * 0.5, o.cloudR * 2.5, D, 1e30, 1e31); if (im.isMesh) { const n = new THREE.Vector3(0, 1, 0).applyQuaternion(o.cloud.quaternion), vw = o.cloud.position.clone().normalize(); k *= THREE.MathUtils.smoothstep(Math.abs(n.dot(vw)), 0.08, 0.4); } im.material.opacity = k; im.visible = k > 0.01; } } }
+      if (o.cloud) { this.place(o.cloud, p, cam, S, o.cloudR); o.cloud.material.uniforms.uOp.value = 0.75 * fade(o.cloudR * 2, o.cloudR * 30, D, 1e30, 1e31); const im = o.cloud.userData.im; if (im) { let k = 0.95 * fade(o.cloudR * 0.5, o.cloudR * 2.5, D, 1e30, 1e31); if (im.isMesh) { const n = im.userData.n || new THREE.Vector3(0, 1, 0).applyQuaternion(o.cloud.quaternion), vw = o.cloud.position.clone().normalize(); k *= THREE.MathUtils.smoothstep(Math.abs(n.dot(vw)), 0.08, 0.4); } im.material.opacity = k; im.visible = k > 0.01; } } }
     if (this.interior) { const I = this.interior, o = this.item(I.id), p = P[I.id]; I.I.group.visible = !bg; if (o && p && !bg) { this.place(I.I.group, p, cam, S, o.R); o.mesh.visible = false; } }
     this.place(this.sunLight, P.Sun, cam, S); this.g.U.sun.value.set(...(() => { const s = [P.Sun[0] - P.Earth[0], P.Sun[1] - P.Earth[1], P.Sun[2] - P.Earth[2]], L = Math.hypot(...s); const v = new THREE.Vector3(s[0] / L, s[1] / L, s[2] / L).applyAxisAngle(new THREE.Vector3(0, 1, 0), -G); return [v.x, v.y, v.z]; })());
     // orbits & belts (stored in AU, around the Sun)
@@ -298,14 +312,16 @@ export class Cosmos {
     this.place(this.helio, P.Sun, cam, S, AU); this.helio.material.opacity = 0.06 * fade(3e9, 3e10, D, 3e12, 3e13); this.helio.visible = this.helio.material.opacity > 0.003;
     { const op = this.conOn === false ? 0 : 0.35 * fade(1, 2, D, 2e11, 3e13); this.conOp = op; if (this.con) this.con.setOpacity(op / 0.35); }
     if (this.stars) { this.place(this.stars, P.Sun, cam, S, LY); this.stars.material.uniforms.uOp.value = fade(1, 2, D, 3e16, 5e17) || (D < 1 ? 1 : 0); }
-    this.place(this.galaxy, this.galC, cam, S, LY); this.galaxy.material.uniforms.uOp.value = 0.12 + 0.6 * fade(1e15, 3e17, D, 1e21, 3e22); this.galaxy.material.uniforms.uSize.value = D < 1e17 ? 2.2 : 1.6; this.galDisc.material.opacity = 0.95 * fade(3e16, 3e17, D, 1e21, 3e22) * THREE.MathUtils.smoothstep(Math.abs(new THREE.Vector3(0, 0, 1).applyQuaternion(this.galaxy.quaternion).dot(this.galaxy.position.clone().normalize())), 0.06, 0.3); this.galDisc.visible = this.galDisc.material.opacity > 0.01;
+    this.place(this.galaxy, this.galC, cam, S, LY);  this.galaxy.material.uniforms.uSize.value = D < 1e17 ? 2.2 : 1.6; { const ef = THREE.MathUtils.smoothstep(Math.abs(new THREE.Vector3(0, 0, 1).applyQuaternion(this.galaxy.quaternion).dot(this.galaxy.position.clone().normalize())), 0.06, 0.3), fo = fade(1e16, 3e17, D, 1e21, 3e22);
+      this.galDisc.material.opacity = fo * ef; this.galaxy.material.uniforms.uOp.value = 0.5 * fo * (1 - ef * 0.9); // edge-on: the stars show the thin disc
+      const pk = Math.max(0, Math.min(1, Math.log(3e17 / D) / Math.log(30))); this.pano.material.uniforms.uOp.value = pk; this.pano.visible = pk > 0.01; } this.galDisc.visible = this.galDisc.material.opacity > 0.01;
     this.place(this.web, P.Sun, cam, S, LY); this.web.material.uniforms.uOp.value = 0.7 * fade(3e19, 1e21, D, 1e30, 1e31); this.web.visible = this.web.material.uniforms.uOp.value > 0.01;
     this.place(this.cmb, P.Sun, cam, S, 4.4e23); this.cmb.material.uniforms.uOp.value = 0.5 * fade(2e22, 3e23, D, 1e30, 1e31); this.cmb.visible = this.cmb.material.uniforms.uOp.value > 0.01;
     return D;
   }
   frame(dt) {
     const live = !!this.g.opt.live, rr = live && this.rate === 1 ? 600 : this.rate; if (rr) this.tOff += dt * 1000 * rr; // live: time runs 10 min per second, planets spin, galaxies turn
-    if (live) { this.galSpin += dt * 0.015; this.galaxy.quaternion.copy(this.galQ).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), this.galSpin)); for (const o of this.items) if (o.cloud && o.kind === 'galaxy') o.cloud.rotateY(dt * 0.03); } const w = this.w, el = w.renderer.domElement, asp = el.clientWidth / Math.max(1, el.clientHeight); if (this.cam.aspect !== asp) { this.cam.aspect = asp; this.cam.updateProjectionMatrix(); }
+    if (live) { for (const o of this.items) if (o.cloud && o.kind === 'galaxy' && !o.cloud.userData.photo) o.cloud.rotateY(dt * 0.03); } const w = this.w, el = w.renderer.domElement, asp = el.clientWidth / Math.max(1, el.clientHeight); if (this.cam.aspect !== asp) { this.cam.aspect = asp; this.cam.updateProjectionMatrix(); }
     const ms = this.now(); this.positions(ms);
     if (this.fly) { const F = this.fly; F.t = Math.min(1, F.t + dt / F.dur); const e = F.t * F.t * (3 - 2 * F.t), to = this.pos[F.to] || F.b; F.cur = [0, 1, 2].map(i => F.a[i] + (to[i] - F.a[i]) * e);
       this.dist = Math.exp(Math.log(F.d0) + (Math.log(F.d1) - Math.log(F.d0)) * e + F.hump * Math.sin(Math.PI * e)); this.az = F.az0 + F.dAz * e; this.el = F.el0 + F.dEl * e; if (F.t >= 1) { this.focus = F.to; this.fly = null; } }
@@ -364,6 +380,7 @@ export class Cosmos {
     this.active = false; this.fly = null; this.tOff = 0; this.rate = 0; this.uiBox.hidden = true; this.g.cam.position.copy(v.setLength(Math.min(7.4, v.length()))); this.g.cam.lookAt(0, 0, 0); this.g.ctl.enabled = true; this.g.ctl.update(); document.body.classList.remove('cosmos-on'); this.card(null); this.g.onCosmos && this.g.onCosmos(false); }
   goTo(id) { const o = this.item(id); if (!o) return; if (this.interior && this.interior.id !== id) this.closeInterior(); this.positions(this.now()); const a = this.focusPos().slice(), b = this.pos[id], sep = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), d0 = this.dist, d1 = Math.max(o.view, o.R * 3);
     const hump = Math.max(0, Math.log(sep * 1.4 / Math.max(d0, d1))); let az1 = this.az, el1 = this.el; if ((o.body || o.voy) && id !== 'Sun' && id !== 'Earth') { const s = new THREE.Vector3(-b[0], -b[1], -b[2]).normalize().applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.6); az1 = Math.atan2(s.x, s.z); el1 = Math.max(-0.5, Math.min(0.5, Math.asin(s.y) + 0.25)); } // look at the sunlit side
+    if (o.cloud && o.cloud.userData.photo) { const s = new THREE.Vector3(-b[0], -b[1], -b[2]).normalize(); az1 = Math.atan2(s.x, s.z) + 0.15; el1 = Math.asin(s.y) + 0.1; } // photographed galaxies: come in from our side, as the photo was taken
     let dAz = ((az1 - this.az) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
     this.fly = { a, b, to: id, cur: a, t: 0, d0, d1, hump, dur: 2.2 + Math.min(4, hump * 0.35), az0: this.az, dAz, el0: this.el, dEl: el1 - this.el }; this.card(o); }
   events() {
@@ -386,7 +403,7 @@ export class Cosmos {
       <div class="cosCard" id="cosCard" hidden></div><div class="cosCard cosInt" id="cosInt" hidden></div>
       <div class="cosBottom"><div class="cosScale"><i id="cosBar"></i><span id="cosScaleT"></span><b id="cosLevel"></b></div>
         <div class="cosTime"><button data-rate="0" title="${t('Pause')}">⏸</button><button data-rate="1" title="${t('Real time')}">▶</button><button data-rate="3600">1 h/s</button><button data-rate="86400">1 ${t('day')}/s</button><button data-rate="2592000">1 ${t('month')}/s</button><button data-rate="31557600">1 ${t('year')}/s</button><button id="cosNow" title="${t('Now')}">⟲</button><span id="cosDate"></span></div>
-        <div class="cosNote">${t('Planets: JPL orbital elements · stars: Yale Bright Star Catalogue · the Milky Way, galaxy shapes and the cosmic web are illustrations.')} ${t('Surface maps: Solar System Scope (CC BY 4.0), from NASA data.')} ${t('Constellation figures: Stellarium (Free Art License).')}</div></div>
+        <div class="cosNote">${t('Planets: JPL orbital elements · stars: Yale Bright Star Catalogue · Milky Way: all-sky photo ESO/S. Brunier, map NASA/JPL-Caltech/ESO/R. Hurt (artist’s impression) · galaxy photos: ESA/Hubble & DSS2 (M31), N.A. Sharp/NOIRLab/NSF/AURA (M81), NASA, ESA, S. Beckwith & Hubble Heritage Team (M51), CC BY 4.0 · other galaxy shapes and the cosmic web are illustrations.')} ${t('Surface maps: Solar System Scope (CC BY 4.0), from NASA data.')} ${t('Constellation figures: Stellarium (Free Art License).')}</div></div>
       <button class="cosBack" id="cosBack">🌍 ${t('Back to Earth')}</button>`;
     document.body.appendChild(d);
     d.querySelectorAll('[data-go]').forEach(b => b.onclick = () => this.goTo(b.dataset.go));
@@ -438,7 +455,7 @@ export class Cosmos {
     const n = Math.pow(10, Math.floor(Math.log10(km))), nice = [1, 2, 5].map(k => k * n).filter(v => v <= km).pop() || n; this.uiBox.querySelector('#cosBar').style.width = (nice / km * px).toFixed(0) + 'px'; this.uiBox.querySelector('#cosScaleT').textContent = fmtKm(nice);
     const fo = this.item(this.focus); this.uiBox.querySelector('#cosLevel').textContent = fo && fo.body && D < fo.R * 60 ? (lang === 'km' && fo.km ? fo.km : t(fo.name)) : t(SCALES.find(([v]) => D < v)[1]); const dt = new Date(this.now()); this.uiBox.querySelector('#cosDate').textContent = dt.toISOString().slice(0, 16).replace('T', ' ') + ' UTC'; }
   hideLabels() { this.labelBox.hidden = true; this.uiBox.hidden = true; this.closeInterior(); }
-  async openInterior(o) { this.closeInterior(); const M = await import('./interior.js?v=109'), def = M.INTERIORS[o.id]; if (!def || !o.mesh) return;
+  async openInterior(o) { this.closeInterior(); const M = await import('./interior.js?v=110'), def = M.INTERIORS[o.id]; if (!def || !o.mesh) return;
     this.positions(this.now()); const p = this.pos[o.id], c = this.camAbs(), d = new THREE.Vector3(c[0] - p[0], c[1] - p[1], c[2] - p[2]).normalize();
     const I = new M.Interior(def, { E: M.octant(d), surface: U => M.cutMaterial(o.mesh.material, U), surfRot: o.mesh.quaternion.clone(), parent: this.scene }); I.setOn(true); this.interior = { I, id: o.id };
     const b = this.uiBox.querySelector('#cosInt'), nm = (en, km) => esc(lang === 'km' && km ? km : t(en)); b.hidden = false;

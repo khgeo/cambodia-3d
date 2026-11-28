@@ -4,8 +4,8 @@
 // or (with your proxy) OpenSky.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { t, lang } from './i18n.js?v=109';
-import { ATM, loadSmall } from './smallbodies.js?v=109';
+import { t, lang } from './i18n.js?v=110';
+import { ATM, loadSmall } from './smallbodies.js?v=110';
 
 const R_KM = 6371, D2R = Math.PI / 180;
 const GIBS = 'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&CRS=EPSG:4326&BBOX=-90,-180,90,180&FORMAT=';
@@ -80,7 +80,7 @@ export class Globe {
     if (this.on) return; const w = this.w; this.on = true; w.controls.enabled = false; this.ctl.enabled = true; this.placePlate();
     const p = xyz(this.lat, this.lon, 1); this.cam.position.copy(p.clone().multiplyScalar(1.002)); this.ctl.target.set(0, 0, 0); this.ctl.update();
     this.anim = { t: 0, from: 1.002, to: 3.4, dir: p.clone().normalize() }; this.onToggle && this.onToggle(true);
-    if (!this.loaded) { this.loaded = true; this.loadBase(); import('./cosmos.js?v=109').then(M => { this.cos = new M.Cosmos(this); }).catch(e => console.warn('cosmos', e)); this.satEvents(); }
+    if (!this.loaded) { this.loaded = true; this.loadBase(); import('./cosmos.js?v=110').then(M => { this.cos = new M.Cosmos(this); }).catch(e => console.warn('cosmos', e)); this.satEvents(); }
     this.refresh(); clearInterval(this.timer); this.timer = setInterval(() => this.refresh(), 60000);
   }
   leave() {
@@ -411,7 +411,7 @@ export class Globe {
     c.innerHTML = `<div class="cosCh"><b style="color:${SAT_GROUPS[s.grp] ? SAT_GROUPS[s.grp][1] : '#fff'}">🛰️ ${s.sp ? s.sp.label : s.name}</b><button id="satX">✕</button></div><div class="cosK">${SAT_GROUPS[s.grp] ? SAT_GROUPS[s.grp][0] : ''}${s.sp && s.sp.label !== s.name ? ' · ' + s.name : ''}</div>
       <div>⬆️ ${Math.round(gd.height).toLocaleString()} km · 💨 ${sp.toFixed(2)} km/s (${Math.round(sp * 3600).toLocaleString()} km/h)</div><div>🔄 ${per.toFixed(1)} min · ∠ ${(s.rec.inclo / D2R).toFixed(1)}° · 📍 ${(gd.latitude / D2R).toFixed(2)}°, ${(gd.longitude / D2R).toFixed(2)}°</div><div class="cosInfo">${t('The view follows it. Drag or tap ✕ to stop.')}</div><div class="row" style="margin-top:6px"><button id="satClose" class="primary" style="margin:0">🔭 ${t('3D close-up')}${/ISS/.test(s.name) ? ' · ' + t('go inside') : ''}</button></div>`;
     c.querySelector('#satX').onclick = () => { this.followSat = null; this.satCard(null); };
-    c.querySelector('#satClose').onclick = async () => { if (!this.sv) { const M = await import('./satview.js?v=109'); this.sv = new M.SatView(this); } this.satCard(null); this.sv.onClose = () => { if (this.followSat) this.satCard(this.followSat); }; this.sv.open(s); }; }
+    c.querySelector('#satClose').onclick = async () => { if (!this.sv) { const M = await import('./satview.js?v=110'); this.sv = new M.SatView(this); } this.satCard(null); this.sv.onClose = () => { if (this.followSat) this.satCard(this.followSat); }; this.sv.open(s); }; }
   // layers of the atmosphere at their true heights (thin coloured lines at the edge of the Earth) and the Kármán line
   stepSpace() {
     if (this.opt.atmos && !this.atmosG) { const g = this.atmosG = new THREE.Group(), geo = new THREE.SphereGeometry(1, 160, 80);
@@ -420,7 +420,7 @@ export class Globe {
         fragmentShader: 'uniform vec3 c; uniform float op; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(1.0 - abs(dot(vN, vV)), 7.0); gl_FragColor = vec4(c * f * op, 1.0); }' })); m.scale.setScalar(1 + km / 6371); g.add(m); };
       for (const [, , , top, col] of ATM) if (top <= 1000) shell(top, col, 1.6); shell(100, '#ffffff', 1.1); this.scene.add(g); }
     const ins = !!this.opt.inside && !(this.cos && this.cos.active);
-    if (ins && !this.inside && !this.insBusy) { this.insBusy = true; import('./earthinside.js?v=109').then(M => { this.inside = new M.Inside(this); this.insM = M; const [a, b, c] = this.inside.E; this.U.ce1.value.copy(a); this.U.ce2.value.copy(b); this.U.ce3.value.copy(c); this.insideView(); }); }
+    if (ins && !this.inside && !this.insBusy) { this.insBusy = true; import('./earthinside.js?v=110').then(M => { this.inside = new M.Inside(this); this.insM = M; const [a, b, c] = this.inside.E; this.U.ce1.value.copy(a); this.U.ce2.value.copy(b); this.U.ce3.value.copy(c); this.insideView(); }); }
     if (this.inside) { this.inside.setOn(ins); this.U.cutOn.value = ins ? 1 : 0; this.U.cHalf.value = this.inside.I.U.uHalf.value; this.U.cd.value.copy(this.inside.I.hd); if (ins) { this.clouds.visible = false; for (const o of [this.flPts, this.routes]) if (o) o.visible = false; for (const T of this.tiles.values()) T.m.visible = false; if (this.windLines) this.windLines.visible = false; this.inside.frame(this.cam, this.w.renderer.domElement, (en, km) => lang === 'km' && km ? km : t(en)); }
       else if (this._insWas) { for (const T of this.tiles.values()) T.m.visible = true; for (const o of [this.flPts, this.routes]) if (o) o.visible = !!this.opt.flights; if (this.windLines) this.windLines.visible = true; } this._insWas = ins; }
     if (this.insFly) { const F = this.insFly; F.t = Math.min(1, F.t + 1 / 90); const e = F.t * F.t * (3 - 2 * F.t); this.cam.position.copy(F.a.clone().lerp(F.b, e).normalize().multiplyScalar(F.d0 + (F.d1 - F.d0) * e)); this.cam.lookAt(0, 0, 0); if (F.t >= 1) this.insFly = null; }

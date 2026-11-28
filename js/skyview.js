@@ -2,9 +2,9 @@
 // planets, the Moon with its phase, constellation lines and floating names, for the area and the chosen time.
 // Scene axes: east = +x, up = +y, north = -z.
 import * as THREE from 'three';
-import { skyNow, bvColor, BODY_KM, loadSky } from './sky.js?v=109';
-import { loadConArt, buildConstellations } from './conart.js?v=109';
-import { showerState } from './smallbodies.js?v=109';
+import { skyNow, bvColor, BODY_KM, loadSky } from './sky.js?v=110';
+import { loadConArt, buildConstellations } from './conart.js?v=110';
+import { showerState } from './smallbodies.js?v=110';
 
 const D2R = Math.PI / 180;
 const dirOf = (alt, az) => { const a = alt * D2R, z = az * D2R; return [Math.sin(z) * Math.cos(a), Math.sin(a), -Math.cos(z) * Math.cos(a)]; };
@@ -18,7 +18,7 @@ void main(){ float d = length(gl_PointCoord - 0.5) * 2.0; float core = smoothste
 
 export class SkyView {
   constructor(world) {
-    this.w = world; this.group = new THREE.Group(); this.group.visible = false; this.group.renderOrder = -1; world.scene.add(this.group);
+    this.w = world; this.group = new THREE.Group(); this.group.visible = false; this.group.renderOrder = 1; world.scene.add(this.group); // drawn after the night dome (atmos.js), so the photo and stars are not covered
     this.mat = new THREE.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: { op: { value: 1 }, pr: { value: world.renderer.getPixelRatio() } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
     this.pts = new THREE.Points(new THREE.BufferGeometry(), this.mat); this.pts.frustumCulled = false; this.group.add(this.pts);
     this.lineMat = new THREE.LineBasicMaterial({ color: 0x5f8fe0, transparent: true, opacity: 0.32, depthWrite: false, fog: false });
@@ -29,14 +29,33 @@ export class SkyView {
     // meteors: streaks shooting out of the active showers' radiants, plus random (sporadic) ones; sped up so a few minutes show an hour
     this.meteorsOn = true; this.mSpeed = 120; this.meteors = []; this.mGroup = new THREE.Group(); this.group.add(this.mGroup); this.mT = 0; this.mCount = 0;
     this.mMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
+    // the real Milky Way: ESO all-sky photo (S. Brunier, CC BY 4.0) in galactic coordinates, turned to this place and time
+    this.style = (() => { try { return localStorage.getItem('cambodia3d.skyStyle') || 'photo'; } catch (e) { return 'photo'; } })();
+    this.PU = { map: { value: null }, gx: { value: new THREE.Vector3(1, 0, 0) }, gy: { value: new THREE.Vector3(0, 1, 0) }, gz: { value: new THREE.Vector3(0, 0, 1) }, uOp: { value: 0 }, gain: { value: 1.8 }, sat: { value: 1.4 }, glow: { value: 1 } };
+    this.pano = new THREE.Mesh(new THREE.SphereGeometry(1, 96, 48), new THREE.ShaderMaterial({ uniforms: this.PU, side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+      vertexShader: 'varying vec3 vD; void main(){ vD = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `uniform sampler2D map; uniform vec3 gx, gy, gz; uniform float uOp, gain, sat, glow; varying vec3 vD;
+        void main(){ vec3 d = normalize(vD); float l = atan(dot(d, gy), dot(d, gx)), b = asin(clamp(dot(d, gz), -1.0, 1.0)); vec3 c = texture2D(map, vec2(fract(0.5 - l / 6.2831853), 0.5 + b / 3.14159265)).rgb;
+          float y = lum(c); c = max(vec3(0.0), mix(vec3(y), c, sat)) * gain; c = c / (1.0 + c * 0.6); // stretch, keeping the bright core from burning out
+          float h = clamp(d.y, 0.0, 1.0); c *= smoothstep(-0.01, 0.3, d.y) * 0.75 + 0.25 * step(0.0, d.y); // thicker air near the horizon
+          c += glow * (vec3(0.02, 0.06, 0.05) * pow(1.0 - h, 6.0) + vec3(0.01, 0.015, 0.04) * (1.0 - h)); // airglow
+          gl_FragColor = vec4(c * uOp * step(-0.02, d.y), 1.0);
+          #include <colorspace_fragment>
+        }`.replace('void main(){', 'float lum(vec3 c){ return dot(c, vec3(0.299, 0.587, 0.114)); }\n        void main(){') }));
+    this.pano.renderOrder = -2; this.pano.frustumCulled = false; this.group.add(this.pano); this.setStyle(this.style);
     this.labels = []; this.showLines = true; this.showNames = true; this.opacity = 0;
     const host = world.renderer.domElement.parentElement; this.lab = document.createElement('div'); this.lab.className = 'skyLabels'; host.appendChild(this.lab);
   }
+  setStyle(st) { this.style = st; try { localStorage.setItem('cambodia3d.skyStyle', st); } catch (e) { }
+    const P = { photo: [4.2, 1.45, 1], natural: [1.3, 0.75, 0.3], chart: [0, 1, 0] }[st] || [4.2, 1.45, 1]; this.PU.gain.value = P[0]; this.PU.sat.value = P[1]; this.PU.glow.value = P[2]; this.pano.visible = st !== 'chart';
+    if (st !== 'chart' && !this.PU.map.value) { const lo = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4, t = new THREE.TextureLoader().load(`textures/space/milkyway_pano_${lo ? '2k' : '4k'}.jpg`); t.colorSpace = THREE.SRGBColorSpace; t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; this.PU.map.value = t; } }
   async load() { this.S = this.S || await loadSky(); this.ART = this.ART || await loadConArt(); return this.S; }
   // rebuild for a place and time
   update(lat, lon, date, lang) {
     const S = this.S; if (!S) return; this.lat = lat; this.lon = lon; this.date = date; this.lang = lang;
     const sky = this.sky = skyNow(S, lat, lon, date), P = [], C = [], Z = [], L = [];
+    { const v = (ra, dec) => { const [alt, az] = sky.hor(ra, dec); return new THREE.Vector3(...dirOf(alt + 0, az)); }; // galactic centre and north pole (J2000) in this sky; refraction ignored
+      const [a1, z1] = sky.hor(266.405, -28.936), [a2, z2] = sky.hor(192.859, 27.128); this.PU.gx.value.set(...dirOf(a1, z1)).normalize(); this.PU.gz.value.set(...dirOf(a2, z2)).normalize(); this.PU.gy.value.crossVectors(this.PU.gz.value, this.PU.gx.value).normalize(); }
     for (const s of sky.stars) {
       if (s.mag > 6 || s.alt < -1) continue; const [r, g, b] = bvColor(s.bv), k = Math.min(1.35, 0.6 + Math.pow(10, -0.4 * (s.mag - 2)) * 0.55);
       P.push(...dirOf(s.alt, s.az)); C.push(r / 255 * k, g / 255 * k, b / 255 * k); Z.push(Math.max(2.2, Math.min(10, (6.8 - s.mag) * 1.45)));
@@ -81,8 +100,8 @@ export class SkyView {
   // each frame: follow the camera (the sky is infinitely far) and place the names
   frame(op) {
     const w = this.w, cam = w.camera, R = (w.extent || 3000) * 6, on = op > 0.02; this.group.visible = on; if (this.art && !on) this.art.group.visible = false; this.lab.style.display = on && this.showNames ? '' : 'none';
-    if (!on) return; this.mat.uniforms.op.value = op; this.lineMat.opacity = 0.32 * op; this.lines.visible = this.showLines && !this.art; if (this.art) { this.art.setOpacity(this.showLines ? op : 0); this.art.group.scale.setScalar(R * 0.995); this.art.group.position.copy(cam.position); }
-    this.group.position.copy(cam.position); this.pts.scale.setScalar(R); this.lines.scale.setScalar(R);
+    if (!on) return; this.mat.uniforms.op.value = op; this.lineMat.opacity = 0.32 * op; this.lines.visible = this.showLines && !this.art; if (this.art) { this.art.setOpacity(this.showLines ? op * (this.style === 'photo' ? 0.45 : 1) : 0); this.art.group.scale.setScalar(R * 0.995); this.art.group.position.copy(cam.position); }
+    this.group.position.copy(cam.position); this.pts.scale.setScalar(R); this.lines.scale.setScalar(R); this.pano.scale.setScalar(R * 0.998); this.PU.uOp.value = op; this.mat.uniforms.op.value = op * (this.style === 'photo' ? 0.75 : 1);
     if (this.moon.visible) { this.moon.position.copy(this.moon.userData.d).multiplyScalar(R * 0.98); const s = R * Math.tan(1.6 * D2R) * 2; this.moon.scale.set(s, s, 1); this.moon.material.opacity = Math.min(1, op * 1.2); }
     this.stepMeteors(op);
     if (!this.showNames) return;

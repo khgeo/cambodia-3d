@@ -8,7 +8,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { t } from './i18n.js?v=109';
+import { t } from './i18n.js?v=110';
 
 const R_KM = 6371, D2R = Math.PI / 180;
 const MODELS = { iss: ['iss.glb', 109, 'NASA 3D Resources'], landsat: ['landsat8.glb', 10, 'NASA 3D Resources (Landsat 8)'], sentinel6: ['sentinel6.glb', 5.2, 'NASA 3D Resources'], goes: ['goes.glb', 20, 'NASA 3D Resources (GOES)'], generic: ['suomi.glb', 8, 'Illustrative model (NASA Suomi NPP)'] };

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Cambodia 3D Landscape</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-<link rel="stylesheet" href="css/app.css?v=109">
+<link rel="stylesheet" href="css/app.css?v=110">
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script type="importmap">
 {"imports":{
@@ -333,10 +333,11 @@
       <div class="row"><input type="range" id="skHour" min="0" max="24" step="0.25" style="flex:1"><b id="skHourLbl" style="width:42px;text-align:right"></b><button id="skPlay" style="flex:0 0 auto" title="Let the night pass">▶</button></div>
       <div class="row skchips"><label><input type="checkbox" id="skLines" checked> Constellation lines</label><label><input type="checkbox" id="skNames" checked> Names</label><label><input type="checkbox" id="skInsetOn" checked> Sky chart inset</label></div>
       <div id="skBodies" class="skbodies"></div>
+      <div class="row"><span>🌌 Sky look</span><select id="skStyle" style="flex:1"><option value="photo">Photo (long exposure)</option><option value="natural">Natural (as the eye sees it)</option><option value="chart">Star chart only</option></select></div>
       <div class="row skchips"><label><input type="checkbox" id="skMeteors" checked> 🌠 Meteors (120× faster)</label></div>
       <div id="skShowers" class="skShowers"></div>
       <div class="row"><select id="skLang" style="flex:1" title="Chart language"><option value="both">ខ្មែរ + English</option><option value="km">ខ្មែរ</option><option value="en">English</option></select><button id="skPng">⬇ Star chart PNG</button></div>
-      <div class="svhelp">Stars: Yale Bright Star Catalogue via d3-celestial (BSD-3). Planets and Moon computed in the browser (StarChart).</div>
+      <div class="svhelp">Milky Way photo: ESO/S. Brunier (CC BY 4.0). Stars: Yale Bright Star Catalogue via d3-celestial (BSD-3). Planets and Moon computed in the browser (StarChart).</div>
     </div>
   </div>
   <div id="skyInset" hidden><canvas id="skCanvas" width="440" height="440"></canvas><canvas id="skView" width="440" height="440"></canvas><button id="skBig" title="Bigger / smaller">⤢</button><div class="skcap">Tap the chart to look there</div></div>
@@ -687,6 +688,6 @@
   <div id="progress" hidden><div class="spin"></div><span id="progressText">Loading…</span></div>
   <button id="creditBtn" title="Show / hide the data credits">ⓘ</button><div id="credit"></div>
 </section>
-<script type="module" src="js/app.js?v=109"></script>
+<script type="module" src="js/app.js?v=110"></script>
 </body>
 </html>
