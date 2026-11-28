@@ -2,7 +2,7 @@
 // with the land owners. Uses the same engine as khgeo.github.io/srae-monitor: Earth Search STAC (AWS, no key),
 // Cloud-Optimized GeoTIFF windows read in the browser, SCL cloud mask, NDVI / EVI / NDMI / NDWI / NDRE.
 import * as THREE from 'three';
-import { t, lang } from './i18n.js?v=110';
+import { t, lang } from './i18n.js?v=111';
 import { searchScenes } from './srae/stac.js';
 import { toUtm, utmZone } from './srae/geo.js';
 import { INDICES, valueColor, gradientCss } from './srae/indices.js';
@@ -160,7 +160,7 @@ export const stageTip = st => st ? (km() ? st[8] : st[7]) : '';
 // rice plants in every field at its growth stage (the near-camera rice hills), water in the flooded paddies, stage tags
 Srae3D.prototype.stages = function (variety = 'medium') { const FL = this.fieldList(), S = this.S; return FL.map((f, k) => riceStage(f, S ? S.fields[k] : null, variety)); };
 Srae3D.prototype.plants = async function (on, variety = 'medium', tags = true) {
-  const w = this.w, RF = w._rf || (w._rf = await import('./ricefield.js?v=110')), FL = this.fieldList();
+  const w = this.w, RF = w._rf || (w._rf = await import('./ricefield.js?v=111')), FL = this.fieldList();
   if (this.water) { w.root.remove(this.water); this.water.geometry.dispose(); this.water.material.dispose(); this.water = null; }
   if (this.tags) { this.tags.traverse(o => { if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } if (o.geometry) o.geometry.dispose(); }); w.root.remove(this.tags); this.tags = null; }
   if (!on || !FL.length) { RF.FARM.stage = null; if (w._farmFields) RF.buildFieldMask(w, w._farmFields); else RF.FARM.mask = null; if (w.grass) w.grass.center.set(1e9, 0, 1e9); return null; }

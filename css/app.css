@@ -754,3 +754,7 @@ body.ride-on #toolDock,body.ride-on .catBtn,body.ride-on #hud,body.ride-on .rpan
 .cosSplit{display:flex;align-items:center;gap:8px;font-size:12.5px;margin:6px 0}.cosSplit input{flex:1}
 .fpsRow select{font-size:12px;margin-left:4px}
 @media (max-width:640px){.cosCard{max-height:calc(100vh - 380px)}.cosInt{top:auto!important;bottom:150px;max-height:35vh}}
+
+#hud .hudhide{position:absolute;left:36px;top:6px;width:26px;height:26px;padding:0;border-radius:13px;background:rgba(17,23,31,.7);font-size:13px;z-index:2}
+#hud.mini{width:auto;background:transparent;overflow:visible}#hud.mini canvas,#hud.mini .hudtext,#hud.mini .hudzoom{display:none}
+#hud.mini .hudhide{position:static;width:40px;height:40px;border-radius:20px;font-size:20px;background:rgba(17,23,31,.84);box-shadow:0 2px 8px rgba(0,0,0,.4)}

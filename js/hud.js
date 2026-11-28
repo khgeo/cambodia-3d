@@ -36,6 +36,9 @@ export class Hud {
     this.w = world; this.root = root; this.canvas = root.querySelector('canvas'); this.text = root.querySelector('.hudtext');
     this.zoom = 0; // 0 auto
     root.querySelector('.hudzoom').onclick = () => { this.zoom = (this.zoom + 1) % 4; };
+    // hide the inset map and coordinates down to a small button (remembered)
+    const hb = root.querySelector('.hudhide'), setMini = m => { root.classList.toggle('mini', m); hb.textContent = m ? '🗺️' : '▴'; hb.title = m ? 'Show the inset map' : 'Hide the inset map'; try { localStorage.setItem('cambodia3d.hudMini', m ? '1' : '0'); } catch (e) { } };
+    hb.onclick = e => { e.stopPropagation(); setMini(!root.classList.contains('mini')); }; try { setMini(localStorage.getItem('cambodia3d.hudMini') === '1'); } catch (e) { }
     setInterval(() => this.draw(), 120);
     // tap / click the inset map to jump there (walk: stand there; drive: nearest road; orbit: look there)
     this.canvas.addEventListener('pointerdown', e => {
@@ -69,7 +72,7 @@ export class Hud {
   }
   draw() {
     const w = this.w, h = w.hud, D = w.D, mc = w.miniCanvas;
-    if (this.root.hidden || !D || !mc || h.lat === undefined) return;
+    if (this.root.hidden || this.root.classList.contains('mini') || !D || !mc || h.lat === undefined) return;
     // sharp on hi-DPI screens: draw at the real pixel density, in 260 × 163 drawing units
     const cv = this.canvas, ctx = cv.getContext('2d'), S = 260, T = 163, dpr = Math.min(3, (cv.clientWidth || S) / S * (window.devicePixelRatio || 1));
     if (cv.width !== Math.round(S * dpr)) { cv.width = Math.round(S * dpr); cv.height = Math.round(T * dpr); } ctx.setTransform(dpr, 0, 0, dpr, 0, 0);

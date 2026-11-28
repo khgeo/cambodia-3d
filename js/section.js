@@ -57,7 +57,7 @@ export async function loadUnderground(world, say, opt = {}) {
   const a = world.D.aoi, pad = 0.01, U = { soil: {}, geo: null, soilOk: false };
   // geology raster crop (data/geology.png: unit id per 0.002° cell, rasterised from the ODC 2006 map)
   try {
-    const im = await loadImg('data/geology.png?v=110');
+    const im = await loadImg('data/geology.png?v=111');
     const x0 = Math.max(0, Math.floor((a.w - pad - GEO.w) / GEO.res)), x1 = Math.min(im.width, Math.ceil((a.e + pad - GEO.w) / GEO.res));
     const y0 = Math.max(0, Math.floor((GEO.n - (a.n + pad)) / GEO.res)), y1 = Math.min(im.height, Math.ceil((GEO.n - (a.s - pad)) / GEO.res));
     const c = document.createElement('canvas'); c.width = x1 - x0; c.height = y1 - y0; const ctx = c.getContext('2d', { willReadFrequently: true });

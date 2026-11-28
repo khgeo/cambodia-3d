@@ -1,7 +1,7 @@
 // Time of day (sun path, dusk, night with lit windows and stars), weather (clear, hazy, monsoon rain, storm with
 // lightning) and a cinematic flight around the area.
 import * as THREE from 'three';
-import { NIGHT } from './shaders.js?v=110';
+import { NIGHT } from './shaders.js?v=111';
 
 const clamp = THREE.MathUtils.clamp, lerp = THREE.MathUtils.lerp;
 export class Atmos {
@@ -54,6 +54,8 @@ export class Atmos {
     const w = this.w, cam = w.camera;
     this.stars.position.copy(cam.position); this.stars.scale.setScalar((w.extent || 3000) * 6);
     if (this.dome.visible) { this.dome.position.copy(cam.position); this.dome.scale.setScalar((w.extent || 3000) * 9); }
+    // at night the real sky (stars, planets, Milky Way photo) comes on by itself
+    if (!this.realSky && !this._autoSky && w.F && this.stars.material.opacity > 0.05) { this._autoSky = true; this.useRealSky(true); }
     if (this.sv && this.realSky) this.sv.frame(this.stars.material.opacity);
     if (this.rain.visible) {
       const p = this.rain.geometry.attributes.position, a = p.array, B = this.rainBox, sp = (this.weather === 'storm' ? 26 : 18) * dt, wind = (this.weather === 'storm' ? 4 : 1.2) * dt;
@@ -75,7 +77,7 @@ export class Atmos {
   async useRealSky(on) {
     this.realSky = !!on; this.stars.visible = !on;
     if (!on) { if (this.sv) this.sv.frame(0); return; }
-    if (!this.sv) { const { SkyView } = await import('./skyview.js?v=110'); this.sv = new SkyView(this.w); await this.sv.load(); }
+    if (!this.sv) { const { SkyView } = await import('./skyview.js?v=111'); this.sv = new SkyView(this.w); await this.sv.load(); }
     this.updateRealSky();
   }
   // the sky time: an exact date from the Night sky panel, or today at the scene hour (Cambodia time, UTC+7)

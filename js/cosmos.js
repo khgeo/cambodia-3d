@@ -6,10 +6,10 @@
 // Frame: equatorial J2000 with y = celestial north (the globe's frame turned by the sidereal time).
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { t, lang } from './i18n.js?v=110';
-import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=110';
-import { loadConArt, buildConstellations } from './conart.js?v=110';
-import { loadSmall, kepler, orbitLine, period, nextPerihelion, dateOfJd, jdOf, LEARN, SHOWERS, nextShowers, showerState } from './smallbodies.js?v=110';
+import { t, lang } from './i18n.js?v=111';
+import { VOYAGERS, makeTrack, voyagerModel } from './voyager.js?v=111';
+import { loadConArt, buildConstellations } from './conart.js?v=111';
+import { loadSmall, kepler, orbitLine, period, nextPerihelion, dateOfJd, jdOf, LEARN, SHOWERS, nextShowers, showerState } from './smallbodies.js?v=111';
 
 const D2R = Math.PI / 180, AU = 1.495978707e8, LY = 9.4607e12, ER = 6371, OBL = 23.43928 * D2R;
 const rev = x => ((x % 360) + 360) % 360;
@@ -455,7 +455,7 @@ export class Cosmos {
     const n = Math.pow(10, Math.floor(Math.log10(km))), nice = [1, 2, 5].map(k => k * n).filter(v => v <= km).pop() || n; this.uiBox.querySelector('#cosBar').style.width = (nice / km * px).toFixed(0) + 'px'; this.uiBox.querySelector('#cosScaleT').textContent = fmtKm(nice);
     const fo = this.item(this.focus); this.uiBox.querySelector('#cosLevel').textContent = fo && fo.body && D < fo.R * 60 ? (lang === 'km' && fo.km ? fo.km : t(fo.name)) : t(SCALES.find(([v]) => D < v)[1]); const dt = new Date(this.now()); this.uiBox.querySelector('#cosDate').textContent = dt.toISOString().slice(0, 16).replace('T', ' ') + ' UTC'; }
   hideLabels() { this.labelBox.hidden = true; this.uiBox.hidden = true; this.closeInterior(); }
-  async openInterior(o) { this.closeInterior(); const M = await import('./interior.js?v=110'), def = M.INTERIORS[o.id]; if (!def || !o.mesh) return;
+  async openInterior(o) { this.closeInterior(); const M = await import('./interior.js?v=111'), def = M.INTERIORS[o.id]; if (!def || !o.mesh) return;
     this.positions(this.now()); const p = this.pos[o.id], c = this.camAbs(), d = new THREE.Vector3(c[0] - p[0], c[1] - p[1], c[2] - p[2]).normalize();
     const I = new M.Interior(def, { E: M.octant(d), surface: U => M.cutMaterial(o.mesh.material, U), surfRot: o.mesh.quaternion.clone(), parent: this.scene }); I.setOn(true); this.interior = { I, id: o.id };
     const b = this.uiBox.querySelector('#cosInt'), nm = (en, km) => esc(lang === 'km' && km ? km : t(en)); b.hidden = false;
